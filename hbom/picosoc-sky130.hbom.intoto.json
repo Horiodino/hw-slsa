@@ -1,0 +1,221 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "caravel_psoc130.gds",
+      "digest": {"sha256": "8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071"}
+    },
+    {
+      "name": "urn:hslsa:lot:ASM-EXAMPLE-17",
+      "digest": {"sha256": "4876860b247bffbd0ceedf5bb53d278f9a25251619cd68dee4d740a4c73cbaf1"}
+    }
+  ],
+  "predicateType": "https://github.com/Horiodino/hw-slsa/hbom/v0.1",
+  "predicate": {
+    "hbomVersion": "0.1",
+    "product": {
+      "name": "picosoc-sky130",
+      "level": "package",
+      "partNumber": "PSOC130-QFN64",
+      "revision": "A0",
+      "manufacturer": {"name": "Example Open Silicon Group", "country": "US"},
+      "purl": "pkg:generic/picosoc-sky130@A0",
+      "deviceIdentity": {"scheme": "serial", "serial": "per unit; the shipped lot lists every serial"}
+    },
+    "renderings": [
+      {
+        "format": "CycloneDX-1.6",
+        "uri": "https://example.org/hbom/picosoc-sky130-A0.cdx.json",
+        "digest": {"sha256": "76e34c4548e2a2975f9305a557607abb7f3865a9bd592a7e7624a55a77d2f24b"}
+      }
+    ],
+    "design": {
+      "ipBlocks": [
+        {
+          "name": "picorv32",
+          "kind": "soft",
+          "supplier": {"name": "YosysHQ"},
+          "version": "v1.0",
+          "license": "ISC",
+          "source": {
+            "uri": "https://github.com/YosysHQ/picorv32",
+            "digest": {"gitCommit": "01afdda1b0e3ca89e503fda08c983a3a66340c5a"}
+          }
+        },
+        {
+          "name": "caravel harness",
+          "kind": "hard",
+          "supplier": {"name": "Efabless"},
+          "license": "Apache-2.0",
+          "source": {
+            "uri": "https://github.com/efabless/caravel",
+            "digest": {"gitCommit": "6240b3bd7435262681632af08c9b6b3bfbf6baad"}
+          }
+        },
+        {
+          "name": "sky130_fd_sc_hd",
+          "kind": "std-cell-library",
+          "supplier": {"name": "SkyWater Technology"},
+          "license": "Apache-2.0"
+        },
+        {
+          "name": "sky130_fd_io",
+          "kind": "io-library",
+          "supplier": {"name": "SkyWater Technology"},
+          "license": "Apache-2.0"
+        }
+      ],
+      "rtlSources": [
+        {
+          "repo": "https://github.com/example/picosoc-sky130",
+          "path": "rtl/",
+          "digest": {"gitCommit": "e06410c3136960fd33c56d41274fecfe11841906"},
+          "language": "Verilog"
+        }
+      ],
+      "pdk": {
+        "name": "sky130A (open_pdks)",
+        "version": "<open_pdks commit>",
+        "vendor": {"name": "SkyWater Technology"},
+        "digest": {"gitCommit": "a496cc6dcfea4d9f87c7431adbe08339419a3fbd"}
+      },
+      "flow": [
+        {
+          "step": "simulation",
+          "tools": [{"name": "Icarus Verilog", "version": "12.0", "purl": "pkg:github/steveicarus/iverilog@v12_0"}]
+        },
+        {
+          "step": "synthesis",
+          "tools": [{"name": "Yosys", "version": "0.46", "purl": "pkg:github/YosysHQ/yosys@v0.46"}],
+          "outputs": [
+            {
+              "uri": "file:runs/final/nl/user_project_wrapper.nl.v",
+              "digest": {"sha256": "fc026475b8786a706f6831d13838bb256ab0e1be5ae65e2ded1ae39a99420900"}
+            }
+          ],
+          "provenanceRef": {
+            "uri": "https://example.org/att/synth.intoto.jsonl",
+            "digest": {"sha256": "8048f7c30b224754081e0043e4d80c698c9b353ad086a11b2dcc000951c30af5"}
+          }
+        },
+        {
+          "step": "place-and-route",
+          "tools": [{"name": "OpenLane", "version": "2.x"}, {"name": "OpenROAD", "version": "<commit>"}],
+          "outputs": [
+            {
+              "uri": "file:runs/final/def/user_project_wrapper.def",
+              "digest": {"sha256": "cb8379ac2098aa165029e3938a51da0bcecfc008fd6795f401178647f96c5b34"}
+            }
+          ],
+          "provenanceRef": {
+            "uri": "https://example.org/att/pnr.intoto.jsonl",
+            "digest": {"sha256": "90b91f6b17c02f4377e84fb4114a8f751fd87d047a9208ed8d6c75a70b8b115f"}
+          }
+        },
+        {"step": "drc", "tools": [{"name": "Magic", "version": "8.3"}, {"name": "KLayout", "version": "0.29"}]},
+        {"step": "lvs", "tools": [{"name": "Netgen", "version": "1.5"}]},
+        {
+          "step": "release",
+          "tools": [{"name": "cosign", "version": "2.4.1", "purl": "pkg:github/sigstore/cosign@v2.4.1"}],
+          "outputs": [
+            {
+              "uri": "file:gds/caravel_psoc130.gds",
+              "digest": {"sha256": "8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071"},
+              "mediaType": "application/vnd.gdsii"
+            }
+          ],
+          "provenanceRef": {
+            "uri": "https://example.org/att/release.intoto.jsonl",
+            "digest": {"sha256": "49ecf35a64234b21ed0c646172f578480fc475e880aa13bd16d0add59dd56f10"}
+          }
+        }
+      ],
+      "finalLayout": {
+        "uri": "file:gds/caravel_psoc130.gds",
+        "digest": {"sha256": "8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071"},
+        "mediaType": "application/vnd.gdsii"
+      }
+    },
+    "manufacturing": {
+      "fab": {
+        "foundry": {"name": "SkyWater Technology", "country": "US", "site": "Bloomington, MN"},
+        "processNode": "SKY130 (130 nm CMOS)",
+        "maskSetId": "MS-EXAMPLE-0001",
+        "shuttle": "MPW-EXAMPLE-01",
+        "attestationRef": {
+          "uri": "https://example.org/att/f1-wafer-fab.intoto.jsonl",
+          "digest": {"sha256": "3f524cdc07a11d7c6220bdb049fe8dd41b27483c96cc59b581e022d547290d69"}
+        }
+      },
+      "waferLots": [{"lotId": "LOT-EXAMPLE-A", "waferIds": ["REDACTED"], "startDate": "2026-03-02"}],
+      "assembly": {
+        "osat": {"name": "Example OSAT", "country": "US"},
+        "packageType": "QFN-64 7x7 mm",
+        "assemblyLot": "ASM-EXAMPLE-17",
+        "dateCode": "2622",
+        "attestationRef": {
+          "uri": "https://example.org/att/f3-packaging.intoto.jsonl",
+          "digest": {"sha256": "625e0f649de27800fc3bcf4c118ef79f69dcb762c2e73fbb1cfce0e7a86f6b80"}
+        }
+      },
+      "test": [
+        {
+          "stage": "wafer-sort",
+          "site": {"name": "SkyWater Technology", "country": "US", "site": "Bloomington, MN"},
+          "program": {
+            "name": "psoc130-probe",
+            "version": "1.0.0",
+            "digest": {"sha256": "ba9c736f19e7f60b7f6764adb0b7908c0a2b394e09b6c09863528c7f2bc86095"}
+          },
+          "resultsRef": {
+            "uri": "https://example.org/att/f2-wafer-sort.intoto.jsonl",
+            "digest": {"sha256": "e4ab4e3b1493d5a997b4e51cdefbaa10570ef3ea9432bd72e7b6a89654ceb7f6"}
+          }
+        },
+        {
+          "stage": "final-test",
+          "site": {"name": "Example Test House", "country": "US"},
+          "program": {
+            "name": "psoc130-ft",
+            "version": "1.2.0",
+            "digest": {"sha256": "9adf009b9ea42792e73e5dc86e9c9024489d74ad894c0a3acbc03095158eaabc"}
+          },
+          "resultsRef": {
+            "uri": "https://example.org/att/f4-final-test.intoto.jsonl",
+            "digest": {"sha256": "608cdb524384f5ee06edc2830d6b13a92047229398768ff88e28ad68d02569e8"}
+          }
+        }
+      ]
+    },
+    "firmware": [
+      {
+        "name": "caravel management firmware",
+        "version": "<tag>",
+        "role": "bootloader",
+        "storage": "external-flash",
+        "digest": {"sha256": "d6e5d4d4d36d3a6f6bd89fc1f50364e0221fffa496a7625d973b14ef2e88ab95"},
+        "sbomRef": {
+          "uri": "https://example.org/sbom/mgmt-fw.spdx.json",
+          "digest": {"sha256": "cdbb608b62f133717bcc4e17284389a4d1c5a650c1c14a11f914d3ddeb112095"}
+        }
+      },
+      {
+        "name": "picosoc firmware",
+        "version": "0.3.0",
+        "role": "runtime",
+        "storage": "external-flash",
+        "digest": {"sha256": "69ccc925cfaab3d874d8a4ecd1d4cc76f278fcda7869d50f0f539cccf78d2ad2"},
+        "sbomRef": {
+          "uri": "https://example.org/sbom/picosoc-fw.cdx.json",
+          "digest": {"sha256": "5d04007a2eb998faa9a2e27f176ae4316c2903b26f0771379e78616e72ced1f6"}
+        }
+      }
+    ],
+    "redactions": [
+      {
+        "path": "/manufacturing/waferLots/0/waferIds",
+        "saltedDigest": {"sha256": "99eba9d39625f84a40323984610d7dd279e2f775fa4a833534e3a0e7ddf53331"}
+      }
+    ]
+  }
+}

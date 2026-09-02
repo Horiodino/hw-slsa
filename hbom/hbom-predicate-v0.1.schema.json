@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Horiodino/hw-slsa/hbom/v0.1/schema.json",
+  "title": "HBOM predicate v0.1",
+  "type": "object",
+  "required": ["hbomVersion", "product", "manufacturing"],
+  "additionalProperties": false,
+  "properties": {
+    "hbomVersion": {"const": "0.1"},
+    "product": {"$ref": "#/$defs/product"},
+    "renderings": {"type": "array", "items": {"$ref": "#/$defs/rendering"}},
+    "design": {"$ref": "#/$defs/design"},
+    "manufacturing": {"$ref": "#/$defs/manufacturing"},
+    "firmware": {"type": "array", "items": {"$ref": "#/$defs/firmware"}},
+    "parts": {"type": "array", "items": {"$ref": "#/$defs/part"}},
+    "redactions": {"type": "array", "items": {"$ref": "#/$defs/redaction"}}
+  },
+  "$defs": {
+    "digestSet": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"enum": ["sha256", "sha384", "sha512", "sha3-256", "gitCommit"]},
+      "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{40,128}$"}
+    },
+    "ref": {
+      "type": "object",
+      "required": ["uri", "digest"],
+      "additionalProperties": false,
+      "properties": {
+        "uri": {"type": "string", "format": "uri"},
+        "digest": {"$ref": "#/$defs/digestSet"},
+        "mediaType": {"type": "string"}
+      }
+    },
+    "org": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "id": {"type": "string", "description": "LEI, DUNS or CAGE, prefixed: lei:, duns:, cage:"},
+        "country": {"type": "string", "pattern": "^[A-Z]{2}$"},
+        "site": {"type": "string"}
+      }
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "purl": {"type": "string"},
+        "digest": {"$ref": "#/$defs/digestSet"}
+      }
+    },
+    "product": {
+      "type": "object",
+      "required": ["name", "level", "manufacturer"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "level": {
+          "enum": ["die", "package", "module", "board", "system"],
+          "description": "Hierarchy level only (what kind of product this is), not an assurance level"
+        },
+        "partNumber": {"type": "string"},
+        "revision": {"type": "string"},
+        "manufacturer": {"$ref": "#/$defs/org"},
+        "purl": {"type": "string"},
+        "cpe": {"type": "string"},
+        "deviceIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scheme": {"enum": ["DICE", "Caliptra", "TPM-EK", "PUF", "serial"]},
+            "certDigest": {"$ref": "#/$defs/digestSet"},
+            "serial": {"type": "string"}
+          }
+        }
+      }
+    },
+    "rendering": {
+      "type": "object",
+      "required": ["format", "uri", "digest"],
+      "additionalProperties": false,
+      "description": "Full CycloneDX or SPDX document for the same product, bound by digest",
+      "properties": {
+        "format": {"enum": ["CycloneDX-1.6", "SPDX-3.1"]},
+        "uri": {"type": "string", "format": "uri"},
+        "digest": {"$ref": "#/$defs/digestSet"}
+      }
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ipBlocks": {"type": "array", "items": {"$ref": "#/$defs/ipBlock"}},
+        "rtlSources": {"type": "array", "items": {"$ref": "#/$defs/rtlSource"}},
+        "pdk": {
+          "type": "object",
+          "required": ["name", "version"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {"type": "string"},
+            "version": {"type": "string"},
+            "vendor": {"$ref": "#/$defs/org"},
+            "digest": {"$ref": "#/$defs/digestSet"}
+          }
+        },
+        "flow": {"type": "array", "items": {"$ref": "#/$defs/flowStep"}},
+        "finalLayout": {"$ref": "#/$defs/ref"}
+      }
+    },
+    "ipBlock": {
+      "type": "object",
+      "required": ["name", "kind", "supplier"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "kind": {"enum": ["soft", "firm", "hard", "analog", "memory-compiler", "io-library", "std-cell-library"]},
+        "supplier": {"$ref": "#/$defs/org"},
+        "version": {"type": "string"},
+        "license": {"type": "string", "description": "SPDX license expression"},
+        "source": {"$ref": "#/$defs/ref"},
+        "encrypted": {"type": "boolean", "description": "IEEE 1735 encrypted delivery"}
+      }
+    },
+    "rtlSource": {
+      "type": "object",
+      "required": ["repo", "digest"],
+      "additionalProperties": false,
+      "properties": {
+        "repo": {"type": "string", "format": "uri"},
+        "path": {"type": "string"},
+        "digest": {"$ref": "#/$defs/digestSet"},
+        "language": {"enum": ["Verilog", "SystemVerilog", "VHDL", "Chisel", "SpinalHDL", "Amaranth", "other"]}
+      }
+    },
+    "flowStep": {
+      "type": "object",
+      "required": ["step", "tools"],
+      "additionalProperties": false,
+      "properties": {
+        "step": {
+          "enum": [
+            "lint",
+            "simulation",
+            "synthesis",
+            "floorplan",
+            "place-and-route",
+            "sta",
+            "drc",
+            "lvs",
+            "signoff",
+            "rom-merge",
+            "gds-merge",
+            "release",
+            "other"
+          ]
+        },
+        "tools": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/tool"}},
+        "outputs": {"type": "array", "items": {"$ref": "#/$defs/ref"}},
+        "provenanceRef": {
+          "$ref": "#/$defs/ref",
+          "description": "design-flow attestation for this step (https://github.com/Horiodino/hw-slsa/design-flow/v0.1)"
+        }
+      }
+    },
+    "manufacturing": {
+      "type": "object",
+      "required": ["fab"],
+      "additionalProperties": false,
+      "properties": {
+        "fab": {
+          "type": "object",
+          "required": ["foundry", "processNode"],
+          "additionalProperties": false,
+          "properties": {
+            "foundry": {"$ref": "#/$defs/org"},
+            "processNode": {"type": "string"},
+            "maskSetId": {"type": "string"},
+            "shuttle": {"type": "string"},
+            "attestationRef": {"$ref": "#/$defs/ref", "description": "F1 wafer fabrication manufacturing-step record"}
+          }
+        },
+        "waferLots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["lotId"],
+            "additionalProperties": false,
+            "properties": {
+              "lotId": {"type": "string"},
+              "waferIds": {"type": "array", "items": {"type": "string"}},
+              "startDate": {"type": "string", "format": "date"}
+            }
+          }
+        },
+        "assembly": {
+          "type": "object",
+          "required": ["osat", "packageType"],
+          "additionalProperties": false,
+          "properties": {
+            "osat": {"$ref": "#/$defs/org"},
+            "packageType": {"type": "string"},
+            "assemblyLot": {"type": "string"},
+            "dateCode": {"type": "string"},
+            "attestationRef": {"$ref": "#/$defs/ref", "description": "F3 packaging manufacturing-step record"}
+          }
+        },
+        "test": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["stage", "site"],
+            "additionalProperties": false,
+            "properties": {
+              "stage": {"enum": ["wafer-sort", "final-test", "burn-in", "system-level-test"]},
+              "site": {"$ref": "#/$defs/org"},
+              "program": {"$ref": "#/$defs/tool"},
+              "resultsRef": {
+                "$ref": "#/$defs/ref",
+                "description": "F2 (wafer sort) or F4 (final test) results, signed by that manufacturing-step record"
+              }
+            }
+          }
+        }
+      }
+    },
+    "firmware": {
+      "type": "object",
+      "required": ["name", "role", "digest"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "role": {"enum": ["boot-rom", "bootloader", "runtime", "microcode", "configuration"]},
+        "storage": {"enum": ["mask-rom", "otp", "on-die-flash", "external-flash"]},
+        "digest": {"$ref": "#/$defs/digestSet"},
+        "sbomRef": {"$ref": "#/$defs/ref"}
+      }
+    },
+    "part": {
+      "type": "object",
+      "required": ["manufacturer", "mpn"],
+      "additionalProperties": false,
+      "properties": {
+        "refDes": {"type": "array", "items": {"type": "string"}},
+        "manufacturer": {"$ref": "#/$defs/org"},
+        "mpn": {"type": "string"},
+        "dateCode": {"type": "string"},
+        "lot": {"type": "string"},
+        "distributor": {"$ref": "#/$defs/org"},
+        "authorized": {"type": "boolean", "description": "Bought through the manufacturer's authorized channel"},
+        "hbomRef": {"$ref": "#/$defs/ref", "description": "The part's own signed HBOM, when it has one"}
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "required": ["path", "saltedDigest"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "description": "JSON Pointer to the withheld field"},
+        "saltedDigest": {"$ref": "#/$defs/digestSet"}
+      }
+    }
+  }
+}

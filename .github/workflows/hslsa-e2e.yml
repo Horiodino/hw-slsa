@@ -1,0 +1,129 @@
+# End-to-end test of the HSLSA chain for the PicoRV32 example.
+#
+# Three jobs play three parties. "produce" is the design house and its
+# suppliers: it runs the real RTL flow and signs every record. "verify" is the
+# buyer: it gets only the public bundle, checks the whole chain, signs VSAs
+# and verifies them with the official slsa-verifier release.
+#
+# Private by design: signing uses local ECDSA keys in DSSE envelopes, and no
+# job requests an OIDC token or talks to Sigstore, so nothing about this repo
+# reaches a public transparency log. See docs/e2e-test.md.
+name: HSLSA end-to-end
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: hslsa-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  SLSA_VERIFIER_VERSION: v2.7.1
+  # sha256 of slsa-verifier-linux-amd64 v2.7.1, from SHA256SUM.md in slsa-framework/slsa-verifier
+  SLSA_VERIFIER_SHA256: 946dbec729094195e88ef78e1734324a27869f03e2c6bd2f61cbc06bd5350339
+
+jobs:
+  lint:
+    name: Lint and unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r tools/requirements.txt
+      - run: ruff check . && ruff format --check .
+      - name: Validate the committed HBOM example against its schema
+        run: |
+          PYTHONPATH=tools python -c "
+          import json; from hslsa.hbom import validate
+          validate(json.load(open('hbom/picosoc-sky130.hbom.intoto.json'))['predicate'])
+          print('hbom example: valid')"
+      - run: pytest -q
+
+  produce:
+    name: Produce (design flow and lot)
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r tools/requirements.txt
+      - name: Install Yosys and Icarus Verilog
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends yosys iverilog
+      - name: Run the flow and sign every step
+        run: e2e/run.sh produce
+      - name: Remove private keys before upload
+        run: rm -rf out/keys
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hslsa-bundle
+          path: out/bundle
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    name: Verify (buyer)
+    needs: produce
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r tools/requirements.txt
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hslsa-bundle
+          path: out/bundle
+      - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
+            "https://github.com/slsa-framework/slsa-verifier/releases/download/${SLSA_VERIFIER_VERSION}/slsa-verifier-linux-amd64"
+          echo "${SLSA_VERIFIER_SHA256}  $RUNNER_TEMP/slsa-verifier" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/slsa-verifier"
+          echo "SLSA_VERIFIER=$RUNNER_TEMP/slsa-verifier" >> "$GITHUB_ENV"
+      - name: Check the chain, sign VSAs, verify them with slsa-verifier
+        env:
+          HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
+        run: e2e/run.sh verify | tee verify.log
+      - name: Tamper tests
+        run: pytest -q -rA tests | tee tamper.log
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## HSLSA end-to-end"
+            echo '```'
+            cat verify.log 2>/dev/null || true
+            echo '```'
+            echo "### Tamper tests"
+            echo '```'
+            grep -E "^(PASSED|FAILED|ERROR)|passed|failed" tamper.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hslsa-vsa
+          path: out/vsa
+          if-no-files-found: error
+          retention-days: 14

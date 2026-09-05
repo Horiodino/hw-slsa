@@ -1,0 +1,23 @@
+{
+  "design": "picorv32",
+  "source": {
+    "repo": "https://github.com/YosysHQ/picorv32",
+    "commit": "ef203c2b0a3fb793280f5114941416c425c5b461",
+    "rawUrl": "https://raw.githubusercontent.com/YosysHQ/picorv32/{commit}/{path}",
+    "files": {
+      "picorv32.v": "0836050971b3c6cdd28ac3b1e5719a67fb645161912bef1e472e63995ceb0622",
+      "testbench_ez.v": "bc4bb99e07b5f49fcd0ae8cd3ccb6d071cf318a4d242853aecaa207c7d152be1"
+    }
+  },
+  "simulation": {
+    "top": "testbench",
+    "files": ["testbench_ez.v", "picorv32.v"],
+    "passMarker": "$finish called",
+    "activityMarker": "ifetch",
+    "minActivity": 100
+  },
+  "synthesis": {
+    "top": "picorv32",
+    "files": ["picorv32.v"]
+  }
+}

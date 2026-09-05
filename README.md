@@ -18,6 +18,8 @@ Status: working draft, version 0.1.
 | [`hbom/hbom-predicate-v0.1.schema.json`](hbom/hbom-predicate-v0.1.schema.json) | JSON Schema (2020-12) for the HBOM predicate |
 | [`hbom/picosoc-sky130.hbom.intoto.json`](hbom/picosoc-sky130.hbom.intoto.json) | Worked example: a PicoRV32 SoC on SkyWater SKY130 |
 | [`hbom/picosoc-sky130.shipped-lot.txt`](hbom/picosoc-sky130.shipped-lot.txt) | The example's shipped-lot unit list, for recomputing its lot digest |
+| [`tools/hslsa/`](tools/hslsa) | Reference tooling: signs step records, builds the HBOM, and verifies the chain into SLSA VSAs |
+| [`docs/e2e-test.md`](docs/e2e-test.md) | The end-to-end test in GitHub Actions: a real RTL flow, a signed lot, and verification with slsa-verifier |
 
 ## Identifiers
 

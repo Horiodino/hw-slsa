@@ -1,0 +1,8 @@
+# Pinned for the end-to-end test (see .github/workflows/hslsa-e2e.yml).
+cryptography==50.0.1
+in-toto-attestation==0.9.3
+jsonschema==4.26.0
+protobuf==7.36.2
+pytest==9.1.1
+ruff==0.16.9
+securesystemslib[crypto]==1.5.1

@@ -1,0 +1,12 @@
+{
+  "design": {
+    "requiredSteps": ["source-freeze", "simulation", "synthesis"],
+    "consumes": {"simulation": ["source-freeze"], "synthesis": ["source-freeze"]},
+    "finalArtifactFrom": "synthesis",
+    "allowedTools": ["iverilog", "vvp", "yosys"]
+  },
+  "claims": {
+    "design": ["HSLSA_DESIGN_LEVEL_1", "SLSA_BUILD_LEVEL_1"],
+    "lot": ["HSLSA_WAFER_LEVEL_2", "HSLSA_PACKAGE_TEST_LEVEL_2", "HSLSA_DESIGN_LEVEL_1"]
+  }
+}

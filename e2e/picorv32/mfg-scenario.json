@@ -1,0 +1,36 @@
+{
+  "product": {
+    "name": "picorv32-hslsa-e2e",
+    "level": "package",
+    "partNumber": "PSOC130-QFN64",
+    "revision": "A0",
+    "manufacturer": {"name": "Example Open Silicon Group", "country": "US"},
+    "deviceIdentity": {"scheme": "serial", "serial": "per unit; the shipped lot lists every serial"}
+  },
+  "fab": {
+    "id": "skywater",
+    "site": {"name": "Example Wafer Fab", "country": "US"},
+    "processNode": "SKY130 (130 nm CMOS)",
+    "maskSetId": "MS-EXAMPLE-0001"
+  },
+  "waferLot": {"lotId": "LOT-EXAMPLE-A", "wafers": ["W01", "W02"]},
+  "sort": {
+    "site": {"name": "Example Sort House", "country": "US"},
+    "program": {"name": "psoc130-probe", "version": "1.0.0"},
+    "grid": [5, 5],
+    "failedDies": [["W01", 2, 0], ["W01", 4, 3], ["W02", 0, 1], ["W02", 3, 4]]
+  },
+  "packaging": {
+    "site": {"name": "Example OSAT", "country": "US"},
+    "packageType": "QFN-64 7x7 mm",
+    "assemblyLot": "ASM-EXAMPLE-17",
+    "serialPrefix": "PSOC130-A0-",
+    "units": 40
+  },
+  "finalTest": {
+    "site": {"name": "Example Test House", "country": "US"},
+    "program": {"name": "psoc130-ft", "version": "1.2.0"},
+    "lotId": "ASM-EXAMPLE-17",
+    "failedUnits": ["PSOC130-A0-00007", "PSOC130-A0-00019", "PSOC130-A0-00033"]
+  }
+}

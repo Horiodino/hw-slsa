@@ -1,6 +1,6 @@
 # End-to-end test
 
-The workflow in [`.github/workflows/hslsa-e2e.yml`](../.github/workflows/hslsa-e2e.yml) builds one attestation chain from RTL to a shipped lot, checks it the way a buyer would, and hands the result to the official [slsa-verifier](https://github.com/slsa-framework/slsa-verifier). It runs on every pull request and every push to `main`.
+The workflow in [`.github/workflows/hslsa-e2e.yml`](../.github/workflows/hslsa-e2e.yml) builds one attestation chain from RTL to a shipped lot, checks it the way a buyer would, and hands the result to the official [slsa-verifier](https://github.com/slsa-framework/slsa-verifier). It runs on every pull request and every push to `main`. The same workflow then builds a board on the shipped chips and checks it; see [board-example.md](board-example.md).
 
 ## What runs
 

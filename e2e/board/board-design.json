@@ -1,0 +1,15 @@
+{
+  "note": "Released board design for the board-level example. Stands in for the full design package (schematic, Gerbers, pick-and-place); its digest is the board HBOM's design subject.",
+  "board": "PSOC-DEVB-01",
+  "revision": "A",
+  "bom": [
+    {"refDes": ["PCB1"], "manufacturer": "Example PCB Fab", "mpn": "PSOC-DEVB-01-PCB", "description": "Bare PCB, 4 layer FR-4, 50 x 40 mm"},
+    {"refDes": ["U1"], "manufacturer": "Example Open Silicon Group", "mpn": "PSOC130-QFN64", "description": "PicoSoC on SKY130, QFN-64 (the example chip)"},
+    {"refDes": ["U2"], "manufacturer": "Winbond Electronics", "mpn": "W25Q128JVSIQ", "description": "128 Mbit SPI NOR flash, SOIC-8, holds the bootloader and runtime images"},
+    {"refDes": ["U3"], "manufacturer": "Texas Instruments", "mpn": "TLV75518PDBVR", "description": "1.8 V 500 mA LDO for the core, SOT-23-5"},
+    {"refDes": ["U4"], "manufacturer": "Texas Instruments", "mpn": "TLV75533PDBVR", "description": "3.3 V 500 mA LDO for I/O and flash, SOT-23-5"},
+    {"refDes": ["Y1"], "manufacturer": "Abracon", "mpn": "ASE-12.000MHZ-LC-T", "description": "12 MHz CMOS oscillator, 3.2 x 2.5 mm"},
+    {"refDes": ["C1", "C2", "C3", "C4", "C5", "C6"], "manufacturer": "Murata Electronics", "mpn": "GRM188R61A106KE69D", "description": "10 uF 10 V X5R 0603 decoupling"},
+    {"refDes": ["R1", "R2"], "manufacturer": "YAGEO", "mpn": "RC0402FR-0710KL", "description": "10 kOhm 1% 0402 pull-ups"}
+  ]
+}

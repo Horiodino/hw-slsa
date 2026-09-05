@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import design, hbom, mfg, verify
+from . import board, design, hbom, mfg, verify
 from .common import TrustRoot, VerificationError, keygen, load_signer
 from .lot import lot_digest, read_units
 
@@ -56,6 +56,19 @@ def main(argv=None):
     v.add_argument("--vsa-key")
     v.add_argument("--vsa-out")
 
+    b = sub.add_parser("board", help="board-level example: shipments, A1 and board HBOM, or the buyer's board check")
+    b.add_argument("action", choices=["produce", "verify"])
+    b.add_argument("--bundle", required=True)
+    b.add_argument("--policy", required=True)
+    b.add_argument("--chip-bundle", help="produce: the chip vendor's bundle that ships with the chips")
+    b.add_argument("--scenario", help="produce: shipments and board build")
+    b.add_argument("--design", help="produce: the released board design")
+    b.add_argument("--keys", help="produce: directory of <role>.key.pem")
+    b.add_argument("--trust-root", help="verify: trust root for the board's signers")
+    b.add_argument("--boards", help="verify: file with the serials of the boards received")
+    b.add_argument("--vsa-key")
+    b.add_argument("--vsa-out")
+
     ld = sub.add_parser("lot-digest", help="compute the lot digest of a unit list")
     ld.add_argument("file")
 
@@ -91,6 +104,10 @@ def main(argv=None):
             hbom.build(a.bundle, a.lock, a.scenario, a.key)
         elif a.cmd == "verify":
             verify.run(a.bundle, TrustRoot.load(a.trust_root), a.policy, a.units, a.vsa_key, a.vsa_out)
+        elif a.cmd == "board" and a.action == "produce":
+            board.produce(a.bundle, a.chip_bundle, a.scenario, a.design, a.policy, a.keys)
+        elif a.cmd == "board":
+            board.run(a.bundle, TrustRoot.load(a.trust_root), a.policy, a.boards, a.vsa_key, a.vsa_out)
         elif a.cmd == "lot-digest":
             print(lot_digest(read_units(a.file)))
     except VerificationError as e:

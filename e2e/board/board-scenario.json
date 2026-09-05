@@ -1,0 +1,53 @@
+{
+  "note": "Manufacturers and part numbers are real. Distributors, sites, shipment IDs, lot codes, date codes and dates are placeholders, so every such value starts with EXAMPLE or Example.",
+  "product": {
+    "name": "picosoc-devboard",
+    "level": "board",
+    "partNumber": "PSOC-DEVB-01",
+    "revision": "A",
+    "manufacturer": {"name": "Example Open Silicon Group", "country": "US"},
+    "deviceIdentity": {"scheme": "serial", "serial": "per board; the board lot lists every serial"}
+  },
+  "chip": {"mpn": "PSOC130-QFN64", "bundle": "parts/picosoc"},
+  "shipments": [
+    {
+      "id": "EXAMPLE-SHIP-0001",
+      "shipper": {"name": "Example Franchised Distributor", "country": "US"},
+      "shipDate": "2026-09-14",
+      "lines": [
+        {
+          "manufacturer": "Example Open Silicon Group",
+          "mpn": "PSOC130-QFN64",
+          "lot": "ASM-EXAMPLE-17",
+          "dateCode": "EXAMPLE-2636",
+          "quantity": 8,
+          "units": [
+            "PSOC130-A0-00001", "PSOC130-A0-00002", "PSOC130-A0-00003", "PSOC130-A0-00004",
+            "PSOC130-A0-00005", "PSOC130-A0-00006", "PSOC130-A0-00008", "PSOC130-A0-00009"
+          ]
+        },
+        {"manufacturer": "Winbond Electronics", "mpn": "W25Q128JVSIQ", "lot": "EXAMPLE-WB-LOT-0001", "dateCode": "EXAMPLE-2621", "quantity": 10},
+        {"manufacturer": "Texas Instruments", "mpn": "TLV75518PDBVR", "lot": "EXAMPLE-TI-LOT-0001", "dateCode": "EXAMPLE-2618", "quantity": 10},
+        {"manufacturer": "Texas Instruments", "mpn": "TLV75533PDBVR", "lot": "EXAMPLE-TI-LOT-0002", "dateCode": "EXAMPLE-2619", "quantity": 10},
+        {"manufacturer": "Abracon", "mpn": "ASE-12.000MHZ-LC-T", "lot": "EXAMPLE-AB-LOT-0001", "dateCode": "EXAMPLE-2611", "quantity": 10},
+        {"manufacturer": "Murata Electronics", "mpn": "GRM188R61A106KE69D", "lot": "EXAMPLE-MU-LOT-0001", "dateCode": "EXAMPLE-2602", "quantity": 100},
+        {"manufacturer": "YAGEO", "mpn": "RC0402FR-0710KL", "lot": "EXAMPLE-YG-LOT-0001", "dateCode": "EXAMPLE-2605", "quantity": 100}
+      ]
+    },
+    {
+      "id": "EXAMPLE-SHIP-0002",
+      "shipper": {"name": "Example PCB Fab", "country": "US"},
+      "shipDate": "2026-09-15",
+      "lines": [
+        {"manufacturer": "Example PCB Fab", "mpn": "PSOC-DEVB-01-PCB", "lot": "EXAMPLE-PCB-LOT-01", "dateCode": "EXAMPLE-2637", "quantity": 8}
+      ]
+    }
+  ],
+  "assembly": {
+    "site": {"name": "Example EMS", "country": "US"},
+    "boardLot": "BRD-EXAMPLE-01",
+    "serialPrefix": "DEVB-A-",
+    "boards": 6,
+    "failedBoards": ["DEVB-A-0004"]
+  }
+}

@@ -5,6 +5,16 @@
   "type": "object",
   "required": ["hbomVersion", "product", "manufacturing"],
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"product": {"properties": {"level": {"enum": ["die", "package"]}}}}},
+      "then": {"properties": {"manufacturing": {"required": ["fab"]}}}
+    },
+    {
+      "if": {"properties": {"product": {"properties": {"level": {"enum": ["module", "board", "system"]}}}}},
+      "then": {"required": ["parts"], "properties": {"manufacturing": {"required": ["boardAssembly"]}}}
+    }
+  ],
   "properties": {
     "hbomVersion": {"const": "0.1"},
     "product": {"$ref": "#/$defs/product"},
@@ -169,7 +179,7 @@
     },
     "manufacturing": {
       "type": "object",
-      "required": ["fab"],
+      "minProperties": 1,
       "additionalProperties": false,
       "properties": {
         "fab": {
@@ -207,6 +217,17 @@
             "assemblyLot": {"type": "string"},
             "dateCode": {"type": "string"},
             "attestationRef": {"$ref": "#/$defs/ref", "description": "F3 packaging manufacturing-step record"}
+          }
+        },
+        "boardAssembly": {
+          "type": "object",
+          "required": ["ems"],
+          "additionalProperties": false,
+          "description": "Board, module or system build (Assembly track)",
+          "properties": {
+            "ems": {"$ref": "#/$defs/org"},
+            "boardLot": {"type": "string"},
+            "attestationRef": {"$ref": "#/$defs/ref", "description": "A1 board assembly manufacturing-step record"}
           }
         },
         "test": {
@@ -253,7 +274,11 @@
         "lot": {"type": "string"},
         "distributor": {"$ref": "#/$defs/org"},
         "authorized": {"type": "boolean", "description": "Bought through the manufacturer's authorized channel"},
-        "hbomRef": {"$ref": "#/$defs/ref", "description": "The part's own signed HBOM, when it has one"}
+        "hbomRef": {"$ref": "#/$defs/ref", "description": "The part's own signed HBOM, when it has one"},
+        "distributionRef": {
+          "$ref": "#/$defs/ref",
+          "description": "Signed distribution record from whoever shipped this lot to the assembler (distributor, or the manufacturer shipping direct)"
+        }
       }
     },
     "redaction": {

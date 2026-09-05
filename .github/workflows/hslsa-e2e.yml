@@ -46,12 +46,12 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install -r tools/requirements.txt
       - run: ruff check . && ruff format --check .
-      - name: Validate the committed HBOM example against its schema
+      - name: Validate the committed HBOM examples against their schema
         run: |
           PYTHONPATH=tools python -c "
           import json; from hslsa.hbom import validate
-          validate(json.load(open('hbom/picosoc-sky130.hbom.intoto.json'))['predicate'])
-          print('hbom example: valid')"
+          for f in ['hbom/picosoc-sky130.hbom.intoto.json', 'hbom/picosoc-devboard.hbom.intoto.json']:
+              validate(json.load(open(f))['predicate']); print(f, 'valid')"
       - run: pytest -q
 
   produce:
@@ -70,12 +70,20 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends yosys iverilog
       - name: Run the flow and sign every step
         run: e2e/run.sh produce
+      - name: Build the board on the shipped chips and sign shipments, A1 and the board HBOM
+        run: e2e/board/run.sh produce
       - name: Remove private keys before upload
-        run: rm -rf out/keys
+        run: rm -rf out/keys out/board-keys
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hslsa-bundle
           path: out/bundle
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hslsa-board-bundle
+          path: out/board
           if-no-files-found: error
           retention-days: 14
 
@@ -95,6 +103,10 @@ jobs:
         with:
           name: hslsa-bundle
           path: out/bundle
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hslsa-board-bundle
+          path: out/board
       - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
         run: |
           curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
@@ -106,6 +118,10 @@ jobs:
         env:
           HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
         run: e2e/run.sh verify | tee verify.log
+      - name: Check the board, sign its VSA, verify it with slsa-verifier
+        env:
+          HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
+        run: e2e/board/run.sh verify | tee -a verify.log
       - name: Tamper tests
         run: pytest -q -rA tests | tee tamper.log
       - name: Summary

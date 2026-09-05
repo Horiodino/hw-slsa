@@ -1,0 +1,248 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "digest": {
+        "sha256": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+      },
+      "name": "board-design.json"
+    },
+    {
+      "digest": {
+        "sha256": "d0c032429682df39bdf9a3d23021639f0987ce5695367cdd6c83283053657462"
+      },
+      "name": "urn:hslsa:lot:BRD-EXAMPLE-01"
+    }
+  ],
+  "predicateType": "https://github.com/Horiodino/hw-slsa/hbom/v0.1",
+  "predicate": {
+    "hbomVersion": "0.1",
+    "product": {
+      "deviceIdentity": {
+        "scheme": "serial",
+        "serial": "per board; the board lot lists every serial"
+      },
+      "level": "board",
+      "manufacturer": {
+        "country": "US",
+        "name": "Example Open Silicon Group"
+      },
+      "name": "picosoc-devboard",
+      "partNumber": "PSOC-DEVB-01",
+      "revision": "A"
+    },
+    "design": {
+      "finalLayout": {
+        "digest": {
+          "sha256": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+        },
+        "uri": "file:artifacts/board-design.json"
+      }
+    },
+    "manufacturing": {
+      "boardAssembly": {
+        "attestationRef": {
+          "digest": {
+            "sha256": "b35e5a01848ffa65b7da76812c0c6e624cfcf6307babe83cdb9c9f28e31d654b"
+          },
+          "uri": "file:att/mfg-a1-board-assembly.intoto.json"
+        },
+        "boardLot": "BRD-EXAMPLE-01",
+        "ems": {
+          "country": "US",
+          "name": "Example EMS"
+        }
+      }
+    },
+    "parts": [
+      {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2637",
+        "distributionRef": {
+          "digest": {
+            "sha256": "9d75db87b328fee1aedaa1f56ec156d4974c6f0cfd97bb819b29b170975e8f97"
+          },
+          "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0002.intoto.json"
+        },
+        "distributor": {
+          "country": "US",
+          "name": "Example PCB Fab"
+        },
+        "lot": "EXAMPLE-PCB-LOT-01",
+        "manufacturer": {
+          "name": "Example PCB Fab"
+        },
+        "mpn": "PSOC-DEVB-01-PCB",
+        "refDes": [
+          "PCB1"
+        ]
+      },
+      {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2636",
+        "distributionRef": {
+          "digest": {
+            "sha256": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+          },
+          "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+          "country": "US",
+          "name": "Example Franchised Distributor"
+        },
+        "hbomRef": {
+          "digest": {
+            "sha256": "60aefdafe82fd9b79c194c8e3ca459cf3646c2a588c414b4c3344df426427482"
+          },
+          "uri": "file:parts/picosoc/att/hbom.intoto.json"
+        },
+        "lot": "ASM-EXAMPLE-17",
+        "manufacturer": {
+          "name": "Example Open Silicon Group"
+        },
+        "mpn": "PSOC130-QFN64",
+        "refDes": [
+          "U1"
+        ]
+      },
+      {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2621",
+        "distributionRef": {
+          "digest": {
+            "sha256": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+          },
+          "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+          "country": "US",
+          "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-WB-LOT-0001",
+        "manufacturer": {
+          "name": "Winbond Electronics"
+        },
+        "mpn": "W25Q128JVSIQ",
+        "refDes": [
+          "U2"
+        ]
+      },
+      {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2618",
+        "distributionRef": {
+          "digest": {
+            "sha256": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+          },
+          "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+          "country": "US",
+          "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-TI-LOT-0001",
+        "manufacturer": {
+          "name": "Texas Instruments"
+        },
+        "mpn": "TLV75518PDBVR",
+        "refDes": [
+          "U3"
+        ]
+      },
+      {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2619",
+        "distributionRef": {
+          "digest": {
+            "sha256": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+          },
+          "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+          "country": "US",
+          "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-TI-LOT-0002",
+        "manufacturer": {
+          "name": "Texas Instruments"
+        },
+        "mpn": "TLV75533PDBVR",
+        "refDes": [
+          "U4"
+        ]
+      },
+      {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2611",
+        "distributionRef": {
+          "digest": {
+            "sha256": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+          },
+          "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+          "country": "US",
+          "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-AB-LOT-0001",
+        "manufacturer": {
+          "name": "Abracon"
+        },
+        "mpn": "ASE-12.000MHZ-LC-T",
+        "refDes": [
+          "Y1"
+        ]
+      },
+      {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2602",
+        "distributionRef": {
+          "digest": {
+            "sha256": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+          },
+          "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+          "country": "US",
+          "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-MU-LOT-0001",
+        "manufacturer": {
+          "name": "Murata Electronics"
+        },
+        "mpn": "GRM188R61A106KE69D",
+        "refDes": [
+          "C1",
+          "C2",
+          "C3",
+          "C4",
+          "C5",
+          "C6"
+        ]
+      },
+      {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2605",
+        "distributionRef": {
+          "digest": {
+            "sha256": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+          },
+          "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+          "country": "US",
+          "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-YG-LOT-0001",
+        "manufacturer": {
+          "name": "YAGEO"
+        },
+        "mpn": "RC0402FR-0710KL",
+        "refDes": [
+          "R1",
+          "R2"
+        ]
+      }
+    ]
+  }
+}

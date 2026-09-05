@@ -1,0 +1,17 @@
+{
+  "note": "The buyer's policy for the board. Each shipper signs with its own role in the trust root and may ship, as an authorized channel, only the manufacturers listed for it.",
+  "shippers": {
+    "Example Franchised Distributor": {
+      "role": "dist-franchised",
+      "authorizedFor": [
+        "Example Open Silicon Group", "Winbond Electronics", "Texas Instruments", "Abracon", "Murata Electronics", "YAGEO"
+      ]
+    },
+    "Example Components Broker": {"role": "dist-broker", "authorizedFor": []},
+    "Example PCB Fab": {"role": "pcb-fab", "authorizedFor": ["Example PCB Fab"]}
+  },
+  "requireAuthorizedChannel": true,
+  "claims": {
+    "board": ["HSLSA_ASSEMBLY_LEVEL_2"]
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "caliptraSw": {
+    "repo": "https://github.com/chipsalliance/caliptra-sw",
+    "tag": "fw-2.1.3",
+    "commit": "b99535ded32492d6c23bbc56f95e787a1e275b59",
+    "rustToolchain": "1.96"
+  },
+  "caliptraRtl": {
+    "repo": "https://github.com/chipsalliance/caliptra-rtl",
+    "commit": "49370266d12cb0c4a8f71b3a0ff7e54ba7d4866e",
+    "tree": "f22d8e011d5240ba83d06ca44024e3b7662432ac"
+  },
+  "adamsBridge": {
+    "repo": "https://github.com/chipsalliance/adams-bridge",
+    "commit": "b77e3d899e828d626cfc2a0d26a6b5704cc121e0",
+    "tree": "9e297da511fd17c465523f39e7480185ada034f4"
+  },
+  "rtl": {
+    "top": "caliptra_top",
+    "fileList": "src/integration/config/caliptra_top.vf",
+    "verilatorFlags": [
+      "--timing", "--timescale", "1ns/1ps", "-Wno-fatal", "+define+RV_OPENSOURCE", "+define+VERILATOR",
+      "-Wno-WIDTH", "-Wno-UNOPTFLAT", "-Wno-LITENDIAN", "-Wno-CMPCONST", "-Wno-MULTIDRIVEN", "-Wno-UNPACKED",
+      "-Wno-UNSIGNED", "-Wno-REALCVT", "-Wno-SELRANGE", "-Wno-PINMISSING", "-Wno-TIMESCALEMOD", "-Wno-BLKANDNBLK"
+    ]
+  },
+  "rom": {
+    "frozenName": "caliptra-rom-no-log.bin",
+    "definesFile": "src/integration/rtl/config_defines.svh",
+    "sizeDefine": "CALIPTRA_IMEM_BYTE_SIZE"
+  },
+  "firmware": {"fwSvn": 1, "fwSvnFuse": 1}
+}

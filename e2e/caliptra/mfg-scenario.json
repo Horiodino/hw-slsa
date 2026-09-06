@@ -1,0 +1,42 @@
+{
+  "product": {
+    "name": "caliptra-hslsa-e2e",
+    "level": "package",
+    "partNumber": "CLP21-EXAMPLE-BGA",
+    "revision": "A0",
+    "manufacturer": {"name": "Example Open Silicon Group", "country": "US"},
+    "deviceIdentity": {"scheme": "Caliptra"}
+  },
+  "fab": {
+    "id": "example-fab",
+    "site": {"name": "Example Wafer Fab", "country": "US"},
+    "processNode": "Example 22 nm",
+    "maskSetId": "MS-CLP-0001"
+  },
+  "waferLot": {"lotId": "LOT-CLP-A", "wafers": ["W01", "W02"]},
+  "sort": {
+    "site": {"name": "Example Sort House", "country": "US"},
+    "program": {"name": "clp21-probe", "version": "1.0.0"},
+    "grid": [4, 3],
+    "failedDies": [["W01", 1, 1], ["W02", 3, 0]]
+  },
+  "packaging": {
+    "site": {"name": "Example OSAT", "country": "US"},
+    "packageType": "FCBGA-400 17x17 mm",
+    "assemblyLot": "ASM-CLP-03",
+    "serialPrefix": "CLP-",
+    "units": 8
+  },
+  "finalTest": {
+    "site": {"name": "Example Test House", "country": "US"},
+    "program": {"name": "clp21-ft", "version": "1.0.0"},
+    "lotId": "ASM-CLP-03",
+    "failedUnits": ["CLP-00006"]
+  },
+  "provisioning": {
+    "id": "urn:hslsa:station:example-test-house:ps-01",
+    "site": {"name": "Example Test House", "country": "US"},
+    "hsm": "urn:hslsa:hsm:example-test-house:hsm-01",
+    "signer": "test-site"
+  }
+}

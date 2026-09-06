@@ -1,0 +1,20 @@
+{
+  "design": {
+    "requiredSteps": ["source-freeze", "lint", "rom-merge"],
+    "consumes": {"lint": ["source-freeze"], "rom-merge": ["source-freeze"]},
+    "finalArtifactFrom": "rom-merge",
+    "allowedTools": ["verilator"]
+  },
+  "firmware": {
+    "romSha384": "ebb8f80e28967898420fbf763de1609565551dece63fa949d75b38fca44052e3d022698b512fa18184cfe3313501f281",
+    "vendorPkHash": "30399676a17e3e973677b3ff862f4bf2d1932d884778453c376fe00dc93fb8aa0770f3ebf3411a0853e9c57ece8a2980",
+    "minSvn": 1,
+    "provisioningSigner": "test-site"
+  },
+  "claims": {
+    "design": ["HSLSA_DESIGN_LEVEL_1", "SLSA_BUILD_LEVEL_1"],
+    "lot": ["HSLSA_WAFER_LEVEL_2", "HSLSA_PACKAGE_TEST_LEVEL_2", "HSLSA_DESIGN_LEVEL_1"],
+    "firmware": ["HSLSA_FIRMWARE_LEVEL_2", "SLSA_BUILD_LEVEL_2"],
+    "device": ["HSLSA_FIRMWARE_LEVEL_2", "HSLSA_PACKAGE_TEST_LEVEL_2", "HSLSA_WAFER_LEVEL_2", "HSLSA_DESIGN_LEVEL_1"]
+  }
+}

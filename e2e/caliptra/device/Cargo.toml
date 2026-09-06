@@ -1,0 +1,26 @@
+# The simulated device: boots Caliptra's emulator (caliptra-sw hw-model) with one
+# unit's fuses, ROM and firmware, and reads back what the silicon proves.
+# Path dependencies point into the pinned caliptra-sw checkout that
+# e2e/caliptra/run.sh fetches into e2e/caliptra/.src (see caliptra.lock.json).
+[package]
+name = "hslsa-caliptra-device"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[workspace]
+
+[dependencies]
+anyhow = "1.0.70"
+caliptra-api = { path = "../.src/caliptra-sw/api" }
+caliptra-api-types = { path = "../.src/caliptra-sw/api/types" }
+caliptra-hw-model = { path = "../.src/caliptra-sw/hw-model" }
+caliptra-image-types = { path = "../.src/caliptra-sw/image/types", default-features = false }
+hex = "0.4.3"
+serde_json = "1.0"
+sha2 = "0.10.8"
+zerocopy = { version = "0.8.17", features = ["derive"] }
+
+[profile.release]
+opt-level = 3

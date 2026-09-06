@@ -21,6 +21,7 @@ Status: working draft, version 0.1.
 | [`hbom/picosoc-devboard.hbom.intoto.json`](hbom/picosoc-devboard.hbom.intoto.json) | Board-level example: the PicoSoC and off-the-shelf parts, with `parts[]` and distributor lot data |
 | [`tools/hslsa/`](tools/hslsa) | Reference tooling: signs step records, builds the HBOM, and verifies the chain into SLSA VSAs |
 | [`docs/e2e-test.md`](docs/e2e-test.md) | The end-to-end test in GitHub Actions: a real RTL flow, a signed lot, and verification with slsa-verifier |
+| [`docs/caliptra-e2e.md`](docs/caliptra-e2e.md) | The Caliptra example: from pinned RTL, ROM and firmware to units that boot and prove their identity, checked back to the RTL |
 | [`docs/board-example.md`](docs/board-example.md) | The board-level example: signed shipments, A1 board assembly and the board HBOM, checked in the same workflow |
 
 ## Identifiers

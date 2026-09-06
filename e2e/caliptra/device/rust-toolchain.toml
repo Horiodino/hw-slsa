@@ -1,0 +1,4 @@
+# Same toolchain as the pinned caliptra-sw checkout.
+[toolchain]
+channel = "1.96"
+profile = "minimal"

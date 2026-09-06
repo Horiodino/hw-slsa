@@ -1,0 +1,29 @@
+{
+  "design": "spm",
+  "source": {
+    "repo": "https://github.com/efabless/openlane2",
+    "commit": "b89f7866fd3d19da470220baf89d0e7804962941",
+    "rawUrl": "https://raw.githubusercontent.com/efabless/openlane2/{commit}/{path}",
+    "files": {
+      "openlane/examples/spm/config.yaml": "60a066d25b18dc025935cc40875b10d5032625e542a4ea6297a770fd18108787",
+      "openlane/examples/spm/pin_order.cfg": "fbc9931852a7112d2f8500137da1364d737f99d099dd264837dd12adcd65e9f6",
+      "openlane/examples/spm/src/spm.v": "2b5ae06da8168106cf0f39fe473faa38fd97ba2fb7887b2dd5e4a38560f47eac",
+      "openlane/examples/spm/src/impl.sdc": "c0fd7c528565389f6ae25994a1add7a607293ddcb312a1c13710a038e53b407d",
+      "openlane/examples/spm/src/signoff.sdc": "ba25b5e3740d162836bf0ded5dd0b42c4b5de7dfe9cecb9a043760b4c181e3c4"
+    }
+  },
+  "openlane": {
+    "version": "2.3.10",
+    "image": "ghcr.io/efabless/openlane2:2.3.10@sha256:37c3bd4ea0534a276cb2deb88d601044857bad2807b9bc5b36efe9d02c62624e",
+    "flow": "Classic",
+    "config": "openlane/examples/spm/config.yaml",
+    "runTag": "hslsa"
+  },
+  "pdk": {
+    "family": "sky130",
+    "variant": "sky130A",
+    "scl": "sky130_fd_sc_hd",
+    "openPdksCommit": "0fe599b2afb6708d281543108caf8310912f54af",
+    "source": "https://github.com/fossi-foundation/ciel-releases"
+  }
+}

@@ -103,6 +103,7 @@ def source_freeze(bundle, lock_path, key, cache):
     for name, want in sorted(src["files"].items()):
         path = cache / name
         if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
             url = src["rawUrl"].format(commit=src["commit"], path=name)
             with urllib.request.urlopen(url, timeout=60) as resp:
                 path.write_bytes(resp.read())

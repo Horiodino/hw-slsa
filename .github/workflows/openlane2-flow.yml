@@ -1,0 +1,113 @@
+# OpenLane 2 RTL-to-GDS for the spm example, with a signed record per step,
+# run twice on separate runners and compared for reproducibility.
+#
+# "flow" runs once per builder: it freezes the source, runs the pinned
+# OpenLane image on the pinned SKY130 PDK, signs each step as it finishes,
+# and signs the tapeout release of the final GDS. "compare" verifies both
+# chains and reports which step outputs are bit-exact across the two runs.
+#
+# Private by design, as in hslsa-e2e.yml: local ECDSA keys in DSSE
+# envelopes, no OIDC token, nothing sent to a transparency log.
+name: OpenLane 2 attested flow
+
+on:
+  push:
+    branches: [main]
+    paths: [openlane2/**, tools/hslsa/**, tools/requirements.txt, .github/workflows/openlane2-flow.yml]
+  pull_request:
+    paths: [openlane2/**, tools/hslsa/**, tools/requirements.txt, .github/workflows/openlane2-flow.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: openlane2-flow-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  CIEL_VERSION: "3.0.0"
+
+jobs:
+  flow:
+    name: Flow (builder ${{ matrix.builder }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        builder: [a, b]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r tools/requirements.txt "ciel==${CIEL_VERSION}"
+      - name: Pull the pinned OpenLane image
+        run: docker pull "$(jq -r .openlane.image openlane2/spm/flow.lock.json)"
+      - name: Enable the pinned SKY130 PDK
+        run: |
+          echo "PDK_ROOT=$RUNNER_TEMP/pdk" >> "$GITHUB_ENV"
+          ciel enable --pdk-root "$RUNNER_TEMP/pdk" --pdk-family "$(jq -r .pdk.family openlane2/spm/flow.lock.json)" \
+            "$(jq -r .pdk.openPdksCommit openlane2/spm/flow.lock.json)"
+      - name: Run OpenLane and sign every step
+        run: openlane2/run.sh produce
+      - name: Remove private keys before upload
+        if: always()
+        run: rm -rf out/openlane2/keys
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Builder ${{ matrix.builder }} on $(uname -n)"
+            echo '```'
+            jq -c '{exitCode, steps: (.steps | length), unfinished}' out/openlane2/bundle/openlane/run.json 2>/dev/null || true
+            tail -n 30 out/openlane2/bundle/openlane/openlane.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: openlane2-${{ matrix.builder }}
+          path: out/openlane2/bundle
+          if-no-files-found: error
+          retention-days: 14
+
+  compare:
+    name: Verify both runs and compare
+    needs: flow
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r tools/requirements.txt
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: openlane2-a
+          path: runs/a
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: openlane2-b
+          path: runs/b
+      - name: Verify both chains, compare every step, sign the rebuild record
+        run: openlane2/run.sh compare runs/a runs/b
+      - name: Summary
+        if: always()
+        run: cat out/openlane2/report/reproducibility.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openlane2-reproducibility
+          path: out/openlane2/report
+          if-no-files-found: error
+          retention-days: 14

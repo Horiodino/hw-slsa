@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import design, hbom, mfg, openlane, verify
+from . import board, caliptra, design, hbom, mfg, openlane, verify
 from .common import TrustRoot, VerificationError, keygen, load_signer, write_json
 from .lot import lot_digest, read_units
 
@@ -69,6 +69,59 @@ def main(argv=None):
     ol.add_argument("--other-run-dir", help="compare: the second run's run directory")
     ol.add_argument("--report", help="compare: directory for the JSON and Markdown report")
 
+    c = sub.add_parser("caliptra", help="the Caliptra example (e2e/caliptra)")
+    csub = c.add_subparsers(dest="action", required=True)
+    ca = csub.add_parser("ca", help="create the IDevID endorsement CA key")
+    ca.add_argument("--keys", required=True)
+    ca.add_argument("--name", default="HSLSA Example Caliptra IDevID CA")
+    cf = csub.add_parser("firmware", help="sign provenance and SBOMs for the built images")
+    cf.add_argument("--bundle", required=True)
+    cf.add_argument("--lock", required=True)
+    cf.add_argument("--build-dir", required=True)
+    cf.add_argument("--key", required=True)
+    cd = csub.add_parser("design", help="run and attest one design step")
+    cd.add_argument("step", choices=["source-freeze", "lint", "rom-merge", "release"])
+    cd.add_argument("--bundle", required=True)
+    cd.add_argument("--lock", required=True)
+    cd.add_argument("--key", required=True)
+    cd.add_argument("--trust-root")
+    cd.add_argument("--policy")
+    cfab = csub.add_parser("fab", help="write the mask ROM every unit carries")
+    cfab.add_argument("--bundle", required=True)
+    cfab.add_argument("--devices", required=True)
+    cp = csub.add_parser("provision", help="program every shipped unit and sign fw-provisioning records")
+    cp.add_argument("--bundle", required=True)
+    cp.add_argument("--devices", required=True)
+    cp.add_argument("--keys", required=True)
+    cp.add_argument("--device-bin", required=True)
+    cp.add_argument("--scenario", required=True)
+    cp.add_argument("--lock", required=True)
+    ch = csub.add_parser("hbom", help="build, validate and sign the HBOM")
+    ch.add_argument("--bundle", required=True)
+    ch.add_argument("--lock", required=True)
+    ch.add_argument("--scenario", required=True)
+    ch.add_argument("--key", required=True)
+    cv = csub.add_parser("verify", help="tapeout, lot, firmware and at-boot checks, then VSAs")
+    cv.add_argument("--bundle", required=True)
+    cv.add_argument("--trust-root", required=True)
+    cv.add_argument("--policy", required=True)
+    cv.add_argument("--units", required=True)
+    cv.add_argument("--boots", required=True)
+    cv.add_argument("--vsa-key")
+    cv.add_argument("--vsa-out")
+    b = sub.add_parser("board", help="board-level example: shipments, A1 and board HBOM, or the buyer's board check")
+    b.add_argument("action", choices=["produce", "verify"])
+    b.add_argument("--bundle", required=True)
+    b.add_argument("--policy", required=True)
+    b.add_argument("--chip-bundle", help="produce: the chip vendor's bundle that ships with the chips")
+    b.add_argument("--scenario", help="produce: shipments and board build")
+    b.add_argument("--design", help="produce: the released board design")
+    b.add_argument("--keys", help="produce: directory of <role>.key.pem")
+    b.add_argument("--trust-root", help="verify: trust root for the board's signers")
+    b.add_argument("--boards", help="verify: file with the serials of the boards received")
+    b.add_argument("--vsa-key")
+    b.add_argument("--vsa-out")
+
     ld = sub.add_parser("lot-digest", help="compute the lot digest of a unit list")
     ld.add_argument("file")
 
@@ -104,6 +157,12 @@ def main(argv=None):
             hbom.build(a.bundle, a.lock, a.scenario, a.key)
         elif a.cmd == "verify":
             verify.run(a.bundle, TrustRoot.load(a.trust_root), a.policy, a.units, a.vsa_key, a.vsa_out)
+        elif a.cmd == "caliptra":
+            run_caliptra(a)
+        elif a.cmd == "board" and a.action == "produce":
+            board.produce(a.bundle, a.chip_bundle, a.scenario, a.design, a.policy, a.keys)
+        elif a.cmd == "board":
+            board.run(a.bundle, TrustRoot.load(a.trust_root), a.policy, a.boards, a.vsa_key, a.vsa_out)
         elif a.cmd == "openlane":
             run_openlane(a)
         elif a.cmd == "lot-digest":
@@ -141,6 +200,30 @@ def run_openlane(a):
         if a.key:
             openlane.rebuild_record(report, a.bundle, a.key, out / "rebuild.intoto.json")
         print(openlane.markdown(report))
+
+
+def run_caliptra(a):
+    if a.action == "ca":
+        caliptra.identity_ca(a.keys, a.name)
+    elif a.action == "firmware":
+        caliptra.firmware(a.bundle, a.lock, a.build_dir, a.key)
+    elif a.action == "design":
+        if a.step == "source-freeze":
+            caliptra.source_freeze(a.bundle, a.lock, a.key)
+        elif a.step == "lint":
+            caliptra.lint(a.bundle, a.lock, a.key)
+        elif a.step == "rom-merge":
+            caliptra.rom_merge(a.bundle, a.lock, a.key)
+        else:
+            caliptra.release(a.bundle, a.key, a.trust_root, a.policy)
+    elif a.action == "fab":
+        caliptra.fab(a.bundle, a.devices)
+    elif a.action == "provision":
+        caliptra.provision(a.bundle, a.devices, a.keys, a.device_bin, a.scenario, a.lock)
+    elif a.action == "hbom":
+        caliptra.hbom(a.bundle, a.lock, a.scenario, a.key)
+    else:
+        caliptra.verify(a.bundle, TrustRoot.load(a.trust_root), a.policy, a.units, a.boots, a.vsa_key, a.vsa_out)
 
 
 if __name__ == "__main__":

@@ -550,6 +550,7 @@ TS_PATTERNS = [
     r" +\d{1,2}:\d{2}:\d{2}(?: +[A-Z]{3,4})? +\d{4}",
     r"\d{1,2}/\d{1,2}/\d{2,4}(?: +\d{1,2}:\d{2}(?::\d{2})?)?",
     r"\b\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\b",
+    r"(?<=^timestamp )\d+$",  # Magic .mag files stamp each cell with Unix epoch seconds
     r"\b\d+(?:\.\d+)? ?(?:s|sec|secs|seconds|ms|MB|MiB|GB|KB|kB)\b",
 ]
 
@@ -560,7 +561,7 @@ def normalize_text(data, hosts=()):
         if h:
             text = text.replace(h, "<host>")
     for pattern in TS_PATTERNS:
-        text = re.sub(pattern, "<t>", text)
+        text = re.sub(pattern, "<t>", text, flags=re.M)
     return text
 
 

@@ -72,6 +72,27 @@ also signs a draft `rebuild` record for the released GDS, with the checks
 evidence Design L4 asks for. Here it comes from a second runner of the same
 operator, so it is not yet an independent rebuild.
 
+### First measurement (CI run 36544446344, 2026-09-08)
+
+Both runs used identical inputs: the same source, image, PDK tree digest and
+tool binaries. The flow had 74 steps and 176 attested outputs.
+
+- 157 of the 176 outputs are bit-exact, and 69 of the 74 steps have every output
+  bit-exact. This includes every netlist, ODB, DEF, LEF and SDC, and the
+  DRC, LVS and XOR results.
+- The other 19 differ only in embedded timestamps: the SDF headers (STA pre-
+  and post-PNR), the SPEF headers (RCX), the GDS BGNLIB/BGNSTR dates from Magic
+  and KLayout, and the `timestamp` line in Magic's `.mag`.
+- None of the outputs differ in content, so the final GDS is equal to the
+  other run's once its dates are cleared. It is not byte-identical.
+- The logs and reports differ as expected, in runtimes, memory figures, host
+  names and dates.
+
+So reaching bit-exact needs no change to placement or routing. The stream-out
+and extraction steps only need a fixed date, for example by setting
+`SOURCE_DATE_EPOCH` or by post-processing the GDS header, and the verifier could
+then require `gds-bit-exact`.
+
 `tests/test_openlane.py` exercises the chain checks and the classifier on a
 synthetic run, so the lint job covers them without OpenLane.
 

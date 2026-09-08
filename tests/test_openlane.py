@@ -260,6 +260,8 @@ def test_classify():
         == "timestamps"
     )
     assert openlane.classify(b"\0odb1", b"\0odb2", "x.odb")[0] == "content"
+    mag = b"magic\ntech sky130A\nmagscale 1 2\ntimestamp %d\n"
+    assert openlane.classify(mag % 1790671539, mag % 1790671554, "spm.mag")[0] == "timestamps"
 
 
 def test_spec_step_mapping_covers_classic_flow():

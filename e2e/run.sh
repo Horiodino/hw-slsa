@@ -13,8 +13,12 @@ E2E=$ROOT/e2e/picorv32
 OUT=${OUT:-$ROOT/out}
 BUNDLE=$OUT/bundle
 KEYS=$OUT/keys
-export PYTHONPATH=$ROOT/tools
-hslsa() { python3 -m hslsa "$@"; }
+# The Go reference tool; set HSLSA to use a prebuilt binary instead of building it here.
+if [[ -z "${HSLSA:-}" ]]; then
+  HSLSA=$ROOT/bin/hslsa
+  (cd "$ROOT" && go build -o "$HSLSA" ./tools/hslsa/cmd/hslsa)
+fi
+hslsa() { "$HSLSA" "$@"; }
 
 produce() {
   rm -rf "$BUNDLE" "$KEYS"
@@ -62,8 +66,8 @@ verify() {
   local sv=${SLSA_VERIFIER:-slsa-verifier}
   local keyid final lot
   keyid=$(hslsa keyid --key "$vsa_dir/verifier.pub.pem")
-  final=$(python3 -c "import json,sys;from hslsa.verify import decode;s=decode(sys.argv[1])['subject'][0];print(s['name'],s['digest']['sha256'])" "$vsa_dir/design.vsa.intoto.json")
-  lot=$(python3 -c "import json,sys;from hslsa.verify import decode;s=decode(sys.argv[1])['subject'][0];print(s['name'],s['digest']['sha256'])" "$vsa_dir/lot.vsa.intoto.json")
+  final=$(hslsa subject "$vsa_dir/design.vsa.intoto.json")
+  lot=$(hslsa subject "$vsa_dir/lot.vsa.intoto.json")
   local common=(--verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1
                 --public-key-path "$vsa_dir/verifier.pub.pem" --public-key-id "$keyid")
 

@@ -20,9 +20,13 @@ BUNDLE=$OUT/bundle
 DEVICES=$OUT/devices
 KEYS=$OUT/keys
 DEVICE_BIN=${DEVICE_BIN:-$BUILD/hslsa-caliptra-device}
-export PYTHONPATH=$ROOT/tools
-hslsa() { python3 -m hslsa "$@"; }
-pin() { python3 -c "import json,sys;d=json.load(open('$E2E/caliptra.lock.json'));print(d[sys.argv[1]][sys.argv[2]])" "$@"; }
+# The Go reference tool; set HSLSA to use a prebuilt binary instead of building it here.
+if [[ -z "${HSLSA:-}" ]]; then
+  HSLSA=$ROOT/bin/hslsa
+  (cd "$ROOT" && go build -o "$HSLSA" ./tools/hslsa/cmd/hslsa)
+fi
+hslsa() { "$HSLSA" "$@"; }
+pin() { jq -r --arg a "$1" --arg b "$2" '.[$a][$b]' "$E2E/caliptra.lock.json"; }
 
 checkout() {
   local dir=$1 repo=$2 commit=$3
@@ -137,17 +141,14 @@ verify() {
   local unit tampered=$OUT/tampered
   unit=$(head -1 "$E2E/received-units.txt")
   mkdir -p "$tampered"
-  python3 - "$DEVICES/$unit/flash.bin" "$tampered/flash.bin" "$BUNDLE/artifacts/fw-manifest.json" <<'EOF'
-import json, sys
-data = bytearray(open(sys.argv[1], "rb").read())
-rt = json.load(open(sys.argv[3]))["runtime"]
-at = len(data) - rt["size"] // 2  # a byte inside the runtime image
-data[at] ^= 0x01
-open(sys.argv[2], "wb").write(data)
-EOF
+  # Flip one bit in a byte inside the runtime image.
+  cp "$DEVICES/$unit/flash.bin" "$tampered/flash.bin"
+  local at byte
+  at=$(( $(stat -c %s "$tampered/flash.bin") - $(jq .runtime.size "$BUNDLE/artifacts/fw-manifest.json") / 2 ))
+  byte=$(od -An -tu1 -j "$at" -N1 "$tampered/flash.bin" | tr -d ' ')
+  printf "$(printf '\\x%02x' $(( byte ^ 1 )))" | dd of="$tampered/flash.bin" bs=1 seek="$at" conv=notrunc status=none
   expect_refused "a runtime image with one bit flipped" 0x000b0016 "$tampered/rt" "$tampered/flash.bin" "$DEVICES/$unit/fuses.json"
-  python3 -c "import json,sys;f=json.load(open(sys.argv[1]));f['vendorPkHash']='00'*48;json.dump(f,open(sys.argv[2],'w'))" \
-    "$DEVICES/$unit/fuses.json" "$tampered/fuses.json"
+  jq --arg zero "$(printf '0%.0s' $(seq 96))" '.vendorPkHash = $zero' "$DEVICES/$unit/fuses.json" > "$tampered/fuses.json"
   expect_refused "firmware on a unit fused for another vendor key" 0x000b0003 "$tampered/vk" "$DEVICES/$unit/flash.bin" "$tampered/fuses.json"
 
   echo "== buyer checks"
@@ -166,7 +167,7 @@ EOF
   keyid=$(hslsa keyid --key "$vsa_dir/verifier.pub.pem")
   local common=(--verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1
                 --public-key-path "$vsa_dir/verifier.pub.pem" --public-key-id "$keyid")
-  subject() { python3 -c "import sys;from hslsa.verify import decode;s=decode(sys.argv[1])['subject'][0];print(s['name'],s['digest']['sha256'])" "$1"; }
+  subject() { hslsa subject "$1"; }
   check_vsa() {
     local file=$1 uri=$2; shift 2
     local s; s=$(subject "$vsa_dir/$file")

@@ -13,9 +13,9 @@ name: OpenLane 2 attested flow
 on:
   push:
     branches: [main]
-    paths: [openlane2/**, tools/hslsa/**, tools/requirements.txt, .github/workflows/openlane2-flow.yml]
+    paths: [openlane2/**, tools/hslsa/**, go.mod, go.sum, .github/workflows/openlane2-flow.yml]
   pull_request:
-    paths: [openlane2/**, tools/hslsa/**, tools/requirements.txt, .github/workflows/openlane2-flow.yml]
+    paths: [openlane2/**, tools/hslsa/**, go.mod, go.sum, .github/workflows/openlane2-flow.yml]
   workflow_dispatch:
 
 permissions:
@@ -46,10 +46,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # ciel is the PDK manager OpenLane uses; it is a Python package.
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install -r tools/requirements.txt "ciel==${CIEL_VERSION}"
+      - run: pip install "ciel==${CIEL_VERSION}"
       - name: Pull the pinned OpenLane image
         run: docker pull "$(jq -r .openlane.image openlane2/spm/flow.lock.json)"
       - name: Enable the pinned SKY130 PDK
@@ -88,10 +92,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install -r tools/requirements.txt
+          go-version-file: go.mod
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: openlane2-a

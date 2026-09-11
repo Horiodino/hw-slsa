@@ -12,8 +12,12 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 LOCK=$ROOT/openlane2/spm/flow.lock.json
 OUT=${OUT:-$ROOT/out/openlane2}
-export PYTHONPATH=$ROOT/tools
-hslsa() { python3 -m hslsa "$@"; }
+# The Go reference tool; set HSLSA to use a prebuilt binary instead of building it here.
+if [[ -z "${HSLSA:-}" ]]; then
+  HSLSA=$ROOT/bin/hslsa
+  (cd "$ROOT" && go build -o "$HSLSA" ./tools/hslsa/cmd/hslsa)
+fi
+hslsa() { "$HSLSA" "$@"; }
 
 produce() {
   local bundle=$OUT/bundle keys=$OUT/keys work=$OUT/work
@@ -28,7 +32,7 @@ produce() {
   hslsa openlane run --bundle "$bundle" --lock "$LOCK" --key "$keys/flow-platform.key.pem" \
     --work "$work" --pdk-root "$PDK_ROOT"
   local run_dir
-  run_dir=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['runDir'])" "$bundle/openlane/run.json")
+  run_dir=$(jq -r .runDir "$bundle/openlane/run.json")
   hslsa openlane release --bundle "$bundle" --run-dir "$run_dir" --lock "$LOCK" \
     --key "$keys/tapeout-authority.key.pem" --trust-root "$bundle/trust-root.json"
   hslsa openlane verify --bundle "$bundle" --run-dir "$run_dir" --trust-root "$bundle/trust-root.json"

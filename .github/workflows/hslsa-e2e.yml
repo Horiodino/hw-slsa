@@ -41,17 +41,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: gofmt and go vet
+        run: |
+          unformatted=$(gofmt -l .)
+          [[ -z $unformatted ]] || { echo "gofmt needed: $unformatted"; exit 1; }
+          go vet ./...
+      - run: go test ./...
+      - name: Validate the committed HBOM examples against their schema
+        run: go run ./tools/hslsa/cmd/hslsa validate-hbom hbom/picosoc-sky130.hbom.intoto.json hbom/picosoc-devboard.hbom.intoto.json
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install -r tools/requirements.txt
       - run: ruff check . && ruff format --check .
-      - name: Validate the committed HBOM examples against their schema
-        run: |
-          PYTHONPATH=tools python -c "
-          import json; from hslsa.hbom import validate
-          for f in ['hbom/picosoc-sky130.hbom.intoto.json', 'hbom/picosoc-devboard.hbom.intoto.json']:
-              validate(json.load(open(f))['predicate']); print(f, 'valid')"
       - run: pytest -q
 
   produce:
@@ -62,10 +67,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install -r tools/requirements.txt
+          go-version-file: go.mod
       - name: Install Yosys and Icarus Verilog
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends yosys iverilog
       - name: Run the flow and sign every step
@@ -95,6 +99,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -122,8 +129,8 @@ jobs:
         env:
           HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
         run: e2e/board/run.sh verify | tee -a verify.log
-      - name: Tamper tests
-        run: pytest -q -rA tests | tee tamper.log
+      - name: Tamper tests, with the Go binary as verifier and chain producer
+        run: HSLSA_BIN=$PWD/bin/hslsa pytest -q -rA tests | tee tamper.log
       - name: Summary
         if: always()
         run: |

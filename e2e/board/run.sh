@@ -14,8 +14,12 @@ OUT=${OUT:-$ROOT/out}
 CHIP=$OUT/bundle
 BUNDLE=$OUT/board
 KEYS=$OUT/board-keys
-export PYTHONPATH=$ROOT/tools
-hslsa() { python3 -m hslsa "$@"; }
+# The Go reference tool; set HSLSA to use a prebuilt binary instead of building it here.
+if [[ -z "${HSLSA:-}" ]]; then
+  HSLSA=$ROOT/bin/hslsa
+  (cd "$ROOT" && go build -o "$HSLSA" ./tools/hslsa/cmd/hslsa)
+fi
+hslsa() { "$HSLSA" "$@"; }
 
 produce() {
   rm -rf "$BUNDLE" "$KEYS"
@@ -45,7 +49,7 @@ verify() {
 
   local sv=${SLSA_VERIFIER:-slsa-verifier} keyid lot
   keyid=$(hslsa keyid --key "$vsa_dir/board-verifier.pub.pem")
-  lot=$(python3 -c "import sys;from hslsa.verify import decode;s=decode(sys.argv[1])['subject'][0];print(s['name'],s['digest']['sha256'])" "$vsa_dir/board.vsa.intoto.json")
+  lot=$(hslsa subject "$vsa_dir/board.vsa.intoto.json")
   local args=(--verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1
               --public-key-path "$vsa_dir/board-verifier.pub.pem" --public-key-id "$keyid"
               --attestation-path "$vsa_dir/board.vsa.intoto.json" --resource-uri "${lot% *}")

@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 
 BIN = os.environ.get("HSLSA_BIN")
+# The CLI requires --lock on every design step, release included; the Python function takes none.
+CALIPTRA_LOCK = Path(__file__).resolve().parents[1] / "e2e" / "caliptra" / "caliptra.lock.json"
 
 
 def go(*args):
@@ -84,7 +86,19 @@ def go_parity():
         caliptra,
         "release",
         lambda b, key, tr, pol: go(
-            "caliptra", "design", "release", "--bundle", b, "--key", key, "--trust-root", tr, "--policy", pol
+            "caliptra",
+            "design",
+            "release",
+            "--bundle",
+            b,
+            "--lock",
+            CALIPTRA_LOCK,
+            "--key",
+            key,
+            "--trust-root",
+            tr,
+            "--policy",
+            pol,
         ),
     )
     mp.setattr(

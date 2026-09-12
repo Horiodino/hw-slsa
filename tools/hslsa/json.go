@@ -10,9 +10,9 @@ import (
 	"strconv"
 )
 
-// Obj is a JSON object. Records are handled as generic JSON, as the Python
-// reference tool did, so a verifier or a test can re-sign a record it did not
-// write without dropping fields it does not know.
+// Obj is a JSON object. Records are handled as generic JSON, so a verifier or
+// a test can re-sign a record it did not write without dropping fields it does
+// not know.
 type Obj = map[string]any
 
 // get walks nested objects by key and returns nil when any step is missing.
@@ -222,7 +222,7 @@ func ReadObj(path string) (Obj, error) {
 }
 
 // readLenientObj reads a JSON object that may hold the bare NaN, Infinity
-// and -Infinity tokens Python's json module writes. They become the strings
+// and -Infinity tokens OpenLane (Python's json module) writes. They become the strings
 // "nan", "inf" and "-inf", which is how records carry them.
 func readLenientObj(path string) (Obj, error) {
 	data, err := os.ReadFile(path)
@@ -301,7 +301,7 @@ func sortedKeys[V any](m map[string]V) []string {
 }
 
 // num formats a JSON number or other scalar the way Python's str() would for
-// the values records hold.
+// the values records hold, so messages match those of the earlier Python tool.
 func num(v any) string {
 	switch x := v.(type) {
 	case json.Number:

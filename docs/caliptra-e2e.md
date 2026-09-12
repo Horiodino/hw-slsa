@@ -26,7 +26,7 @@ All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/ca
 
 - Physical design. Caliptra's SystemVerilog does not go through Yosys, so there is no synthesis, place and route or GDS. The release subject is the RTL with the ROM merged, standing in for the GDS.
 - Booting on the RTL. Caliptra's emulator models the RTL. Booting the same ROM on caliptra-sw's Verilator model would make the booted device the RTL itself, but it needs Verilator 5.006 built from source and a much larger runner than a standard one.
-- Only the ECC P-384 half of Caliptra's certificate chain is checked. Caliptra 2.x also issues an ML-DSA-87 chain; the Python `cryptography` version pinned here cannot verify ML-DSA.
+- Only the ECC P-384 half of Caliptra's certificate chain is checked. Caliptra 2.x also issues an ML-DSA-87 chain; Go's `crypto/x509`, which the verifier uses, cannot verify ML-DSA certificates.
 
 ## Levels claimed
 
@@ -57,7 +57,7 @@ Firmware L3 is out of reach: it needs SLSA Build L3, an independent review, and 
 
 ## What the tamper tests prove
 
-[`tests/test_caliptra_e2e.py`](../tests/test_caliptra_e2e.py) breaks the chain in 22 ways and requires each to fail for the stated reason. As in the PicoRV32 tests, the fixture re-signs the bundle with test keys so it can forge validly signed records:
+[`tools/hslsa/caliptra_test.go`](../tools/hslsa/caliptra_test.go) breaks the chain in 22 ways and requires each to fail for the stated reason. As in the PicoRV32 tests, the fixture re-signs the bundle with test keys so it can forge validly signed records:
 
 - **The device:** a certificate from another unit, a missing alias certificate, an LDevID certificate with the right names signed by the wrong key, a received unit that failed final test.
 - **Provisioning:** another unit's record, a record signed by the wrong site, a record edited without re-signing, an IDevID endorsed by another CA. Also records that lie about the vendor fuses, the SVN fuse or the design release, and a policy minimum SVN above the image.
@@ -72,12 +72,11 @@ The same rules as [the PicoRV32 test](e2e-test.md#keys-and-privacy) apply. Nothi
 
 ## Running it locally
 
-You need Python 3.11 or later, Verilator, rustup and a slsa-verifier binary. The first build takes about 15 minutes.
+You need Go (the version in [`go.mod`](../go.mod)), Verilator, rustup and a slsa-verifier binary. The first build takes about 15 minutes.
 
 ```sh
-pip install -r tools/requirements.txt
 SLSA_VERIFIER=/path/to/slsa-verifier e2e/caliptra/run.sh all
-pytest -q tests/test_caliptra_e2e.py
+go test ./tools/hslsa/
 ```
 
 Sources are checked out into `e2e/caliptra/.src/` and output goes to `out/caliptra/`.

@@ -6,7 +6,7 @@ The workflow in [`.github/workflows/hslsa-e2e.yml`](../.github/workflows/hslsa-e
 
 | Job | Plays | Does |
 | --- | --- | --- |
-| Lint and unit tests | | `ruff`, validates the committed HBOM example against its schema, and checks the example's lot digest can be recomputed from its unit list |
+| Lint and unit tests | | `gofmt`, `go vet` and `go test` (bundle-free tests only), validates the committed HBOM examples against their schema, and checks the example's lot digest can be recomputed from its unit list |
 | Produce | Design house, tapeout authority, fab, sort house, OSAT, test house, product owner | Runs the design flow, signs each step, releases the design, signs F1 to F4 for a lot, builds and signs the HBOM. Uploads the bundle without any private key |
 | Verify | Buyer | Receives only the bundle, runs the tapeout check and the lot receipt check, signs two SLSA Verification Summary Attestations, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
 
@@ -29,7 +29,7 @@ Design stops at L1 even though the flow platform signs every step, because Desig
 
 ## What the tamper tests prove
 
-[`tests/test_e2e.py`](../tests/test_e2e.py) breaks the chain in 24 ways and requires each to fail for the stated reason. The fixture re-signs the bundle with test keys so it can also forge records with valid signatures, which is what an insider at one site could do:
+[`tools/hslsa/e2e_test.go`](../tools/hslsa/e2e_test.go) breaks the chain in 24 ways and requires each to fail for the stated reason. The fixture re-signs the bundle with test keys so it can also forge records with valid signatures, which is what an insider at one site could do:
 
 - files swapped after signing (netlist, source archive, simulation log, wafer maps, genealogy), a unit added to the shipped lot, a received unit that was scrapped at final test
 - a missing step, a payload edited without re-signing, a step signed by an unknown key, a release signed by the flow platform instead of the tapeout authority, a record copied from another site
@@ -64,17 +64,16 @@ slsa-verifier verify-vsa \
   --verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1 \
   --verified-level HSLSA_PACKAGE_TEST_LEVEL_2 \
   --public-key-path verifier.pub.pem \
-  --public-key-id "$(PYTHONPATH=tools python -m hslsa keyid --key verifier.pub.pem)"
+  --public-key-id "$(go run ./tools/hslsa/cmd/hslsa keyid --key verifier.pub.pem)"
 ```
 
 ## Running it locally
 
-Needs Python 3.11 or later, Yosys, Icarus Verilog and a slsa-verifier binary:
+Needs Go (the version in [`go.mod`](../go.mod)), Yosys, Icarus Verilog and a slsa-verifier binary. The scripts build the reference tool into `bin/hslsa`; set `HSLSA` to use a binary you built yourself.
 
 ```sh
-pip install -r tools/requirements.txt
 SLSA_VERIFIER=/path/to/slsa-verifier e2e/run.sh all
-pytest -q
+go test ./...
 ```
 
 ## Moving to public Sigstore later

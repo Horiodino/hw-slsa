@@ -31,7 +31,7 @@ The EMS receives 8 chips from shipped lot `ASM-EXAMPLE-17`, runs the chip's tape
 
 ## What the buyer checks
 
-`python -m hslsa board verify` ([`tools/hslsa/board.py`](../tools/hslsa/board.py)), then a signed SLSA VSA for the board lot checked with slsa-verifier:
+`hslsa board verify` ([`tools/hslsa/board.go`](../tools/hslsa/board.go)), then a signed SLSA VSA for the board lot checked with slsa-verifier:
 
 1. The board HBOM is signed by the board owner, matches the schema, and its lot subject is A1's board lot.
 2. A1 is signed by the EMS, passed its gates, names the same board design, and consumes every shipment record and the chip's lot and HBOM.
@@ -40,7 +40,7 @@ The EMS receives 8 chips from shipped lot `ASM-EXAMPLE-17`, runs the chip's tape
 5. `parts[]` covers exactly the board design's reference designators; every placement is a listed lot; no chip is placed twice or placed without being shipped; no lot is placed more often than it was shipped.
 6. The board lot is the set of boards that passed test, A1's yield accounts for the rest, and every shipped board is an A1 subject. Received boards are in the lot.
 
-[`tests/test_board.py`](../tests/test_board.py) breaks these links in 24 ways and requires each to fail for the stated reason, including a swapped part lot, a changed date code, flash bought from a broker (both marked unauthorized and falsely marked authorized), more parts placed than shipped, a board that claims a chip lot it did not receive, a chip that failed final test shipped to the EMS, a chip on two boards, a shipment signed by the wrong party, and a tampered record in the chip chain under the board.
+[`tools/hslsa/board_test.go`](../tools/hslsa/board_test.go) breaks these links in 24 ways and requires each to fail for the stated reason, including a swapped part lot, a changed date code, flash bought from a broker (both marked unauthorized and falsely marked authorized), more parts placed than shipped, a board that claims a chip lot it did not receive, a chip that failed final test shipped to the EMS, a chip on two boards, a shipment signed by the wrong party, and a tampered record in the chip chain under the board.
 
 ## Levels claimed
 
@@ -64,5 +64,5 @@ After `e2e/run.sh produce`:
 
 ```sh
 SLSA_VERIFIER=/path/to/slsa-verifier e2e/board/run.sh all
-pytest -q tests/test_board.py
+go test ./tools/hslsa/
 ```

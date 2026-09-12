@@ -93,12 +93,12 @@ and extraction steps only need a fixed date, for example by setting
 `SOURCE_DATE_EPOCH` or by post-processing the GDS header, and the verifier could
 then require `gds-bit-exact`.
 
-`tests/test_openlane.py` exercises the chain checks and the classifier on a
+[`tools/hslsa/openlane_test.go`](../tools/hslsa/openlane_test.go) exercises the chain checks and the classifier on a
 synthetic run, so the lint job covers them without OpenLane.
 
 ## Running it locally
 
-You need docker, `pip install -r tools/requirements.txt ciel==3.0.0`, and the
+You need docker, Go, `pip install ciel==3.0.0` (the PDK manager), and the
 PDK:
 
 ```

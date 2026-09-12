@@ -478,6 +478,8 @@ The source drafts were not edited; this spec settles each difference as follows.
 
 ### Next steps
 
+The longer path to real-world use, with suppliers, buyers and a neutral home, is in the [roadmap](../docs/roadmap.md).
+
 - [x] Regenerate the HBOM schema and PicoSoC example for the changes above.
 - [x] Prototype: wrap an OpenLane 2 run of a small SKY130 design so each step emits a signed attestation, and measure how close a second run gets to bit-exact ([openlane2-flow.md](../docs/openlane2-flow.md)).
 - [x] Write one end-to-end example on a part with a hardware identity, from RTL to a booted device ([caliptra-e2e.md](../docs/caliptra-e2e.md)).

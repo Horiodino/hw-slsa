@@ -1,0 +1,126 @@
+# Roadmap to real-world use
+
+This roadmap turns HSLSA from a working draft with simulated supply chain data into something suppliers and buyers can run. It follows from the [viability assessment](https://claude.ai/artifact/E5HsAcGhb79T9x3cNw6cmG) of 2026-09-12, whose short version is: the design is technically sound, but nobody outside this repository signs the records yet.
+
+The phases are ordered by dependency, not by date. Each ends with an exit criterion that can be checked, and the first two can be done entirely in this repository.
+
+## Where we start
+
+What works today, all in CI with local keys:
+
+- The four examples (PicoRV32, board, OpenLane 2, Caliptra) sign every record, run the tapeout, lot receipt, board receipt and at-boot checks, and pass their VSAs through slsa-verifier.
+- Verified levels: Design L1, Wafer L2, Package/Test L2, Assembly L2, Firmware L2.
+
+What the assessment found missing or weak:
+
+| Gap | Why it matters | Phase |
+| --- | --- | --- |
+| No threat model saying what signed records cannot prove | A buyer could read Wafer L3 as "no trojans" | 0 |
+| No example above Design L1; GDS not bit-exact; no independent rebuild | The spec's own Design L2 to L4 are untested | 0 |
+| L3 isolation conflicts with network license servers | Commercial flows cannot reach Design L3 as written | 0 |
+| Overlap with NIST IR 8536, SEMI T26, CISA HBOM | A standalone framework competes for attention | 1 |
+| Salted digests hide values but not volumes and timing | Foundries and OSATs will not accept the disclosure | 1 |
+| All physical data is simulated | Nothing shows a real supplier's data fits the records | 2 |
+| Commercial EDA, MES and test systems emit nothing | Every supplier would need custom integration | 3 |
+| No buyer requires it; no trust root for sites | Suppliers have cost and no benefit | 4 |
+| Spec lives in one person's private repository | Industry will not adopt it from there | 5 |
+
+## Phase 0: Make the spec honest and complete
+
+Work that needs no partner. Target: spec v0.2.
+
+1. **Threat model.** Add a section that states, per track and level, which attacks the records stop and which they only make accountable. It says plainly that a site's signature proves the site made a claim, not that the claim is physically true; that L1 to L3 give tamper evidence for records; and that only L4 sampling checks physical parts, statistically, and cannot see every change (dopant-level trojans evade optical inspection).
+2. **Scope statement.** The full chain, down to the at-boot check, applies to parts with a hardware identity. Every other part on a board gets a distribution record and lot-level naming, which cannot stop a swap inside a lot. Say so in the overview and in Assembly L2 and L3.
+3. **Design L2 example.** A signed, reviewed source freeze (a signed tag plus a review attestation) and signed provenance for one third-party IP block, verified at tapeout.
+4. **Bit-exact GDS.** Pin the dates Magic, KLayout, OpenSTA and RCX embed in the OpenLane 2 flow so two runs match byte for byte, then make the verifier require `gds-bit-exact` by default.
+5. **Independent rebuild.** A second builder under a separate trust root (a different CI account and key) signs the `rebuild` record, so the OpenLane 2 example shows real Design L4 evidence.
+6. **Boot on the RTL.** Boot the Caliptra ROM on the Verilated RTL instead of the emulator, so the booted device is the design itself.
+7. **Licensed tools at L3.** Allow a declared license server as the only permitted network egress for a Design L3 step, with its address and the checked-out features recorded in `hwFlow`.
+8. **Close the blocking open questions.** Decide the board-level root of trust rule for Firmware L2, whether `fw-review` is needed, and one shared step list for `hwFlow.step` and the HBOM's `design.flow[].step`.
+
+**Exit:** spec v0.2 with a threat model, and CI verifying Design L2 and a Design L4 rebuild record from a separate trust root.
+
+## Phase 1: Build on existing standards instead of competing
+
+Target: spec v0.3 and a profile document.
+
+1. **HSLSA as a NIST IR 8536 profile.** Map each HSLSA record onto the IR 8536 meta-framework's provenance chain and event model, and check that its open-source reference implementation can ingest HSLSA records, or that a thin adapter can. Publish the mapping as `spec/nist-ir-8536-profile.md`.
+2. **Selective disclosure.** Design a verifier-escrow mode: an accredited auditor sees full records, the buyer sees only check results and a signed VSA. Measure what salted digests still leak (record counts, lot sizes, timing) and say what the escrow mode hides.
+3. **Output formats.** Emit the HBOM as CycloneDX 1.6 and as SPDX 3.1 once 3.1 is final. Publish firmware reference measurements as CoRIM, so standard RATS verifiers can run part of the at-boot check.
+4. **Transparency logs.** Show SEMI T26 (ledger-based traceability) or a private RFC 9162 log as the L3 log for manufacturing records.
+5. **Policy examples.** Ship buyer policies for each check in a standard policy language (Rego or in-toto layouts), so buyers do not have to use the reference tool.
+
+**Exit:** a published IR 8536 profile, and one HSLSA chain verified by a tool this project did not write.
+
+## Phase 2: Touch real silicon and real hardware
+
+Target: the first chain where physical records come from a real run.
+
+1. **Real board boot.** Run the at-boot check on a physical board: OpenTitan or Caliptra on an FPGA board, provisioned by a script that signs `fw-provisioning` records, then booted and checked against them.
+2. **Open-PDK tapeout.** Put a small design with a unique ID through an open-PDK shuttle (SKY130 or GF180), with the Design chain from phase 0.
+3. **Real package and test data.** Turn the packaging and test data the shuttle returns (unit lists, test logs, wafer maps where available) into F2 to F4 records.
+4. **Proxy signing.** Suppliers will not sign at first. Define a `proxy` signer role: this project signs a record on a supplier's behalf from the supplier's own data, and the record says so. A proxy-signed step caps its track at L1, but the chain shape is real.
+5. **Real board build.** Assemble a small batch of boards and record A1 from the real build and the real distributor invoices.
+
+**Exit:** a public or buyer-shared chain from RTL to a real booted device, with every simulated record replaced by a real or proxy-signed one.
+
+## Phase 3: Adapters for tools suppliers already run
+
+Target: turn an unchanged supplier export into signed records. This is what makes adoption cheap enough.
+
+| Adapter | Reads | Emits |
+| --- | --- | --- |
+| Commercial EDA wrapper | Tcl hooks in the flow scripts (Innovus, ICC2, Fusion Compiler, Calibre) | `design-flow` records per step |
+| MES and test sidecar | Lot events, SEMI E142 wafer maps, STDF test results | F1 to F4 records |
+| Provisioning station plugin | Station logs and readback | `fw-provisioning` records |
+| Distributor importer | Certificates of conformance, packing lists | Distribution records |
+| HSM signing | PKCS#11 | Site-key signatures at L3 |
+
+The EDA wrapper needs a design-house partner with licenses. The rest can be built against sample data from phase 2.
+
+**Exit:** each adapter produces valid records from a real export without manual editing, and the reference verifier accepts them.
+
+## Phase 4: Pilots with one buyer who needs this
+
+No supplier signs records until a customer requires it. Pick one buyer, not the whole market.
+
+| Candidate | Why they would say yes | Pilot scope |
+| --- | --- | --- |
+| A hyperscaler, through OCP | Already requires a Caliptra root of trust and runs OCP S.A.F.E. reviews | Firmware and Package/Test for one root-of-trust part, plus the at-boot check in their fleet |
+| A defense program | DoD is moving from Trusted Foundry to quantifiable assurance and needs evidence from commercial fabs | All five tracks, including one L4 inspection |
+| A server OEM | Already sells factory-signed component verification | Assembly and Firmware for one server board |
+| An open silicon project (lowRISC, CHIPS Alliance) | Open RTL and tools, nothing to hide | Design L3 to L4 and Firmware |
+
+In the pilot:
+
+1. Start with the buyer as the trust root for every site key, which avoids waiting for an industry PKI.
+2. Get one supplier (most likely the OSAT, whose per-unit traceability data already exists) to sign its records with its own key.
+3. Measure the cost per lot, what data each party had to disclose, and which checks failed, and publish the result.
+
+**Exit:** one external supplier signs one record type for a real product, and one buyer verifies it before accepting parts.
+
+## Phase 5: A neutral home and v1.0
+
+1. **Choose a home.** OpenSSF (where SLSA lives), CHIPS Alliance (where Caliptra lives), or the OCP security project. Present the IR 8536 profile and pilot results at NIST's traceability work as well.
+2. **Open the repository.** Adoption needs a public spec. This repository is private and signs nothing publicly by the owner's choice; opening it is the owner's decision.
+3. **Neutral identifiers.** Move predicate URIs from this repository to the new home's domain, with a mapping from the v0.x names.
+4. **Trust roots.** Work with accreditors that already vet sites (DMEA Trusted Supplier, O-TTPS) on issuing and revoking site keys.
+5. **v1.0 criteria.** At least two independent verifier implementations, one production pilot, and every open question in the spec either closed or explicitly deferred.
+
+**Exit:** v1.0 published under neutral governance.
+
+## Running alongside: the L4 defense profile
+
+L4 is expensive and mostly matters to defense and root-of-trust buyers, so it runs as research alongside the phases rather than blocking them:
+
+- Sampling plans: what sample size makes an L4 claim meaningful for a given lot size.
+- Inspection limits: which attacks delayering and imaging find, and which they miss, with references.
+- Lab accreditation: who accredits inspection labs, and how a lab's key is trusted separately from the producer's.
+
+## Decisions the owner needs to make
+
+| Decision | Needed by |
+| --- | --- |
+| Whether to accept proxy-signed records at L1 | Phase 2 |
+| Whether to make the repository and spec public | Phase 4 |
+| Which neutral home to approach first | Phase 5 |

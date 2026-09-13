@@ -132,6 +132,9 @@ func TapeoutCheck(bundle string, trust *TrustRoot, policy Obj, release bool) (*D
 				return nil, failf("%s: tool %s is not on the approved list", label, S(t, "name"))
 			}
 		}
+		if err := checkNetwork(stmt, label, pol); err != nil {
+			return nil, err
+		}
 		for _, consumed := range Strs(pol, "consumes", step) {
 			prev, ok := stmts[consumed]
 			if !ok {

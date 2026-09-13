@@ -21,7 +21,7 @@ var (
 	e2eLock     = filepath.Join(e2eDir, "inputs.lock.json")
 	e2eScenario = filepath.Join(e2eDir, "mfg-scenario.json")
 	e2ePolicy   = filepath.Join(e2eDir, "policy.json")
-	e2eRoles    = []string{"flow-platform", "tapeout-authority", "fab-site", "sort-site", "osat-site", "test-site", "product-owner"}
+	e2eRoles    = []string{"ip-vendor", "source-owner", "source-reviewer", "flow-platform", "tapeout-authority", "fab-site", "sort-site", "osat-site", "test-site", "product-owner"}
 )
 
 func chipSource() string { return envPath("HSLSA_BUNDLE", "out/bundle") }
@@ -81,6 +81,10 @@ func chipBundle(t *testing.T) string {
 		if err := BuildTrustRoot(filepath.Join(work, "pub"), filepath.Join(bundle, "trust-root.json")); err != nil {
 			return err
 		}
+		moved, err := resignSourceInputs(bundle, keys)
+		if err != nil {
+			return err
+		}
 		signer, err := LoadSigner(filepath.Join(keys, "flow-platform.key.pem"))
 		if err != nil {
 			return err
@@ -91,6 +95,12 @@ func chipBundle(t *testing.T) string {
 			if err != nil {
 				return err
 			}
+			// The source freeze consumes the re-signed review and IP envelopes by digest.
+			for _, d := range Objs(stmt, "predicate", "buildDefinition", "resolvedDependencies") {
+				if to, ok := moved[S(d, "digest", "sha256")]; ok {
+					O(d, "digest")["sha256"] = to
+				}
+			}
 			if _, err := Sign(stmt, signer, path); err != nil {
 				return err
 			}
@@ -100,14 +110,71 @@ func chipBundle(t *testing.T) string {
 	return filepath.Join(copyOf(t, valid), "bundle")
 }
 
+// resignSourceInputs re-signs the git tag, the review and the IP provenance
+// with the test keys, and maps each envelope's old sha256 to its new one.
+func resignSourceInputs(bundle, keys string) (map[string]string, error) {
+	moved := map[string]string{}
+	for role, name := range map[string]string{"source-reviewer": reviewAtt, "ip-vendor": ipAtt("picorv32")} {
+		path := filepath.Join(bundle, "att", name)
+		before, err := sha256File(path)
+		if err != nil {
+			return nil, err
+		}
+		stmt, err := DecodeEnvelope(path)
+		if err != nil {
+			return nil, err
+		}
+		signer, err := LoadSigner(filepath.Join(keys, role+".key.pem"))
+		if err != nil {
+			return nil, err
+		}
+		after, err := Sign(stmt, signer, path)
+		if err != nil {
+			return nil, err
+		}
+		moved[before] = S(after, "digest", "sha256")
+	}
+	return moved, retag(bundle, keys, "source-owner", nil)
+}
+
+// retag lets edit change the tag's signed text, then signs it with keys/<role>.key.pem.
+func retag(bundle, keys, role string, edit func(string) string) error {
+	path := filepath.Join(bundle, "artifacts", sourceGitDir, "tag")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	payload, _, found := splitSignedTag(raw)
+	if !found {
+		return fmt.Errorf("%s is not an SSH-signed tag", path)
+	}
+	if edit != nil {
+		payload = []byte(edit(string(payload)))
+	}
+	signer, err := LoadSigner(filepath.Join(keys, role+".key.pem"))
+	if err != nil {
+		return err
+	}
+	signed, err := SignTag(payload, signer.priv)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, signed, 0o644)
+}
+
 func chipCheck(t *testing.T, bundle string, units []string) error {
+	t.Helper()
+	return chipCheckPolicy(t, bundle, units, e2ePolicy)
+}
+
+func chipCheckPolicy(t *testing.T, bundle string, units []string, policy string) error {
 	t.Helper()
 	trust := ok(LoadTrustRoot(filepath.Join(bundle, "trust-root.json")))
 	unitsFile := ""
 	if units != nil {
 		unitsFile = writeLines(t, filepath.Join(t.TempDir(), "units.txt"), units)
 	}
-	_, _, err := Verify(bundle, trust, e2ePolicy, unitsFile, "", "")
+	_, _, err := Verify(bundle, trust, policy, unitsFile, "", "")
 	return err
 }
 

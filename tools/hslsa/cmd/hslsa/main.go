@@ -211,7 +211,7 @@ func trustRoot(args []string) error {
 }
 
 func design(args []string) error {
-	step, rest, err := action(args, "source-freeze", "simulation", "synthesis", "release")
+	step, rest, err := action(args, "ip-release", "source-tag", "review", "source-freeze", "simulation", "synthesis", "release")
 	if err != nil {
 		return err
 	}
@@ -225,12 +225,27 @@ func design(args []string) error {
 	if err := f.parse(rest); err != nil {
 		return err
 	}
+	if *cache == "" {
+		*cache = ".hslsa-cache"
+	}
 	switch step {
+	case "ip-release":
+		return hslsa.IPRelease(*bundle, *lock, *key, *cache)
+	case "source-tag":
+		return hslsa.SourceTag(*bundle, *lock, *key, *cache)
+	case "review":
+		return hslsa.SourceReview(*bundle, *lock, *key)
 	case "source-freeze":
-		if *cache == "" {
-			*cache = ".hslsa-cache"
+		if *trust == "" && *policy == "" {
+			return hslsa.SourceFreeze(*bundle, *lock, *key, *cache)
 		}
-		return hslsa.SourceFreeze(*bundle, *lock, *key, *cache)
+		if err := need(trust, "trust-root", "source-freeze at Design L2"); err != nil {
+			return err
+		}
+		if err := need(policy, "policy", "source-freeze at Design L2"); err != nil {
+			return err
+		}
+		return hslsa.SourceFreezeL2(*bundle, *lock, *key, *cache, *trust, *policy)
 	case "simulation":
 		return hslsa.Simulation(*bundle, *lock, *key)
 	case "synthesis":

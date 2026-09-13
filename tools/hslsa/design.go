@@ -279,6 +279,16 @@ func download(url, path string) error {
 
 // SourceFreeze is step 0: fetch the pinned RTL, check every digest, and freeze it into one archive.
 func SourceFreeze(bundle, lockPath, key, cache string) error {
+	return sourceFreeze(bundle, lockPath, key, cache, "", "")
+}
+
+// SourceFreezeL2 is step 0 at Design L2: it also gates on the signed, reviewed
+// tag and the IP vendor's provenance, and consumes all three by digest.
+func SourceFreezeL2(bundle, lockPath, key, cache, trustRoot, policyPath string) error {
+	return sourceFreeze(bundle, lockPath, key, cache, trustRoot, policyPath)
+}
+
+func sourceFreeze(bundle, lockPath, key, cache, trustRoot, policyPath string) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
@@ -286,31 +296,18 @@ func SourceFreeze(bundle, lockPath, key, cache string) error {
 	}
 	src := O(lock, "source")
 	files := O(src, "files")
-	if err := os.MkdirAll(cache, 0o755); err != nil {
+	got, err := fetchSources(lock, cache)
+	if err != nil {
 		return err
 	}
 	var deps []Obj
 	var mismatched []string
 	for _, name := range sortedKeys(files) {
 		want, _ := files[name].(string)
-		path := filepath.Join(cache, name)
-		if _, err := os.Stat(path); err != nil {
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				return err
-			}
-			url := strings.NewReplacer("{commit}", S(src, "commit"), "{path}", name).Replace(S(src, "rawUrl"))
-			if err := download(url, path); err != nil {
-				return err
-			}
+		if got[name] != want {
+			mismatched = append(mismatched, fmt.Sprintf("%s (%s)", name, got[name]))
 		}
-		got, err := sha256File(path)
-		if err != nil {
-			return err
-		}
-		if got != want {
-			mismatched = append(mismatched, fmt.Sprintf("%s (%s)", name, got))
-		}
-		d := rd(name, got)
+		d := rd(name, got[name])
 		d["uri"] = fmt.Sprintf("git+%s@%s#%s", S(src, "repo"), S(src, "commit"), name)
 		deps = append(deps, d)
 	}
@@ -329,13 +326,18 @@ func SourceFreeze(bundle, lockPath, key, cache string) error {
 	if detail == "" {
 		detail = "every file matches inputs.lock.json"
 	}
-	pred := designPredicate(
-		"source-freeze",
-		Obj{"design": S(lock, "design"), "repo": S(src, "repo"), "commit": S(src, "commit")},
-		deps, nil,
-		[]Obj{check("inputs-pinned", len(mismatched) == 0, detail)},
-		nil, started,
-	)
+	checks := []Obj{check("inputs-pinned", len(mismatched) == 0, detail)}
+	external := Obj{"design": S(lock, "design"), "repo": S(src, "repo"), "commit": S(src, "commit")}
+	if trustRoot != "" {
+		l2deps, l2checks, err := sourceFreezeL2Inputs(bundle, trustRoot, policyPath, S(lock, "freeze", "repo"), tarPath)
+		if err != nil {
+			return err
+		}
+		deps = append(deps, l2deps...)
+		checks = append(checks, l2checks...)
+		external["tag"] = S(lock, "freeze", "tag")
+	}
+	pred := designPredicate("source-freeze", external, deps, nil, checks, nil, started)
 	subject, err := fileRD(tarPath, "")
 	if err != nil {
 		return err
@@ -537,6 +539,7 @@ func DesignRelease(bundle, lockPath, key, trustRoot, policyPath string) error {
 			"design":            S(lock, "design"),
 			"finalArtifact":     filepath.Base(final),
 			"finalArtifactKind": "gate-level netlist (stands in for GDS until steps 3 to 7 run)",
+			"ipBlocks":          ipBlocks(lock),
 		},
 		deps, nil, []Obj{gate}, nil, started,
 	)
@@ -549,6 +552,15 @@ func DesignRelease(bundle, lockPath, key, trustRoot, policyPath string) error {
 		return err
 	}
 	return finish(bundle, "release", []Obj{subject}, pred, signer)
+}
+
+// ipBlocks lists the lock's third-party IP blocks for the release record.
+func ipBlocks(lock Obj) []Obj {
+	var out []Obj
+	for _, ip := range Objs(lock, "ip") {
+		out = append(out, Obj{"name": S(ip, "name"), "supplier": S(ip, "supplier"), "version": S(lock, "source", "commit")})
+	}
+	return nonNil(out)
 }
 
 // sortObjsBy sorts objects by a string field.

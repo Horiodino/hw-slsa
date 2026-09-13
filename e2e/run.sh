@@ -25,12 +25,18 @@ produce() {
   mkdir -p "$BUNDLE" "$KEYS"
   # One key per party. In a real chain each lives with its own site; here they are
   # generated per run and only their public halves leave this job.
-  hslsa keygen --out "$KEYS" flow-platform tapeout-authority fab-site sort-site osat-site test-site product-owner
+  hslsa keygen --out "$KEYS" ip-vendor source-owner source-reviewer flow-platform tapeout-authority fab-site sort-site osat-site test-site product-owner
   mkdir -p "$KEYS/pub" && cp "$KEYS"/*.pub.pem "$KEYS/pub/"
   hslsa trust-root --keys "$KEYS/pub" --out "$BUNDLE/trust-root.json"
   cp "$E2E/policy.json" "$BUNDLE/policy.json"
 
-  hslsa design source-freeze --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem" --cache "$OUT/cache"
+  # Design L2 inputs, each from its own party: the IP vendor's provenance, the
+  # design lead's SSH-signed git tag, and the reviewer's approval of that commit.
+  hslsa design ip-release    --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/ip-vendor.key.pem" --cache "$OUT/cache"
+  hslsa design source-tag    --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/source-owner.key.pem" --cache "$OUT/cache"
+  hslsa design review        --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/source-reviewer.key.pem"
+  hslsa design source-freeze --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem" --cache "$OUT/cache" \
+    --trust-root "$BUNDLE/trust-root.json" --policy "$BUNDLE/policy.json"
   hslsa design simulation    --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem"
   hslsa design synthesis     --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem"
   hslsa design release       --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/tapeout-authority.key.pem" \
@@ -74,11 +80,11 @@ verify() {
   echo "== slsa-verifier verify-vsa: design"
   "$sv" verify-vsa "${common[@]}" --attestation-path "$vsa_dir/design.vsa.intoto.json" \
     --subject-digest "sha256:${final#* }" --resource-uri "hslsa:design:${final% *}" \
-    --verified-level HSLSA_DESIGN_LEVEL_1 --verified-level SLSA_BUILD_LEVEL_1
+    --verified-level HSLSA_DESIGN_LEVEL_2 --verified-level SLSA_BUILD_LEVEL_2
   echo "== slsa-verifier verify-vsa: shipped lot"
   "$sv" verify-vsa "${common[@]}" --attestation-path "$vsa_dir/lot.vsa.intoto.json" \
     --subject-digest "sha256:${lot#* }" --resource-uri "${lot% *}" \
-    --verified-level HSLSA_WAFER_LEVEL_2 --verified-level HSLSA_PACKAGE_TEST_LEVEL_2 --verified-level HSLSA_DESIGN_LEVEL_1
+    --verified-level HSLSA_WAFER_LEVEL_2 --verified-level HSLSA_PACKAGE_TEST_LEVEL_2 --verified-level HSLSA_DESIGN_LEVEL_2
 
   echo "== slsa-verifier negative cases"
   local lotargs=("${common[@]}" --attestation-path "$vsa_dir/lot.vsa.intoto.json" --resource-uri "${lot% *}")
@@ -88,7 +94,7 @@ verify() {
     --subject-digest "sha256:${final#* }" --verified-level HSLSA_WAFER_LEVEL_2
   expect_fail "an SLSA build level above the claim" "$sv" verify-vsa "${common[@]}" \
     --attestation-path "$vsa_dir/design.vsa.intoto.json" --subject-digest "sha256:${final#* }" \
-    --resource-uri "hslsa:design:${final% *}" --verified-level SLSA_BUILD_LEVEL_2
+    --resource-uri "hslsa:design:${final% *}" --verified-level SLSA_BUILD_LEVEL_3
   hslsa keygen --out "$vkey/other" verifier
   hslsa pubkey --key "$vkey/other/verifier.key.pem" --out "$vkey/other.pub.pem"
   expect_fail "a VSA checked against another verifier's key" "$sv" verify-vsa \

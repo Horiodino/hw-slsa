@@ -9,6 +9,18 @@
       "testbench_ez.v": "bc4bb99e07b5f49fcd0ae8cd3ccb6d071cf318a4d242853aecaa207c7d152be1"
     }
   },
+  "freeze": {
+    "note": "Simulated: the design house vendors PicoRV32 into its own RTL repository and freezes it with an SSH-signed git tag. The repository exists only inside the produce job.",
+    "repo": "https://git.example.com/example-open-silicon/picosoc-rtl.git",
+    "tag": "picosoc-rtl-v1.0",
+    "date": "2026-09-01T12:00:00Z",
+    "author": "Example RTL Engineer <rtl-engineer@example.com>",
+    "tagger": "Example Design Lead <design-lead@example.com>",
+    "reviewer": "Example RTL Reviewer <rtl-reviewer@example.com>"
+  },
+  "ip": [
+    {"name": "picorv32", "supplier": "YosysHQ", "license": "ISC", "files": ["picorv32.v"]}
+  ],
   "simulation": {
     "top": "testbench",
     "files": ["testbench_ez.v", "picorv32.v"],

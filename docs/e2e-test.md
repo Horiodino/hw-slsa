@@ -7,10 +7,20 @@ The workflow in [`.github/workflows/hslsa-e2e.yml`](../.github/workflows/hslsa-e
 | Job | Plays | Does |
 | --- | --- | --- |
 | Lint and unit tests | | `gofmt`, `go vet` and `go test` (bundle-free tests only), validates the committed HBOM examples against their schema, and checks the example's lot digest can be recomputed from its unit list |
-| Produce | Design house, tapeout authority, fab, sort house, OSAT, test house, product owner | Runs the design flow, signs each step, releases the design, signs F1 to F4 for a lot, builds and signs the HBOM. Uploads the bundle without any private key |
+| Produce | IP vendor, design lead, reviewer, flow platform, tapeout authority, fab, sort house, OSAT, test house, product owner | Signs the IP provenance, the source tag and its review, runs the design flow, signs each step, releases the design, signs F1 to F4 for a lot, builds and signs the HBOM. Uploads the bundle without any private key |
 | Verify | Buyer | Receives only the bundle, runs the tapeout check and the lot receipt check, signs two SLSA Verification Summary Attestations, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
 
 **Real:** the design is [PicoRV32](https://github.com/YosysHQ/picorv32) at a pinned commit, with every file checked against [`e2e/picorv32/inputs.lock.json`](../e2e/picorv32/inputs.lock.json). Step 1 runs its testbench in Icarus Verilog and step 2 synthesizes it with Yosys; the netlist is byte-for-byte reproducible. Every signature, digest link and check is real, and the verifier uses the in-toto attestation library to validate every statement and to parse every step predicate as SLSA Provenance v1.
+
+**Design L2 inputs:** the design house vendors PicoRV32 into its own RTL repository, which exists only inside the produce job and has no public URL. Three parties sign, each with its own key:
+
+- The IP vendor signs SLSA Provenance v1 (buildType `.../ip-release@v1`) for the IP release, with `picorv32.v` as its subject. YosysHQ does not publish signed provenance, so an `ip-vendor` key plays that part, the same way site keys play the fab and test house.
+- The design lead commits the RTL and signs a release tag with git's own SSH signing (`gpg.format=ssh`, `git tag -s`). The tag, commit and tree objects go into the bundle under `artifacts/source-git/`.
+- A reviewer who is not the commit's author signs a `source-review` record (`https://github.com/Horiodino/hw-slsa/source-review/v0.1`) whose subject is the tagged commit.
+
+The source freeze step checks all three before it signs, records the results as the gates `signed-reviewed-tag` and `third-party-ip-provenance`, and lists the tagged commit, the review and the IP provenance in its `resolvedDependencies`. The buyer's tapeout check repeats every check itself instead of trusting those gates: it verifies the SSH signature on the tag against the `source-owner` key in the trust root, recomputes git's object hashes from the tag through the commit and tree down to every file in `source.tar`, opens the review and IP records under their own roles, and requires the IP files in the archive to match the vendor's subjects. So a flow platform that swaps RTL under the tag is caught even though it signs its own record. Git names objects with SHA-1; that is what the tag signs, and a SHA-256 git repository would remove that weakness.
+
+The release record lists the IP blocks, and the verifier refuses a Design L2 claim unless the policy requires signed provenance for every one of them and a signed, reviewed tag. The example has no waivers, so the L2 rule that waivers are signed by a signoff owner is not exercised.
 
 **Simulated:** there is no fab, so wafer maps, genealogy and test results come from [`e2e/picorv32/mfg-scenario.json`](../e2e/picorv32/mfg-scenario.json). The scenario packages 40 units and fails 3 at final test, which gives exactly the shipped lot in [`hbom/picosoc-sky130.shipped-lot.txt`](../hbom/picosoc-sky130.shipped-lot.txt), so the lot digest matches the spec's worked example.
 
@@ -22,20 +32,21 @@ The verifier only emits VSAs when every check passes, and it claims the levels i
 
 | VSA subject | `verifiedLevels` |
 | --- | --- |
-| Released design (netlist digest) | `HSLSA_DESIGN_LEVEL_1`, `SLSA_BUILD_LEVEL_1` |
-| Shipped lot (`urn:hslsa:lot:ASM-EXAMPLE-17`, lot digest) | `HSLSA_WAFER_LEVEL_2`, `HSLSA_PACKAGE_TEST_LEVEL_2`, `HSLSA_DESIGN_LEVEL_1` |
+| Released design (netlist digest) | `HSLSA_DESIGN_LEVEL_2`, `SLSA_BUILD_LEVEL_2` |
+| Shipped lot (`urn:hslsa:lot:ASM-EXAMPLE-17`, lot digest) | `HSLSA_WAFER_LEVEL_2`, `HSLSA_PACKAGE_TEST_LEVEL_2`, `HSLSA_DESIGN_LEVEL_2` |
 
-Design stops at L1 even though the flow platform signs every step, because Design L2 also needs a signed, reviewed source-freeze tag and signed provenance for third-party IP, and PicoRV32 has neither. Wafer and Package/Test reach L2 because each site signs with its own key, units are named with genealogy, and final test signs the shipped lot digest.
+Design reaches L2: every step runs on GitHub Actions and is signed by the flow platform's key, the source freeze is a signed, reviewed tag, and the one third-party IP block arrives with signed provenance. It stops short of L3 because the steps are not isolated from each other or the network, the signing key is reachable from the job that runs the tools, and there is no equivalence record. Wafer and Package/Test reach L2 because each site signs with its own key, units are named with genealogy, and final test signs the shipped lot digest.
 
 ## What the tamper tests prove
 
-[`tools/hslsa/e2e_test.go`](../tools/hslsa/e2e_test.go) breaks the chain in 24 ways and requires each to fail for the stated reason. The fixture re-signs the bundle with test keys so it can also forge records with valid signatures, which is what an insider at one site could do:
+[`tools/hslsa/e2e_test.go`](../tools/hslsa/e2e_test.go) breaks the chain in 24 ways, and [`tools/hslsa/source_test.go`](../tools/hslsa/source_test.go) in 15 more for the Design L2 inputs, and each must fail for the stated reason. The fixture re-signs the bundle with test keys so it can also forge records with valid signatures, which is what an insider at one site could do:
 
 - files swapped after signing (netlist, source archive, simulation log, wafer maps, genealogy), a unit added to the shipped lot, a received unit that was scrapped at final test
 - a missing step, a payload edited without re-signing, a step signed by an unknown key, a release signed by the flow platform instead of the tapeout authority, a record copied from another site
+- the Design L2 inputs: a tag signed by an unknown key or edited after signing, a validly signed tag that points at another commit, a source archive that is not the tagged tree (re-signed by the flow platform), a review signed by an unknown key, of another commit, not approving, or by the commit's author, a source freeze that does not consume the review, IP provenance that is missing, signed by the design house instead of the vendor, or for other file contents, and a policy that claims Design L2 without the source or IP rules
 - validly signed lies: a failed gate, an unapproved tool, a step that does not consume the frozen source, a release of an artifact the flow did not build, a packaging record that names another design, a yield record that hides a failed unit, an HBOM that names another lot or does not match its schema
 
-The verify job also runs slsa-verifier four times expecting failure: a level above the claim, an SLSA build level above the claim, another subject's digest, and another verifier's key.
+The verify job also runs slsa-verifier four times expecting failure: a level above the claim, an SLSA build level above the claim (L3), another subject's digest, and another verifier's key.
 
 ## Keys and privacy
 
@@ -69,7 +80,7 @@ slsa-verifier verify-vsa \
 
 ## Running it locally
 
-Needs Go (the version in [`go.mod`](../go.mod)), Yosys, Icarus Verilog and a slsa-verifier binary. The scripts build the reference tool into `bin/hslsa`; set `HSLSA` to use a binary you built yourself.
+Needs Go (the version in [`go.mod`](../go.mod)), git, ssh-keygen (OpenSSH 8.2 or later, for SSH-signed tags), Yosys, Icarus Verilog and a slsa-verifier binary. The scripts build the reference tool into `bin/hslsa`; set `HSLSA` to use a binary you built yourself.
 
 ```sh
 SLSA_VERIFIER=/path/to/slsa-verifier e2e/run.sh all

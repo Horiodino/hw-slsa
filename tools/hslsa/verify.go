@@ -141,6 +141,11 @@ func TapeoutCheck(bundle string, trust *TrustRoot, policy Obj, release bool) (*D
 				return nil, err
 			}
 		}
+		if step == "source-freeze" && Has(pol, "source") {
+			if err := checkSourceFreezeL2(bundle, trust, pol, stmt); err != nil {
+				return nil, err
+			}
+		}
 		stmts[step] = stmt
 	}
 	if !release {
@@ -176,7 +181,48 @@ func TapeoutCheck(bundle string, trust *TrustRoot, policy Obj, release bool) (*D
 	if !sha256Set(Objs(stmts[from], "subject"))[S(final, "digest", "sha256")] {
 		return nil, failf("%s: released artifact is not an output of %s", label, from)
 	}
+	if err := requireDesignL2Rules(policy, rel); err != nil {
+		return nil, err
+	}
 	return &DesignResult{Final: final, Release: envRD(bundle, AttName("release")), Inputs: stepEnvs}, nil
+}
+
+// designClaim is the highest Design level the policy's claims name.
+func designClaim(policy Obj) int {
+	level := 0
+	for _, list := range O(policy, "claims") {
+		for _, c := range Strs(Obj{"v": list}, "v") {
+			var n int
+			if _, err := fmt.Sscanf(c, "HSLSA_DESIGN_LEVEL_%d", &n); err == nil && n > level {
+				level = n
+			}
+		}
+	}
+	return level
+}
+
+// requireDesignL2Rules refuses a Design L2 or higher claim unless the policy
+// makes the tapeout check verify the signed, reviewed source freeze and signed
+// provenance for every IP block the release lists.
+func requireDesignL2Rules(policy, rel Obj) error {
+	level := designClaim(policy)
+	if level < 2 {
+		return nil
+	}
+	pol := O(policy, "design")
+	if S(pol, "source", "tagSigner") == "" || S(pol, "source", "reviewer") == "" {
+		return failf("policy claims Design L%d but does not require a signed, reviewed source freeze", level)
+	}
+	required := map[string]bool{}
+	for _, ip := range Objs(pol, "thirdPartyIP") {
+		required[S(ip, "name")] = true
+	}
+	for _, ip := range Objs(rel, "predicate", "buildDefinition", "externalParameters", "ipBlocks") {
+		if !required[S(ip, "name")] {
+			return failf("policy claims Design L%d but does not require signed provenance for IP block %s", level, S(ip, "name"))
+		}
+	}
+	return nil
 }
 
 // LotResult is what the lot receipt check vouches for.

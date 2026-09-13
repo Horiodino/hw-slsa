@@ -107,6 +107,8 @@ Every record in HSLSA is an [in-toto Statement v1](https://github.com/in-toto/at
 | --- | --- | --- | --- | --- |
 | Design flow step | `https://github.com/Horiodino/hw-slsa/design-flow/v0.1` | `hwFlow` | Flow platform, per step and once as a run summary | Output files of the step; the final GDS for the summary |
 | Tapeout release | `https://github.com/Horiodino/hw-slsa/design-flow/v0.1`, buildType `.../design-flow/step/release@v1` | `hwFlow` | Tapeout authority | Final GDS |
+| Source review | `https://github.com/Horiodino/hw-slsa/source-review/v0.1` | none | Reviewer, who is not the commit's author | The reviewed commit (`gitCommit` digest) |
+| Third-party IP release | `https://slsa.dev/provenance/v1` (unchanged), buildType `.../ip-release@v1` or the vendor's own | none | IP vendor | The released IP files |
 | Rebuild (L4) | `https://github.com/Horiodino/hw-slsa/design-flow/v0.1`, buildType `.../design-flow/step/rebuild@v1` | `hwFlow` | Second builder | Final GDS of the release it rebuilt |
 | Manufacturing step | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `hwMfg` | Fab, sort, OSAT, test and EMS sites | Wafer lot, packaged lot, shipped lot, or board lot and boards |
 | Distribution | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1`, buildType `.../mfg/step/distribution@v1` | `hwMfg` | The shipper: a distributor, or a manufacturer shipping direct | The shipment's packing list |
@@ -275,7 +277,7 @@ Each arrow is a digest link. A board has its own HBOM, with the board design and
 
 | Step | Track | Consumes (by digest) | Produces (subject) | Key gates in `checks` |
 | --- | --- | --- | --- | --- |
-| 0. Source freeze | Design | RTL tree, testbenches, constraints, IP manifests | Source archive | Signed tag; two-person review at L4 |
+| 0. Source freeze | Design | RTL tree, testbenches, constraints, IP manifests; at L2 the signed tag's commit, its source review and each IP block's provenance | Source archive | At L2, signed tag, source review and IP provenance verified; two-person review at L4 |
 | 1. Simulation and lint | Design | Source archive, testbenches, IP models | Coverage and log reports | Tests pass, coverage threshold |
 | 2. Synthesis | Design | Source archive, liberty files | Gate-level netlist, SDC | Lint clean; netlist vs RTL equivalence |
 | 3. Floorplan and power | Design | Netlist, SDC, tech and cell LEF | ODB/DEF | Macro placement check |
@@ -285,6 +287,8 @@ Each arrow is a digest link. A board has its own HBOM, with the board design and
 | 6a. ROM merge (mask ROM only) | Design, for Firmware | ROM image (by its SLSA provenance digest), ROM compiler, empty ROM macro | Programmed ROM macro GDS, merged layout | `rom-readback`: bits extracted from layout match the image digest; optional `rom-matches-frozen` (see [Mask ROM](#mask-rom)) |
 | 7. GDS stream-out | Design | Routed layout, cell, IP and ROM macro GDS | Final GDSII/OASIS | GDS vs DEF XOR clean |
 | Release | Design | Run summary over steps 0 to 7 | Final GDS | Tapeout policy check (below) |
+| Source review | `https://github.com/Horiodino/hw-slsa/source-review/v0.1` | none | Reviewer, who is not the commit's author | The reviewed commit (`gitCommit` digest) |
+| Third-party IP release | `https://slsa.dev/provenance/v1` (unchanged), buildType `.../ip-release@v1` or the vendor's own | none | IP vendor | The released IP files |
 | Rebuild (L4) | Design | Release attestation, the same pinned inputs | Final GDS of the release | `gds-bit-exact`, `gds-equal-ignoring-timestamps` |
 | F1. Wafer fabrication | Wafer | GDS release, mask set record | Wafer lot | Mask data vs GDS XOR; inline parametrics |
 | F2. Wafer sort | Wafer | F1, wafer lot | Wafer maps; unit identities if provisioned here | Probe pass; identity provisioning log |
@@ -322,7 +326,8 @@ The programming station is the firmware's last builder. For every part it writes
 2. Every step from source freeze to stream-out is present, signed by an allowed builder, and linked by digest. With [per-tool records](#per-tool-design-steps), each spec step is covered by at least one record and every input view is an output of an earlier record.
 3. Every tool and PDK digest (or the image and PDK tree digests that pin them) is on the approved list, and every step names the same ones.
 4. Every required gate passed, every waiver is signed by a signoff owner, and a chip with a mask ROM passed `rom-readback`.
-5. From Design L3, an equivalence record between RTL and final netlist exists; at Design L4, a [`rebuild` record](#rebuild-record) from an independent builder also exists and passes the check the policy asks for (`gds-bit-exact` by default).
+5. From Design L2, the source freeze consumes a tag signed by an allowed source owner and a source review of the same commit by someone other than its author, and the verifier walks git's object hashes from the tag to every file in the source archive. Every IP block the release lists has provenance signed by its vendor, and the IP files in the archive match it.
+6. From Design L3, an equivalence record between RTL and final netlist exists; at Design L4, a [`rebuild` record](#rebuild-record) from an independent builder also exists and passes the check the policy asks for (`gds-bit-exact` by default).
 
 **At lot receipt**, by the buyer, OEM or EMS:
 
@@ -399,7 +404,7 @@ The HBOM is the one document a buyer starts from: it lists what the product is m
 
 The JSON Schema and the worked examples are in this repository at [`hbom/hbom-predicate-v0.1.schema.json`](../hbom/hbom-predicate-v0.1.schema.json), [`hbom/picosoc-sky130.hbom.intoto.json`](../hbom/picosoc-sky130.hbom.intoto.json) and [`hbom/picosoc-devboard.hbom.intoto.json`](../hbom/picosoc-devboard.hbom.intoto.json), all current with these changes. [`hbom/picosoc-sky130.shipped-lot.txt`](../hbom/picosoc-sky130.shipped-lot.txt) and [`hbom/picosoc-devboard.board-lot.txt`](../hbom/picosoc-devboard.board-lot.txt) are their canonical unit and board lists, so both lot digests can be recomputed.
 
-**Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L1: the flow platform signs every step, but there is no signed, reviewed source freeze and no signed IP provenance. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the proposed board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1.
+**Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L2: the flow platform signs every step, the source freeze is an SSH-signed git tag with a source review by someone other than the author, and PicoRV32 arrives with IP provenance signed by a key standing in for its vendor. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the proposed board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1.
 
 ## Relationship to existing standards
 
@@ -428,14 +433,14 @@ Four examples run in this repository's GitHub Actions and exercise the spec end 
 
 | Example | Exercises | Levels verified | Docs |
 | --- | --- | --- | --- |
-| PicoRV32 on SKY130 | Design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks | Design L1, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md) |
+| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]`, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image and PDK tree pins, release of a real GDS, a draft `rebuild` record from a second runner | Shape of Design L4 evidence, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
 | Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
 The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, and signs VSAs. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
-What the examples do not show yet: no example reaches Design L2 or above (no signed, reviewed source freeze or signed IP provenance), the OpenLane 2 GDS is equal ignoring timestamps but not bit-exact, and no rebuild comes from an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated, and Caliptra units run on its emulator rather than on the RTL.
+What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key is simulated, the OpenLane 2 GDS is equal ignoring timestamps but not bit-exact, and no rebuild comes from an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated, and Caliptra units run on its emulator rather than on the RTL.
 
 ## Decisions and open questions
 
@@ -487,7 +492,7 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [ ] Pin the dates Magic, KLayout, STA and RCX embed, so the OpenLane 2 GDS is bit-exact and the verifier can require `gds-bit-exact`.
 - [ ] Have a second, independently operated builder sign a `rebuild` record for a released design.
 - [ ] Boot the Caliptra ROM on the Verilated RTL instead of the emulator, so the booted device is the design itself.
-- [ ] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance.
+- [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
 

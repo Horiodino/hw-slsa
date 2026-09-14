@@ -8,9 +8,7 @@ HSLSA is a framework for proving how a chip or board was made, the way SLSA, SBO
 
 This is version 0.1, a working draft. It consolidates the project's earlier drafts (the unified level scheme, a standards gap analysis, design provenance for RTL-to-GDS flows, fabrication and assembly attestations, firmware attestations, and the HBOM schema) into one text, and supersedes them where they disagree. Revision 2 writes in what the four [worked examples](#worked-examples-and-reference-implementation) needed: records for board parts, per-tool design steps, rebuilds and provisioning, and the checks a buyer runs on a board and on a booted device. Where the spec and the examples differ, the spec now matches what the examples, the HBOM schema and the reference tool do.
 
-**Scope.** Digital ASIC and SoC design from RTL to GDSII, mask making, wafer fabrication and sort, packaging and final test, board assembly, and all firmware that ships in the part or on the board, through to the device proving what it booted. The full chain, down to the at-boot check, applies to parts with a hardware identity. Every other part on a board gets a distribution record and lot-level naming, which cannot detect one part swapped for another inside a lot. Out of scope for 0.1: distribution after the first buyer, the internals of secure boot and update protocols, and firmware for off-chip components (their vendors attest it, and it enters here as a dependency). Whether analog and mixed-signal flows can reach Design L3 is an open question.
-
-**What the records prove.** A signed record proves which party made a claim and that nobody changed it afterwards, not that the claim is physically true. Levels L1 to L3 make the records tamper-evident and their signers accountable; only the L4 defense profile examines physical parts, and only a sample of them. The [threat model](#threat-model) says, track by track, which attacks each level stops and which it only makes accountable.
+**Scope.** Digital ASIC and SoC design from RTL to GDSII, mask making, wafer fabrication and sort, packaging and final test, board assembly, and all firmware that ships in the part or on the board, through to the device proving what it booted. Out of scope for 0.1: distribution after the first buyer, the internals of secure boot and update protocols, and firmware for off-chip components (their vendors attest it, and it enters here as a dependency). Whether analog and mixed-signal flows can reach Design L3 is an open question.
 
 **Conventions.** MUST, SHOULD and MAY carry their RFC 2119 meaning in requirement tables. Every predicate and schema URI lives under `https://github.com/Horiodino/hw-slsa/`, the repository that hosts this spec. URIs are identifiers and need not resolve; a custom domain can replace this prefix in a later version.
 
@@ -61,7 +59,7 @@ Wafer and Package/Test are separate tracks because foundry and OSAT are usually 
 | L3 | Hardened | Signing keys and build steps are isolated, inputs are pinned, and the subject is rooted in a hardware identity | Core |
 | L4 | Independently verified | A second, independent party rebuilt or physically inspected the item and got the same answer | Optional defense profile |
 
-Claims are written as track plus level, such as `Design L3`. An L4 claim is written `Design L4 (defense profile)` and requires L3 in the same track; tooling that checks only the core reads it as L3. A level says how far a buyer can rely on the records, not that the parts are free of tampering: Wafer L3 does not mean "no trojans". See the [threat model](#threat-model).
+Claims are written as track plus level, such as `Design L3`. An L4 claim is written `Design L4 (defense profile)` and requires L3 in the same track; tooling that checks only the core reads it as L3.
 
 ### Core requirements
 
@@ -69,10 +67,10 @@ Each cell adds to the one on its left.
 
 | Track | L1: Provenance exists | L2: Signed by the producer | L3: Hardened |
 | --- | --- | --- | --- |
-| Design | Every flow step emits a `design-flow` attestation (tools, PDK, parameters, subject digests) and the chain from GDS back to RTL is complete; the release record lists IP blocks and versions and the GDS digest; an HBOM is published | Steps run on a managed flow platform, not a workstation, and the platform identity signs each attestation; source freeze is a signed, reviewed tag; waivers are signed by a signoff owner; third-party IP arrives with signed provenance | Steps are isolated from each other and from the network, except that a step MAY reach declared license servers ([Network access and licensed tools](#network-access-and-licensed-tools)); tools and PDK are pinned by digest and on an allow-list (a container image digest and a [PDK tree digest](#pinning-tools-and-pdks) count as pins); signing keys are unreachable from step code; formal equivalence between RTL and final netlist is recorded, and enough is attested for an independent party to rerun equivalence and LVS |
+| Design | Every flow step emits a `design-flow` attestation (tools, PDK, parameters, subject digests) and the chain from GDS back to RTL is complete; the release record lists IP blocks and versions and the GDS digest; an HBOM is published | Steps run on a managed flow platform, not a workstation, and the platform identity signs each attestation; source freeze is a signed, reviewed tag; waivers are signed by a signoff owner; third-party IP arrives with signed provenance | Steps are isolated from each other and from the network; tools and PDK are pinned by digest and on an allow-list (a container image digest and a [PDK tree digest](#pinning-tools-and-pdks) count as pins); signing keys are unreachable from step code; formal equivalence between RTL and final netlist is recorded, and enough is attested for an independent party to rerun equivalence and LVS |
 | Wafer | Lot record names the fab, mask set revision, GDS digest and probe program version | Each step signs with a site key; wafer fab names the wafer lot as subject; from sort onward, records name each unit | Keys held in HSMs at accredited sites (for example DMEA or O-TTPS); the fab verifies the design release attestation before mask making and records the mask-vs-GDS XOR; identities provisioned at sort are rooted in an on-die RoT (DICE or Caliptra class) and issued by an HSM-backed CA |
 | Package/Test | Record names the OSAT, assembly lot and test program version for each lot | Each step signs with a site key; records name each unit, with genealogy to wafer and die position; every unit has a unique identity by final test; final test signs the shipped lot digest | Keys held in HSMs at accredited sites; every unit answers an identity challenge at final test, rooted in hardware; the shipped lot digest covers the units' certificate digests |
-| Assembly | Board HBOM with lot and date code for every part, plus IPC-1782 style build records per serial number | Each assembly step signs its record against the board serial and the identities of its key components; every part lot arrives with a [distribution record](#distribution-record) signed by its shipper, and the assembler runs the lot receipt check on each chip before placement; a part without a hardware identity is named only by lot and date code, which cannot detect a swap inside a lot | Signing at accredited sites; every component with a hardware identity is checked by attestation at build; a platform certificate binds the system to those parts; parts without an identity stay at lot-level naming, as at L2 |
+| Assembly | Board HBOM with lot and date code for every part, plus IPC-1782 style build records per serial number | Each assembly step signs its record against the board serial and the identities of its key components; every part lot arrives with a [distribution record](#distribution-record) signed by its shipper, and the assembler runs the lot receipt check on each chip before placement | Signing at accredited sites; component identities are checked by attestation at build; a platform certificate binds the system to its parts |
 | Firmware | SLSA Build L1 provenance and an SBOM for every image; mask ROM content is proven by the Design track's ROM merge step | SLSA Build L2; images are signed and verified before the SoC runs them, by a secure-boot ROM on the silicon or by an attested board-level root of trust (proposed); a part with neither stops at Firmware L1 | SLSA Build L3; firmware is independently reviewed (S.A.F.E. style); releases appear in a transparency log; the device reports firmware measurements under a DICE or Caliptra class identity, and they match the attested image digests |
 
 Three rules apply across tracks:
@@ -95,7 +93,7 @@ L4 is opt-in because its costs (a second builder, destructive part sampling) onl
 | Assembly | Sampled boards are X-rayed and components authenticated (SAE AS6171 style) by an independent lab, checked against the board HBOM | Counterfeit or substituted components that pass electrical test |
 | Firmware | An independent party reproduces each image built from source bit for bit; two-person review on releases; per-unit data is covered by provisioning readback instead; a closed vendor binary caps the product at Firmware L3 unless its vendor supplies an independent rebuild | A compromised firmware build system or insider |
 
-Wafer and Package/Test samples are drawn from the shipped lot after final test, so one inspection can serve both tracks. The lab commits to a random seed before the lot is sealed, states the lot size and sampling plan, names the regions and layers it imaged and the technique it used, and signs under a trust root separate from the producer's. What sampling and imaging can and cannot find is under [Limits of physical inspection](#limits-of-physical-inspection).
+Wafer and Package/Test samples are drawn from the shipped lot after final test, so one inspection can serve both tracks. The lab commits to a random seed before the lot is sealed, states the lot size and sampling plan, and signs under a trust root separate from the producer's.
 
 **SLSA and DoD alignment.** Design Ln and Firmware Ln each meet SLSA Build Ln for n from 1 to 3. From L2, Firmware adds device and review requirements SLSA does not have, so tooling must not treat the two as equal. How HSLSA lines up with DoD Microelectronics Levels of Assurance is inferred, not established: L3 in all tracks may approach LoA2, and the L4 profile may approach LoA3.
 
@@ -187,7 +185,7 @@ None of these key models requires a public transparency log. The reference tool 
 
 ### Record shapes
 
-The examples needed four record shapes the drafts left open, and commercial flows need one more, for network access. Each is still an in-toto Statement whose predicate is a superset of SLSA Provenance v1.
+The examples needed four record shapes the drafts left open. Each is still an in-toto Statement whose predicate is a superset of SLSA Provenance v1.
 
 #### Pinning tools and PDKs
 
@@ -199,6 +197,8 @@ A tool MAY be pinned by the digest of the container image it runs in, as a `reso
 
 Every step of one flow MUST name the same source, image and PDK digests, so a verifier can check that nothing changed mid-flow. The [OpenLane 2 example](../docs/openlane2-flow.md) pins the SKY130A variant this way.
 
+A flow MAY replace files inside a pinned image, for example so that tools stop writing the build time into their outputs. The replacement files are then one more `resolvedDependencies` entry, pinned by tree digest, annotated `kind: overlay` and listing the digest of each image file they replace. A `SOURCE_DATE_EPOCH` the flow passes to its tools goes in `externalParameters.sourceDateEpoch`. Every step MUST name the same overlay and the same `SOURCE_DATE_EPOCH`. The OpenLane 2 example needs both for a byte-identical GDS ([its overlay](../openlane2/overlay/README.md)).
+
 #### Per-tool design steps
 
 A flow tool usually runs many small steps for each spec step (OpenLane 2's Classic flow runs 74 for steps 1 to 7). A flow platform MAY sign one record per tool step, with buildType `.../design-flow/step/<tool>@v1`, as long as each record:
@@ -209,55 +209,24 @@ A flow tool usually runs many small steps for each spec step (OpenLane 2's Class
 
 The verifier requires every spec step from synthesis to stream-out to be covered by at least one record, the records to be linked in order, and the released GDS to be a subject of the last stream-out record. The mapping from OpenLane 2 step names to spec steps is in [`tools/hslsa/openlane.go`](../tools/hslsa/openlane.go).
 
-#### Network access and licensed tools
-
-Commercial EDA tools check out licenses from a license server while they run, so a step that runs one cannot be cut off from the network entirely, as Design L3 otherwise requires. A Design L3 step MAY therefore reach declared license servers and nothing else. A Design L3 step MUST record its network access in `hwFlow.network`, and any other design step MAY, with these fields:
-
-| Field | Holds |
-| --- | --- |
-| `mode` | `isolated` (no network), `license-server` (the servers below and nothing else) or `open` (anything else). A step with no `network` block counts as `open` |
-| `licenseServers[]` | Each server the step may reach: `address` as the tool is configured with it (`27000@lic1.flow.internal` for FlexNet), `daemon` (the vendor daemon, such as `snpslmd`), and `endpoints[]`, the `ip:port` pairs the platform allows |
-| `features[]` | Each license feature checked out: `server` (a declared `address`), `name`, `version` and `count` |
-| `featureSource` | Where `features[]` came from: `license-server-log` (the server's checkout log for this step's client) or `tool-log` |
-| `observed[]` | Every outbound connection attempt the platform saw from the step: `endpoint`, `allowed`, `connections`, `bytesSent` and `bytesReceived` |
-
-```json
-"network": {
-  "mode": "license-server",
-  "licenseServers": [
-    {"address": "27000@lic1.flow.internal", "daemon": "snpslmd", "endpoints": ["10.20.0.5:27000", "10.20.0.5:27010"]}
-  ],
-  "features": [
-    {"server": "27000@lic1.flow.internal", "name": "Example-Synthesis", "version": "2025.06", "count": 1}
-  ],
-  "featureSource": "license-server-log",
-  "observed": [
-    {"endpoint": "10.20.0.5:27000", "allowed": true, "connections": 1, "bytesSent": 1830, "bytesReceived": 2210},
-    {"endpoint": "10.20.0.5:27010", "allowed": true, "connections": 2, "bytesSent": 9120, "bytesReceived": 8870}
-  ]
-}
-```
-
-1. **The platform enforces it.** The flow platform sets the network policy outside the step (a network namespace or firewall that step code cannot change) and fills in `observed[]` from what it enforced. A tool's own report of its network use counts for nothing.
-2. **Only declared endpoints.** The step can reach the declared endpoints and nothing else, including DNS: the platform resolves each server's address before the step starts and allows the resulting `ip:port` pairs. A FlexNet server needs two, the license manager's port and the vendor daemon's, so the vendor daemon's port has to be fixed (`PORT=` on the license file's `VENDOR` line); a daemon on a random port cannot be allowed by endpoint.
-3. **The record agrees with itself.** Every allowed connection in `observed[]` went to a declared endpoint, and every checked-out feature came from a declared server. Blocked attempts are recorded with `allowed: false`; they do not fail the step, since the platform stopped them, but they show a buyer that a tool tried to reach somewhere else.
-4. **The policy names the servers.** Every declared server and endpoint is on the tapeout policy's list. A policy SHOULD list only servers the design house runs on its own network; listing a tool vendor's cloud licensing service accepts that design data can reach that vendor.
-5. **Features are configuration.** Which features a tool checks out can decide which engines and options it may use, so they belong to the step's effective configuration. A rebuild SHOULD check out the same features, and its `hwFlow.reproducibility` names any difference.
-
-The license connection is still a way out of the step: a compromised tool can send design data to the server, and the server's replies reach the tool. This rule accepts that, and the server joins the flow platform's trust boundary. `bytesSent` lets a policy set a ceiling per step, which catches bulk copying but not a slow leak.
-
-The reference tool's tapeout check applies rule 3 to every step that carries a `network` block. Its policy adds three settings under `design.network`: `requireIsolation` makes every required step `isolated` or `license-server`; `allowedLicenseServers[]`, each an `address` and its `endpoints`, is the list for rule 4, which also applies whenever isolation is required; and `maxBytesSent` is the ceiling on the bytes a step sent. No worked example runs its steps isolated yet, so the unit tests in [`tools/hslsa/network_test.go`](../tools/hslsa/network_test.go) and one tamper test on the PicoRV32 chain exercise the check.
-
 #### Rebuild record
 
-A `rebuild` record is a design-flow statement with buildType `.../design-flow/step/rebuild@v1`, signed by the second builder. Its subject is the released final GDS, it consumes the release attestation it rebuilt, and `hwFlow.checks` carries two results:
+A `rebuild` record is a design-flow statement with buildType `.../design-flow/step/rebuild@v1`, signed by the second builder. Its subject is the released final GDS. Its `resolvedDependencies` are the release attestation it rebuilt (`kind: release`) and the source, image, PDK and any overlay it built from, and `hwFlow.checks` carries two results:
 
 | Check | Passes when |
 | --- | --- |
 | `gds-bit-exact` | The second build's final GDS is byte-identical to the released one |
 | `gds-equal-ignoring-timestamps` | The two are equal once the GDS BGNLIB and BGNSTR dates are cleared |
 
-`hwFlow.reproducibility` MAY add a per-output comparison and the first step whose outputs differ in content. A Design L4 claim needs a rebuild record from an independently operated builder in which `gds-bit-exact` passes; a buyer's policy MAY accept `gds-equal-ignoring-timestamps` instead, and says so. The [OpenLane 2 example](../docs/openlane2-flow.md#reproducibility) signs a draft rebuild record from a second runner of the same operator, which is the right shape but not yet independent.
+`hwFlow.reproducibility` MAY add a per-output comparison and the first step whose outputs differ in content. A Design L4 claim needs a rebuild record from an independently operated builder in which `gds-bit-exact` passes; a buyer's policy MAY accept `gds-equal-ignoring-timestamps` instead, and says so. At tapeout the verifier accepts a rebuild record only when:
+
+- it is signed by a key the buyer lists for the `rebuilder` role, in a trust root of its own, and none of the rebuilder's keys is a key of the design house;
+- its `runDetails.builder.id` is not the builder of any step record in the flow;
+- its subject is the released GDS, and it names that release attestation;
+- it built from the same source, image, PDK, overlay and `SOURCE_DATE_EPOCH` as the flow;
+- the check the policy requires passes.
+
+Records cannot show who operates a key. That the second builder is independently operated is something the buyer establishes before listing its key, as for any site key. The [OpenLane 2 example](../docs/openlane2-flow.md#the-rebuild-and-the-buyers-check) rebuilds its release bit for bit on a separate runner, with its own keys, trust root and builder id, and its tapeout check requires `gds-bit-exact`. Both builders still run under one GitHub account, so it is not yet an independently operated rebuild.
 
 #### Distribution record
 
@@ -328,6 +297,8 @@ Each arrow is a digest link. A board has its own HBOM, with the board design and
 | 6a. ROM merge (mask ROM only) | Design, for Firmware | ROM image (by its SLSA provenance digest), ROM compiler, empty ROM macro | Programmed ROM macro GDS, merged layout | `rom-readback`: bits extracted from layout match the image digest; optional `rom-matches-frozen` (see [Mask ROM](#mask-rom)) |
 | 7. GDS stream-out | Design | Routed layout, cell, IP and ROM macro GDS | Final GDSII/OASIS | GDS vs DEF XOR clean |
 | Release | Design | Run summary over steps 0 to 7 | Final GDS | Tapeout policy check (below) |
+| Source review | `https://github.com/Horiodino/hw-slsa/source-review/v0.1` | none | Reviewer, who is not the commit's author | The reviewed commit (`gitCommit` digest) |
+| Third-party IP release | `https://slsa.dev/provenance/v1` (unchanged), buildType `.../ip-release@v1` or the vendor's own | none | IP vendor | The released IP files |
 | Rebuild (L4) | Design | Release attestation, the same pinned inputs | Final GDS of the release | `gds-bit-exact`, `gds-equal-ignoring-timestamps` |
 | F1. Wafer fabrication | Wafer | GDS release, mask set record | Wafer lot | Mask data vs GDS XOR; inline parametrics |
 | F2. Wafer sort | Wafer | F1, wafer lot | Wafer maps; unit identities if provisioned here | Probe pass; identity provisioning log |
@@ -366,8 +337,7 @@ The programming station is the firmware's last builder. For every part it writes
 3. Every tool and PDK digest (or the image and PDK tree digests that pin them) is on the approved list, and every step names the same ones.
 4. Every required gate passed, every waiver is signed by a signoff owner, and a chip with a mask ROM passed `rom-readback`.
 5. From Design L2, the source freeze consumes a tag signed by an allowed source owner and a source review of the same commit by someone other than its author, and the verifier walks git's object hashes from the tag to every file in the source archive. Every IP block the release lists has provenance signed by its vendor, and the IP files in the archive match it.
-6. From Design L3, every step's `hwFlow.network` is `isolated` or `license-server`, every connection the platform allowed went to a declared endpoint, and every declared license server is on the policy's list (see [Network access and licensed tools](#network-access-and-licensed-tools)).
-7. From Design L3, an equivalence record between RTL and final netlist exists; at Design L4, a [`rebuild` record](#rebuild-record) from an independent builder also exists and passes the check the policy asks for (`gds-bit-exact` by default).
+6. From Design L3, an equivalence record between RTL and final netlist exists; at Design L4, a [`rebuild` record](#rebuild-record) from an independent builder also exists and passes the check the policy asks for (`gds-bit-exact` by default).
 
 **At lot receipt**, by the buyer, OEM or EMS:
 
@@ -446,122 +416,6 @@ The JSON Schema and the worked examples are in this repository at [`hbom/hbom-pr
 
 **Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L2: the flow platform signs every step, the source freeze is an SSH-signed git tag with a source review by someone other than the author, and PicoRV32 arrives with IP provenance signed by a key standing in for its vendor. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the proposed board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1.
 
-## Threat model
-
-This section says what a buyer can rely on at each level, and what no level gives them. Read it before writing a level into a purchasing policy.
-
-### What a signed record proves
-
-When a verifier accepts a record, it has learned three things: the holder of an allowed key signed it, nobody changed it afterwards, and it links by digest to the records around it. It has not learned that the record is true. A fab's F1 record shows that the fab claims it built the released GDS. It cannot show that nobody changed a mask.
-
-Physical things differ from files in a way that shapes everything below. A file's name is its digest, so changing the file changes its name and breaks every link to it. A wafer, a unit or a board keeps its name when it is changed. The lot digest proves which units a site said were in a lot, not what is inside them: a modified part keeps its serial, and every record around it stays valid.
-
-Records meet the physical part in three places only:
-
-1. **Hardware identity.** At Package/Test L3 final test, at lot receipt for an L3 lot, and at boot, a unit proves it holds a private key rooted in its own die. A part without that key (a clone, a remarked part, a die that was never endorsed) fails. A genuine die in a tampered package passes, and so does a clone carrying a key extracted from a genuine die.
-2. **The device's own measurements.** At boot the device reports what it ran and which fuses it read, measured by its mask ROM, and the [at-boot check](#where-the-chain-is-checked) compares them with the provisioning record and the image provenance. This tests the programming station's claims against the part itself, but only as far as the ROM can be trusted, which is why the ROM is proven through the Design track.
-3. **L4 inspection.** An independent lab examines sampled parts. Nothing else in this spec looks at silicon, packages or boards.
-
-Everything else in the chain is signed testimony. It makes the signer accountable for what it said, and makes any later change to what it said detectable.
-
-### Three outcomes
-
-For each attack in the tables below, HSLSA does one of three things:
-
-- **Stops it.** A check fails before the design, lot or unit is used: one the buyer runs, or, for firmware, the device's own secure boot.
-- **Makes it accountable.** The attack can succeed, but only if an allowed signer puts its key to a false statement. The record is then evidence against that signer, for a contract, an audit or an accreditor. This works only after the fact, once something else exposes the false statement, and only while the key was not stolen.
-- **Does not address it.** No record can show it.
-
-Some threats are outside HSLSA altogether: changes made after the buyer's checks (a board modified in the field, except firmware the at-boot check measures), unintended design flaws, side-channel and fault attacks on the finished product, and supply disruption. HSLSA records how a part was made; it does not test whether the design is secure.
-
-### What the verifier trusts
-
-1. **The trust root.** Its list of keys by role decides which platforms, sites, shippers and labs are allowed. Whoever writes it decides what an allowed site is.
-2. **Key custody.** Each key is used only by the party it names. At L2 a site key may sit on an ordinary server, and whoever takes it can sign anything that site could. At L3 an HSM stops the key from being copied, not from being misused by the people allowed to use it. This spec does not define key revocation yet (see [Open questions](#open-questions) on trust roots).
-3. **Hardware roots of trust.** A unit's identity key stays inside it, and the ROM that measures its firmware does what its design says. Fault injection, side channels or invasive extraction that recover a device key let a clone answer the identity challenge.
-4. **The cryptography.** SHA-256, SHA-384 and ECDSA.
-5. **The verifier and its policy.** The policy decides which sites, checks and levels are acceptable.
-
-HSLSA does not require a public transparency log (see [Signing and keys](#signing-and-keys)). Private records keep supplier data private but leave two gaps a shared log would close:
-
-- **Equivocation.** A site can sign two different records for the same lot and show each to a different buyer, and no one sees both. A log shared by a consortium, or run by one buyer for all its suppliers, closes this among the parties that read it.
-- **Backdating after key theft.** Without a log, a stolen key can sign records dated before the theft, and a verifier cannot tell them from genuine ones. Only Firmware L3 requires a log today.
-
-A producer also decides what to record. Rule 2 under [Rules every step follows](#rules-every-step-follows) breaks the chain when a file is changed without a record, but a physical change made without a record, such as rework or extra wafers, leaves no trace in the chain. Overproduced parts are stopped only where a buyer checks that each part is in a signed shipped lot, and at L2 a copied serial defeats that check.
-
-### Per track and level
-
-Each row adds to the rows above it. At L1 records need not be signed, so they stop honest mistakes (a missing step, a lot record that names the wrong design) but nothing deliberate: anyone can rewrite an unsigned record to match a change.
-
-**Design**
-
-| Level | Stops | Makes accountable | Does not address |
-| --- | --- | --- | --- |
-| L2 | Forged or altered step records; a GDS, netlist or source archive swapped after signing; RTL changed after the signed source freeze; a third-party IP block replaced by one with a different digest | The flow platform for every step record; the engineers who signed and reviewed the source freeze; the signoff owner for each waiver; each IP vendor for the block it delivered | Malicious RTL that passed review; a trojan inside third-party IP, since provenance shows who delivered it, not what it does (and IEEE 1735 encrypted IP cannot be reviewed by the integrator at all); a compromised flow platform, whose steps can still reach each other and its key |
-| L3 | One step tampering with another step or reaching the signing key; a tool or PDK other than the pinned, approved one; a step fetching unpinned inputs over the network; logic added between RTL and netlist, which the equivalence record exposes to anyone who reruns it | The flow platform for the isolation it records, including which license servers a step reached | A malicious tool or PDK that is on the allow-list, since a pin proves which binary ran, not that it is honest; a tool whose output also passes the recorded equivalence and LVS checks because they ran on the same platform (L3 makes an independent rerun possible, but does not require one); design data leaving over a declared license server connection (see [Network access and licensed tools](#network-access-and-licensed-tools)) |
-| L4 | A compromised flow platform or an insider at one builder, since the independent rebuild would not reproduce the GDS; one rogue reviewer or signoff owner, through two-person review | The second builder, for the result it signs | Malicious RTL or IP, which both builders build faithfully; a trojan in a pinned input both builders share, such as the same tool binary or PDK; the two builders colluding |
-
-**Wafer**
-
-| Level | Stops | Makes accountable | Does not address |
-| --- | --- | --- | --- |
-| L2 | Forged or altered fab and sort records; a lot record that points at another design; units added to the records after sort | The fab, for its claim that it built the released GDS with the stated mask set; the sort site, for each unit's result | Anything the fab does to the silicon: a changed mask, a changed process, an inserted trojan; wafers run and never recorded; a stolen site key |
-| L3 | Remote theft of site keys, through HSMs; a fab building from an unreleased or altered GDS, through its own check of the release attestation; a die with no endorsed identity passing as genuine wherever its identity is challenged | The fab's accreditation; the mask-vs-GDS XOR, which is the fab's own statement | A fab that alters a mask after the XOR, or records an XOR it did not run; process changes that alter no mask, such as dopant concentration or oxide thickness; an HSM misused by its authorized operators |
-| L4 | Statistically, layout changes and mask substitution in the regions the lab images, compared against the signed GDS | The lab, for its results and its sampling | Changes outside the imaged regions or in units not sampled; dopant-level trojans, unless the lab images the active layer with a dopant-sensitive technique ([below](#limits-of-physical-inspection)); malicious logic that is already in the GDS, since inspection shows the die matches the design, not that the design is benign |
-
-**Package/Test**
-
-| Level | Stops | Makes accountable | Does not address |
-| --- | --- | --- | --- |
-| L2 | Forged or altered packaging and test records; a unit added to a shipped lot after F4, or received with a serial not in it; a scrapped unit shipped, through the lot digest and yield reconciliation | The OSAT, for genealogy and marking; the test site, for each result and the test program it names | A copied serial: serials are not secrets, so a fake part carrying a valid serial passes a serial check; a die swapped or remarked at the OSAT under a genuine serial; a test site that signs results for tests it did not run |
-| L3 | A clone, a remarked part or anything else that cannot answer an identity challenge rooted in the die, at final test and again at lot receipt | The site's accreditation | A genuine die in a modified package (an added die, changed bonding); a clone carrying a key extracted from a genuine die; an HSM misused by its authorized operators |
-| L4 | Statistically, die swaps, remarking and additions to the package that decapsulation and X-ray show on sampled units | The lab | Units not sampled; changes inside the die, which are the Wafer track's to find |
-
-**Assembly**
-
-| Level | Stops | Makes accountable | Does not address |
-| --- | --- | --- | --- |
-| L2 | Forged or altered build records; a part lot from a shipper the policy does not name; a chip whose own chain fails; more of a lot placed than was shipped, or a serialized part placed twice | Each shipper, for its certificate of conformance and traceability claim; the EMS, for every placement | A swap inside a lot: a part without a hardware identity is named only by lot and date code, so a counterfeit placed from a correctly labelled reel matches its records; a shipper that certifies counterfeit parts; rework or implants added after A1 |
-| L3 | Substitution of a component that has a hardware identity, which must pass attestation at build; such a component swapped after build, where the buyer checks the platform certificate | The site's accreditation | The same swap inside a lot for every part without an identity, which is most of a board (passives, power parts, commodity logic); an added chip or changed trace, which no record describes |
-| L4 | Statistically, counterfeit or substituted components and board-level implants that X-ray and component authentication show on sampled boards | The lab | Boards not sampled; implants inside a genuine component's package; counterfeits good enough to pass the authentication tests |
-
-**Firmware**
-
-| Level | Stops | Makes accountable | Does not address |
-| --- | --- | --- | --- |
-| L2 | Forged provenance; an image the secure-boot ROM or attested board root of trust refuses because it is not signed; a station writing an image whose provenance fails; where the buyer runs the at-boot check, a unit that booted firmware other than its records name | The build platform, for provenance; the programming station's site, for what it wrote, burned and read back | A compromised build platform, since SLSA Build L2 does not isolate a build from its own steps; malicious source; a stolen image-signing key, whose images boot |
-| L3 | A build step tampering with provenance or keys (SLSA Build L3); a signed image that was never released, since it is missing from the transparency log; a unit whose measured firmware or fuses differ from its records, since the at-boot check is required | The reviewers, for what their review covered; the signer of every logged release | Vulnerabilities and backdoors the review missed; a stolen release key used for a logged image, which the log shows but does not stop; a flawed mask ROM, which takes the first measurement |
-| L4 | A compromised build system or an insider on it, since an independent party must reproduce each image built from source bit for bit; one rogue releaser, through two-person review | The rebuilder | Malicious source, which both builds reproduce; a toolchain both builders share; vendor binaries, which cap the product at Firmware L3 unless their vendor supplies an independent rebuild |
-
-### Limits of physical inspection
-
-L4 is the only place this spec looks at the parts themselves, and it has three limits a buyer should price in.
-
-**Sampling.** A lab draws $n$ parts at random from a lot. A change made to every part, such as a changed mask, is found by the first sample the lab can see it in. A change made to a fraction $p$ of the parts is missed with probability about $(1-p)^n$ when the lot is much larger than the sample: with 1% of parts changed, 30 samples miss it about 74% of the time, and finding it with 95% confidence takes about 300 samples, whatever the lot size. Sampling suits changes made to a whole lot and is weak against changes aimed at a few parts. The inspection record states the lot size and sampling plan so a buyer can compute this, and the lab commits to its seed before the lot is sealed so the producer cannot steer which parts it gets.
-
-**What imaging can see.** A lab compares what it images with the signed GDS, so it finds only changes in the regions and layers it images, with the technique it uses:
-
-- A trojan can be tiny. The A2 attack needs as little as one gate's worth of added circuit, placed at fabrication time in unused space in the layout ([Yang et al., IEEE S&P 2016](https://ieeexplore.ieee.org/document/7546493)). Imaging named regions, such as the root of trust, misses a change elsewhere.
-- A dopant-level trojan changes only the doping of existing transistors, adding no metal or polysilicon, so optical inspection of the layout misses it ([Becker et al., CHES 2013](https://link.springer.com/chapter/10.1007/978-3-642-40349-1_12)). Scanning electron microscopy with passive voltage contrast can reveal dopant types, but imaging the active layer this way takes up to 16 times as many images as a metal layer ([Sugawara et al., CHES 2014](https://link.springer.com/chapter/10.1007/978-3-662-44709-3_7)).
-- Process changes that alter no layer's shape, such as dopant concentration or oxide thickness, change a transistor's electrical behaviour, not its layout, and imaging does not measure them.
-
-An inspection record therefore names the regions and layers it imaged and the technique it used, so a buyer can tell which of these it could have found.
-
-**Destruction.** Delayering and decapsulation destroy the sample, so an inspection speaks for the parts that shipped only as far as the lot is uniform and the sample was drawn at random.
-
-### Reading a claim
-
-| Claim | Means | Does not mean |
-| --- | --- | --- |
-| Design L3 | Every step ran isolated with pinned, approved tools, and equivalence between RTL and final netlist was recorded | That the RTL, IP or tools contain no malicious logic |
-| Wafer L3 | The fab's records are signed with HSM keys at an accredited site; the fab says it checked its masks against the released GDS; every die carries a hardware identity | That the silicon has no trojan. Only Wafer L4 looks at silicon, and only at samples |
-| Package/Test L2 | Each unit's serial is in a lot the test site signed | That a part carrying that serial is genuine; that needs Package/Test L3 |
-| Assembly L3 | Every part with a hardware identity was verified at build | That parts without an identity are the ones the records name |
-| Firmware L3 | The device booted images that were built in isolation, reviewed and logged, and its measurements match its records | That the reviewed firmware has no vulnerabilities |
-| Any L4 | An independent party rebuilt the item or inspected a sample and got the same answer | That every unit was inspected, or that the design itself is benign |
-
-The tamper tests in the [worked examples](#worked-examples-and-reference-implementation) exercise the "Stops" column for record-level attacks: forged, altered, re-signed, unlinked and misattributed records. None exercises a physical attack, because all physical data in the examples is simulated.
-
 ## Relationship to existing standards
 
 HSLSA reuses an existing standard wherever one fits and adds only the glue: per-step predicates for hardware, the physical subject naming, and the rules that tie device identity to supply chain records. Citations were checked on 2026-09-02.
@@ -591,12 +445,12 @@ Four examples run in this repository's GitHub Actions and exercise the spec end 
 | --- | --- | --- | --- |
 | PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]`, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
-| OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image and PDK tree pins, release of a real GDS, a draft `rebuild` record from a second runner | Shape of Design L4 evidence, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
+| OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
 | Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
 The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, and signs VSAs. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
-What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key is simulated, the OpenLane 2 GDS is equal ignoring timestamps but not bit-exact, and no rebuild comes from an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated, and Caliptra units run on its emulator rather than on the RTL.
+What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key is simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated, and Caliptra units run on its emulator rather than on the RTL.
 
 ## Decisions and open questions
 
@@ -645,8 +499,9 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Prototype: wrap an OpenLane 2 run of a small SKY130 design so each step emits a signed attestation, and measure how close a second run gets to bit-exact ([openlane2-flow.md](../docs/openlane2-flow.md)).
 - [x] Write one end-to-end example on a part with a hardware identity, from RTL to a booted device ([caliptra-e2e.md](../docs/caliptra-e2e.md)).
 - [x] Add a board-level example to exercise `parts[]`, distributor lot data and A1 ([board-example.md](../docs/board-example.md)).
-- [ ] Pin the dates Magic, KLayout, STA and RCX embed, so the OpenLane 2 GDS is bit-exact and the verifier can require `gds-bit-exact`.
-- [ ] Have a second, independently operated builder sign a `rebuild` record for a released design.
+- [x] Pin the dates Magic, KLayout, STA and RCX embed, so the OpenLane 2 GDS is bit-exact and the verifier can require `gds-bit-exact` ([overlay](../openlane2/overlay/README.md)).
+- [x] Have a second builder, with its own keys and trust root, sign a `rebuild` record for a released design, and check it at tapeout ([openlane2-flow.md](../docs/openlane2-flow.md#the-rebuild-and-the-buyers-check)).
+- [ ] Run that second builder under a separate operator, such as another CI account or organization.
 - [ ] Boot the Caliptra ROM on the Verilated RTL instead of the emulator, so the booted device is the design itself.
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
@@ -656,11 +511,8 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 
 Starts phase 0 of the [roadmap](../docs/roadmap.md), toward v0.2.
 
-- **Design L2 example.** The PicoRV32 example now verifies Design L2: an SSH-signed git tag, a source review by someone other than the author (new `source-review` predicate), and signed IP provenance, checked at tapeout (step 5 of the tapeout check).
-- **Threat model.** Added the [threat model](#threat-model): what a signed record proves and where records meet the physical part, what the verifier trusts, what private records leave open (equivocation, backdating with a stolen key), and per track and level which attacks are stopped, which are only made accountable and which are not addressed. It states that a signature proves who made a claim, not that the claim is true, that L1 to L3 make records tamper-evident, and that only L4 sampling examines parts, statistically, with the limits of sampling and imaging (tiny layout trojans, dopant-level trojans, process changes). Added a short table on reading a claim. The overview and the level definitions point at it.
-- **Scope.** The full chain, down to the at-boot check, applies to parts with a hardware identity; other board parts get distribution records and lot-level naming, which cannot detect a swap inside a lot. Stated in the overview and in Assembly L2 and L3.
-- **Licensed tools at Design L3.** A Design L3 step MAY reach declared license servers and nothing else, recorded in the new `hwFlow.network` block (mode, servers and endpoints, checked-out features, observed connections); see [Network access and licensed tools](#network-access-and-licensed-tools). The tapeout check gains a step for it, and the reference tool checks it.
-- **Inspection records.** An L4 inspection record names the regions and layers imaged and the imaging technique.
+- **Bit-exact design flows.** A flow MAY replace files inside a pinned image, pinned as a `kind: overlay` dependency, and pass tools a `SOURCE_DATE_EPOCH` in `externalParameters`; every step names the same ones (see [Pinning tools and PDKs](#pinning-tools-and-pdks)). The OpenLane 2 example uses both to make its GDS byte-identical across builders.
+- **Rebuild record.** The record lists the inputs it built from next to the release it rebuilt, and the spec lists what the verifier checks before it accepts one: a rebuilder key in its own trust root that is not a design-house key, a builder other than the flow's, the released GDS, the same inputs, and the check the policy requires. The OpenLane 2 example's tapeout check now requires a bit-exact rebuild from a second builder under its own trust root.
 
 ### Revision 2 (2026-09-12)
 

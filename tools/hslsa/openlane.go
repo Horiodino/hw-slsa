@@ -27,6 +27,7 @@ package hslsa
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -86,7 +87,7 @@ var (
 
 // probe runs inside the OpenLane image with the image's own interpreter and
 // reports each tool's version line and the digest of its binary, and the real
-// path and digest of each OpenLane script named on its command line.
+// path, digest and first line of each OpenLane script named on its command line.
 const probe = `
 import hashlib, json, os, shutil, subprocess, sys
 def digest(path):
@@ -115,7 +116,9 @@ try:
     for rel in sys.argv[1:]:
         real = os.path.realpath(os.path.join(root, rel))
         if os.path.isfile(real):
-            scripts[rel] = {"path": real, "sha256": digest(real)}
+            with open(real, "rb") as f:
+                first = f.readline(200).decode("utf-8", "replace").rstrip("\n")
+            scripts[rel] = {"path": real, "sha256": digest(real), "firstLine": first}
 except ImportError:
     pass
 print(json.dumps({"tools": out, "scripts": scripts}))
@@ -372,19 +375,26 @@ func (f *Flow) prepareOverlay(scripts Obj) error {
 	if err != nil {
 		return err
 	}
+	var bad []string
 	for _, rel := range f.overlayFiles() {
 		in := O(scripts, rel)
 		if in == nil {
 			return fmt.Errorf("the OpenLane image has no script %s to overlay", rel)
 		}
 		if want := S(replaces, rel); S(in, "sha256") != want {
-			return fmt.Errorf("the image's %s is sha256:%s, but the overlay was made from sha256:%s", rel, S(in, "sha256"), want)
+			bad = append(bad, fmt.Sprintf("the image's %s is sha256:%s (first line %q), but the lock pins sha256:%s, the copy the overlay was made from",
+				rel, S(in, "sha256"), S(in, "firstLine"), want))
+			continue
 		}
 		file := filepath.Join(dir, filepath.FromSlash(rel))
 		if !isFile(file) {
 			return fmt.Errorf("overlay file %s is missing", file)
 		}
 		f.mounts = append(f.mounts, resolvePath(file)+":"+S(in, "path")+":ro")
+		fmt.Printf("overlay: %s over %s, whose first line is %q\n", rel, S(in, "path"), S(in, "firstLine"))
+	}
+	if len(bad) > 0 {
+		return errors.New(strings.Join(bad, "\n"))
 	}
 	digest, err := TreeDigest(dir)
 	if err != nil {

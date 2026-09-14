@@ -31,7 +31,7 @@
     "overlay": {
       "dir": "../overlay/scripts",
       "replaces": {
-        "klayout/stream_out.py": "d0600b91a2a4ae37270129e0df6171abddddb200bd162e11affa91053f9e1465",
+        "klayout/stream_out.py": "49f42b8da94fec52ee237c085386406e8dca6290357a16f2a9d2f1302daf9bb9",
         "magic/def/mag_gds.tcl": "a4f34a9ed4a454cd1fcc7bb256b52dc5673b1d6636f8c20ca0877a3d6f12213e",
         "openroad/common/io.tcl": "30478f65d023b814e45a180506c86bb331a8dd1f8e48d00172b192eb674eab50"
       }

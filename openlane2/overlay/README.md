@@ -7,10 +7,10 @@ change to the pinned flow, and every step record names it.
 
 `scripts/` holds patched copies of three files from OpenLane's own `scripts`
 directory, at tag 2.3.10. `hslsa openlane run` bind-mounts each one read-only
-over the image's copy, after checking that the image's copy is the upstream
-file the patch was made from (`reproducibility.overlay.replaces` in
-[`../spm/flow.lock.json`](../spm/flow.lock.json) pins each upstream file by
-sha256). It also passes `SOURCE_DATE_EPOCH` from the lock into the container.
+over the image's copy, after checking that the image's copy is the file the
+patch was made from (`reproducibility.overlay.replaces` in
+[`../spm/flow.lock.json`](../spm/flow.lock.json) pins the image's copy of each
+file by sha256). It also passes `SOURCE_DATE_EPOCH` from the lock into the container.
 Without `SOURCE_DATE_EPOCH`, each patched script behaves exactly like the
 original.
 
@@ -39,7 +39,7 @@ and the released GDS consistent.
 ## Moving to a new OpenLane version
 
 The run stops if the image's copy of a replaced script is not the pinned
-upstream file. To move to a new image, copy the three files from the new
+file. To move to a new image, copy the three files from the new
 tag, reapply the changes above, and update the digests in the lock. Newer
 Magic, OpenROAD or KLayout releases may honour `SOURCE_DATE_EPOCH` on their
 own, and then the matching change can go.

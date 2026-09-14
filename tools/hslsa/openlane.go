@@ -14,9 +14,15 @@ package hslsa
 // subjects are the views it produced plus its state_out.json, which carries
 // the metrics.
 //
+// To make the outputs bit-exact, the lock can name an overlay: patched copies of
+// the few OpenLane scripts that write dates, bind-mounted over the image's own
+// copies, and a SOURCE_DATE_EPOCH for them to use. Both are inputs of every
+// step record. See openlane2/overlay/README.md.
+//
 // OpenLaneCompare measures reproducibility between two runs of the same flow
 // on different builders: which step outputs are bit-exact, which differ only
-// in timestamps or line order, and which differ in content.
+// in timestamps or line order, and which differ in content. RebuildRecord and
+// CheckRebuild turn a comparison into the spec's Design L4 rebuild evidence.
 
 import (
 	"bytes"
@@ -79,9 +85,13 @@ var (
 )
 
 // probe runs inside the OpenLane image with the image's own interpreter and
-// reports each tool's version line and the digest of its binary.
+// reports each tool's version line and the digest of its binary, and the real
+// path and digest of each OpenLane script named on its command line.
 const probe = `
-import hashlib, json, os, shutil, subprocess
+import hashlib, json, os, shutil, subprocess, sys
+def digest(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
 out = {}
 for name, args in [("openlane", ["--version"]), ("yosys", ["-V"]), ("openroad", ["-version"]),
                    ("magic", ["--version"]), ("klayout", ["-v"]), ("netgen", None), ("verilator", ["--version"])]:
@@ -89,8 +99,6 @@ for name, args in [("openlane", ["--version"]), ("yosys", ["-V"]), ("openroad", 
     if not p:
         continue
     real = os.path.realpath(p)
-    with open(real, "rb") as f:
-        digest = hashlib.sha256(f.read()).hexdigest()
     version = ""
     if args:
         try:
@@ -99,8 +107,18 @@ for name, args in [("openlane", ["--version"]), ("yosys", ["-V"]), ("openroad", 
             version = lines[0].strip() if lines else ""
         except Exception as e:
             version = "unknown (%s)" % e
-    out[name] = {"version": version, "digest": digest, "path": real}
-print(json.dumps(out))
+    out[name] = {"version": version, "digest": digest(real), "path": real}
+scripts = {}
+try:
+    import openlane
+    root = os.path.join(os.path.dirname(os.path.abspath(openlane.__file__)), "scripts")
+    for rel in sys.argv[1:]:
+        real = os.path.realpath(os.path.join(root, rel))
+        if os.path.isfile(real):
+            scripts[rel] = {"path": real, "sha256": digest(real)}
+except ImportError:
+    pass
+print(json.dumps({"tools": out, "scripts": scripts}))
 `
 
 type stepDir struct {
@@ -264,6 +282,7 @@ type attested struct {
 // Flow is everything one attested OpenLane run needs, and the per-step signer.
 type Flow struct {
 	bundle     string
+	lockPath   string
 	lock       Obj
 	signer     *Signer
 	work       string
@@ -275,6 +294,8 @@ type Flow struct {
 	source     Obj
 	tools      Obj
 	pdk        Obj
+	overlay    Obj      // the overlay's resolvedDependencies entry, or nil
+	mounts     []string // overlay files bind-mounted over the image's scripts
 	commonDeps []Obj
 }
 
@@ -288,7 +309,7 @@ func NewFlow(bundle, lockPath, key, work, pdkRoot string) (*Flow, error) {
 	if err != nil {
 		return nil, err
 	}
-	f := &Flow{bundle: bundle, lock: lock, signer: signer, work: resolvePath(work), pdkRoot: resolvePath(pdkRoot)}
+	f := &Flow{bundle: bundle, lockPath: lockPath, lock: lock, signer: signer, work: resolvePath(work), pdkRoot: resolvePath(pdkRoot)}
 	f.designDir = filepath.Join(f.work, "design", filepath.Dir(S(lock, "openlane", "config")))
 	f.RunDir = filepath.Join(f.designDir, "runs", S(lock, "openlane", "runTag"))
 	f.meta = filepath.Join(bundle, "openlane")
@@ -302,24 +323,88 @@ func (f *Flow) imageRD() Obj {
 	return Obj{"name": "openlane2-image", "uri": "docker://" + ref, "digest": Obj{"sha256": digest}}
 }
 
-func (f *Flow) probeTools() (Obj, error) {
-	out, err := runCmd("", nil, "docker", "run", "--rm", f.image(), "python3", "-c", probe)
+// overlayFiles lists the scripts the overlay replaces, relative to OpenLane's scripts directory.
+func (f *Flow) overlayFiles() []string {
+	return sortedKeys(O(f.lock, "reproducibility", "overlay", "replaces"))
+}
+
+// probeTools records the image's tools in tools.json and returns where the overlaid scripts live in it.
+func (f *Flow) probeTools() (Obj, Obj, error) {
+	args := append([]string{"run", "--rm", f.image(), "python3", "-c", probe}, f.overlayFiles()...)
+	out, err := runCmd("", nil, "docker", args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if out.Code != 0 {
-		return nil, fmt.Errorf("probing the OpenLane image: exit %d: %s", out.Code, strings.TrimSpace(out.Stderr))
+		return nil, nil, fmt.Errorf("probing the OpenLane image: exit %d: %s", out.Code, strings.TrimSpace(out.Stderr))
 	}
 	lines := splitLines(strings.TrimSpace(out.Stdout))
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("probing the OpenLane image: no output")
+		return nil, nil, fmt.Errorf("probing the OpenLane image: no output")
 	}
 	v, err := decodeJSON([]byte(lines[len(lines)-1]))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	tools, _ := v.(map[string]any)
-	return tools, WriteJSON(filepath.Join(f.meta, "tools.json"), tools)
+	tools := O(v, "tools")
+	return tools, O(v, "scripts"), WriteJSON(filepath.Join(f.meta, "tools.json"), tools)
+}
+
+// prepareOverlay checks that each overlaid script in the image is the upstream
+// file the overlay was made from, and plans a read-only mount for each.
+func (f *Flow) prepareOverlay(scripts Obj) error {
+	spec := O(f.lock, "reproducibility", "overlay")
+	if spec == nil {
+		return nil
+	}
+	dir := filepath.Join(filepath.Dir(f.lockPath), S(spec, "dir"))
+	replaces := O(spec, "replaces")
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(dir, p)
+		if _, ok := replaces[filepath.ToSlash(rel)]; !ok {
+			return fmt.Errorf("overlay file %s is not listed in the lock", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, rel := range f.overlayFiles() {
+		in := O(scripts, rel)
+		if in == nil {
+			return fmt.Errorf("the OpenLane image has no script %s to overlay", rel)
+		}
+		if want := S(replaces, rel); S(in, "sha256") != want {
+			return fmt.Errorf("the image's %s is sha256:%s, but the overlay was made from sha256:%s", rel, S(in, "sha256"), want)
+		}
+		file := filepath.Join(dir, filepath.FromSlash(rel))
+		if !isFile(file) {
+			return fmt.Errorf("overlay file %s is missing", file)
+		}
+		f.mounts = append(f.mounts, resolvePath(file)+":"+S(in, "path")+":ro")
+	}
+	digest, err := TreeDigest(dir)
+	if err != nil {
+		return err
+	}
+	f.overlay = Obj{
+		"name":        "openlane2-overlay",
+		"digest":      Obj{"sha256": digest},
+		"annotations": Obj{"kind": "overlay", "replaces": replaces},
+	}
+	return nil
+}
+
+// sourceDateEpoch is the SOURCE_DATE_EPOCH the lock pins, or "".
+func (f *Flow) sourceDateEpoch() string {
+	v := get(f.lock, "reproducibility", "sourceDateEpoch")
+	if v == nil {
+		return ""
+	}
+	return num(v)
 }
 
 func (f *Flow) pdkRD() (Obj, error) {
@@ -363,7 +448,11 @@ func (f *Flow) prepare() error {
 	}
 	source["annotations"] = Obj{"kind": "source"}
 	f.source = source
-	if f.tools, err = f.probeTools(); err != nil {
+	var scripts Obj
+	if f.tools, scripts, err = f.probeTools(); err != nil {
+		return err
+	}
+	if err := f.prepareOverlay(scripts); err != nil {
 		return err
 	}
 	if f.pdk, err = f.pdkRD(); err != nil {
@@ -372,6 +461,9 @@ func (f *Flow) prepare() error {
 	img := f.imageRD()
 	img["annotations"] = Obj{"kind": "toolchain"}
 	f.commonDeps = []Obj{f.source, img, f.pdk}
+	if f.overlay != nil {
+		f.commonDeps = append(f.commonDeps, f.overlay)
+	}
 	return nil
 }
 
@@ -382,10 +474,14 @@ func (f *Flow) command() ([]string, error) {
 		return nil, err
 	}
 	args := []string{"docker", "run", "--rm", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "-w", f.designDir}
-	for _, m := range []string{f.work + ":" + f.work, f.pdkRoot + ":" + f.pdkRoot, tmp + ":/tmp"} {
+	for _, m := range append([]string{f.work + ":" + f.work, f.pdkRoot + ":" + f.pdkRoot, tmp + ":/tmp"}, f.mounts...) {
 		args = append(args, "-v", m)
 	}
-	for _, e := range []string{"TMPDIR=/tmp", "HOME=/tmp", "PDK_ROOT=" + f.pdkRoot} {
+	env := []string{"TMPDIR=/tmp", "HOME=/tmp", "PDK_ROOT=" + f.pdkRoot}
+	if sde := f.sourceDateEpoch(); sde != "" {
+		env = append(env, "SOURCE_DATE_EPOCH="+sde)
+	}
+	for _, e := range env {
 		args = append(args, "-e", e)
 	}
 	args = append(args, f.image(), "openlane", "--manual-pdk", "--pdk-root", f.pdkRoot, "--pdk", S(pdk, "variant"),
@@ -543,16 +639,20 @@ func (f *Flow) attest(ordinal int, slug, dir string) error {
 	meta["startedOn"] = started
 	meta["finishedOn"] = Now()
 	run["byproducts"] = nonNil(byproducts)
+	params := Obj{
+		"design": get(f.lock, "design"),
+		"flow":   get(f.lock, "openlane", "flow"),
+		"config": get(f.lock, "openlane", "config"),
+		"runTag": get(f.lock, "openlane", "runTag"),
+		"step":   filepath.Base(dir),
+	}
+	if sde := get(f.lock, "reproducibility", "sourceDateEpoch"); sde != nil {
+		params["sourceDateEpoch"] = sde
+	}
 	pred := Obj{
 		"buildDefinition": Obj{
-			"buildType": openlaneStepType,
-			"externalParameters": Obj{
-				"design": get(f.lock, "design"),
-				"flow":   get(f.lock, "openlane", "flow"),
-				"config": get(f.lock, "openlane", "config"),
-				"runTag": get(f.lock, "openlane", "runTag"),
-				"step":   filepath.Base(dir),
-			},
+			"buildType":            openlaneStepType,
+			"externalParameters":   params,
 			"resolvedDependencies": deps,
 		},
 		"runDetails": run,
@@ -677,6 +777,12 @@ func (f *Flow) WriteSummary(code int) ([]string, error) {
 		"workDir":    f.work,
 		"host":       host,
 	}
+	if f.overlay != nil {
+		summary["overlay"] = f.overlay
+	}
+	if sde := get(f.lock, "reproducibility", "sourceDateEpoch"); sde != nil {
+		summary["sourceDateEpoch"] = sde
+	}
 	return unfinished, WriteJSON(filepath.Join(f.meta, "run.json"), summary)
 }
 
@@ -752,6 +858,16 @@ func checkChain(bundle, runDir string, trust *TrustRoot) ([]olRecord, error) {
 		}
 		if !jsonEqual(digestsOf(kinds["pdk"]), []any{get(meta, "pdk", "digest")}) {
 			return nil, failf("%s: does not name the PDK tree", label)
+		}
+		wantOverlay := []any{}
+		if d := get(meta, "overlay", "digest"); d != nil {
+			wantOverlay = append(wantOverlay, d)
+		}
+		if !jsonEqual(digestsOf(kinds["overlay"]), wantOverlay) {
+			return nil, failf("%s: does not name the flow's script overlay", label)
+		}
+		if !jsonEqual(get(stmt, "predicate", "buildDefinition", "externalParameters", "sourceDateEpoch"), get(meta, "sourceDateEpoch")) {
+			return nil, failf("%s: SOURCE_DATE_EPOCH differs from the flow's", label)
 		}
 		for _, d := range kinds["view"] {
 			if _, ok := known[S(d, "digest", "sha256")]; !ok {
@@ -1138,10 +1254,12 @@ func OpenLaneCompare(bundleA, runA, bundleB, runB string, trustA, trustB *TrustR
 		byStepB[S(r.entry, "step")] = r.stmt
 	}
 	inputs := Obj{
-		"source": jsonEqual(get(metaA, "source", "digest"), get(metaB, "source", "digest")),
-		"image":  jsonEqual(get(metaA, "image", "digest"), get(metaB, "image", "digest")),
-		"pdk":    jsonEqual(get(metaA, "pdk", "digest"), get(metaB, "pdk", "digest")),
-		"tools":  jsonEqual(toolsA, toolsB),
+		"source":          jsonEqual(get(metaA, "source", "digest"), get(metaB, "source", "digest")),
+		"image":           jsonEqual(get(metaA, "image", "digest"), get(metaB, "image", "digest")),
+		"pdk":             jsonEqual(get(metaA, "pdk", "digest"), get(metaB, "pdk", "digest")),
+		"overlay":         jsonEqual(get(metaA, "overlay", "digest"), get(metaB, "overlay", "digest")),
+		"sourceDateEpoch": jsonEqual(get(metaA, "sourceDateEpoch"), get(metaB, "sourceDateEpoch")),
+		"tools":           jsonEqual(toolsA, toolsB),
 	}
 	files := func(stmt Obj, kind string) map[string]string {
 		out := map[string]string{}
@@ -1242,7 +1360,7 @@ func OpenLaneCompare(bundleA, runA, bundleB, runB string, trustA, trustB *TrustR
 	}
 	return Obj{
 		"inputsMatch":               inputs,
-		"finalGds":                  Obj{"a": S(gdsA, "digest", "sha256"), "b": S(gdsB, "digest", "sha256"), "class": gdsClass},
+		"finalGds":                  Obj{"a": S(gdsA, "digest", "sha256"), "b": S(gdsB, "digest", "sha256"), "class": gdsClass, "path": S(gdsB, "name")},
 		"steps":                     len(steps),
 		"stepsWithBitExactSubjects": bitExactSteps,
 		"subjects":                  Obj{"total": subjTotal, "bitExact": subjSame},
@@ -1280,7 +1398,7 @@ func short(s string) string {
 func ReproducibilityMarkdown(report Obj) string {
 	r := normalize(report)
 	var inputs []string
-	for _, k := range []string{"source", "image", "pdk", "tools"} {
+	for _, k := range []string{"source", "image", "pdk", "overlay", "sourceDateEpoch", "tools"} {
 		v := "NO"
 		if Truthy(get(r, "inputsMatch", k)) {
 			v = "yes"
@@ -1292,7 +1410,7 @@ func ReproducibilityMarkdown(report Obj) string {
 		first = s
 	}
 	lines := []string{
-		"## OpenLane 2 reproducibility: two runs on separate runners",
+		"## OpenLane 2 reproducibility: the release and its rebuild",
 		"",
 		"- Inputs identical: " + strings.Join(inputs, ", "),
 		fmt.Sprintf("- Final GDS: **%s** (a `%s`, b `%s`)", S(r, "finalGds", "class"), short(S(r, "finalGds", "a")), short(S(r, "finalGds", "b"))),
@@ -1325,8 +1443,10 @@ func ReproducibilityMarkdown(report Obj) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-// RebuildRecord signs a record of the second build, bound to the released GDS of the first.
-func RebuildRecord(report Obj, bundleA, key, out string) error {
+// RebuildRecord signs the second builder's record of its rebuild: the subject is
+// the GDS released in bundleA, the dependencies are that release and the inputs
+// the rebuild in bundleB used, and the checks say how its GDS compares.
+func RebuildRecord(report Obj, bundleA, bundleB, key, out string) error {
 	relPath := filepath.Join(bundleA, "att", OpenLaneReleaseAtt)
 	rel, err := DecodeEnvelope(relPath)
 	if err != nil {
@@ -1337,6 +1457,22 @@ func RebuildRecord(report Obj, bundleA, key, out string) error {
 	if err != nil {
 		return err
 	}
+	relRD["annotations"] = Obj{"kind": "release"}
+	metaB, err := ReadObj(filepath.Join(bundleB, "openlane", "run.json"))
+	if err != nil {
+		return err
+	}
+	deps := []Obj{relRD}
+	for _, in := range []struct{ key, kind string }{{"source", "source"}, {"image", "toolchain"}, {"pdk", "pdk"}, {"overlay", "overlay"}} {
+		if d := O(metaB, in.key); d != nil {
+			d["annotations"] = Obj{"kind": in.kind}
+			deps = append(deps, d)
+		}
+	}
+	params := Obj{"design": get(rel, "predicate", "buildDefinition", "externalParameters", "design"), "rebuilt": "att/" + OpenLaneReleaseAtt}
+	if sde := get(metaB, "sourceDateEpoch"); sde != nil {
+		params["sourceDateEpoch"] = sde
+	}
 	g := O(report, "finalGds")
 	class := S(g, "class")
 	pass := func(ok bool) string {
@@ -1346,12 +1482,12 @@ func RebuildRecord(report Obj, bundleA, key, out string) error {
 		return "fail"
 	}
 	run := builder()
-	run["byproducts"] = []Obj{}
+	run["byproducts"] = []Obj{rd("rebuild/"+S(g, "path"), S(g, "b"))}
 	pred := Obj{
 		"buildDefinition": Obj{
 			"buildType":            designStepType("rebuild"),
-			"externalParameters":   Obj{"comparedWith": "second OpenLane run, same inputs, separate runner"},
-			"resolvedDependencies": []Obj{relRD},
+			"externalParameters":   params,
+			"resolvedDependencies": deps,
 		},
 		"runDetails": run,
 		"hwFlow": Obj{
@@ -1362,6 +1498,7 @@ func RebuildRecord(report Obj, bundleA, key, out string) error {
 				{"name": "gds-equal-ignoring-timestamps", "result": pass(class == "identical" || class == "timestamps"), "detail": class},
 			},
 			"reproducibility": Obj{
+				"inputsMatch":            report["inputsMatch"],
 				"subjects":               report["subjects"],
 				"subjectClasses":         report["subjectClasses"],
 				"firstContentDivergence": report["firstContentDivergence"],
@@ -1378,4 +1515,89 @@ func RebuildRecord(report Obj, bundleA, key, out string) error {
 	}
 	_, err = Sign(stmt, signer, out)
 	return err
+}
+
+// RebuildChecks are the rebuild record checks a buyer's policy can require.
+var RebuildChecks = []string{"gds-bit-exact", "gds-equal-ignoring-timestamps"}
+
+// CheckRebuild is the Design L4 part of the tapeout check, run after
+// OpenLaneVerify passed with records and final. The rebuild record must be
+// signed by a rebuilder in its own trust root, none of whose keys is a key of
+// the design house, under a builder id other than the flow's; it must rebuild
+// this release's GDS from the same pinned inputs; and require, the check the
+// buyer's policy names, must pass.
+func CheckRebuild(bundle string, trust *TrustRoot, records []olRecord, final Obj, rebuildPath string, rebuildTrust *TrustRoot, require string) (Obj, error) {
+	if !contains(RebuildChecks, require) {
+		return nil, fmt.Errorf("unknown rebuild check %q (want one of %s)", require, strings.Join(RebuildChecks, ", "))
+	}
+	if len(rebuildTrust.Roles["rebuilder"]) == 0 {
+		return nil, failf("rebuild: the rebuild trust root has no rebuilder key")
+	}
+	house := map[string]string{}
+	for role, keys := range trust.Roles {
+		for _, k := range keys {
+			house[k.ID] = role
+		}
+	}
+	for _, k := range rebuildTrust.Roles["rebuilder"] {
+		if role, ok := house[k.ID]; ok {
+			return nil, failf("rebuild: rebuilder key %s is the design house's %s key; a rebuild needs a separate trust root", short(k.ID), role)
+		}
+	}
+	stmt, err := rebuildTrust.Open(rebuildPath, "rebuilder", DesignFlow)
+	if err != nil {
+		return nil, err
+	}
+	if err := asSLSAProvenance(stmt, "rebuild"); err != nil {
+		return nil, err
+	}
+	if buildType(stmt) != designStepType("rebuild") {
+		return nil, failf("rebuild: wrong buildType")
+	}
+	id := S(stmt, "predicate", "runDetails", "builder", "id")
+	for _, r := range records {
+		if S(r.stmt, "predicate", "runDetails", "builder", "id") == id {
+			return nil, failf("rebuild: builder %s also ran the flow", id)
+		}
+	}
+	if !jsonEqual(get(firstSubject(stmt), "digest"), get(final, "digest")) {
+		return nil, failf("rebuild: rebuilt a different GDS than the release")
+	}
+	kinds := map[string][]any{}
+	for _, d := range Objs(stmt, "predicate", "buildDefinition", "resolvedDependencies") {
+		k := S(d, "annotations", "kind")
+		kinds[k] = append(kinds[k], get(d, "digest"))
+	}
+	if !jsonEqual(kinds["release"], []any{fileDigest(filepath.Join(bundle, "att", OpenLaneReleaseAtt))}) {
+		return nil, failf("rebuild: does not name this release")
+	}
+	meta, err := ReadObj(filepath.Join(bundle, "openlane", "run.json"))
+	if err != nil {
+		return nil, failf("openlane: run.json: %v", err)
+	}
+	for _, in := range []struct{ key, kind string }{{"source", "source"}, {"image", "toolchain"}, {"pdk", "pdk"}, {"overlay", "overlay"}} {
+		want := []any{}
+		if d := get(meta, in.key, "digest"); d != nil {
+			want = append(want, d)
+		}
+		if !jsonEqual(kinds[in.kind], want) {
+			return nil, failf("rebuild: used a different %s than the flow", in.key)
+		}
+	}
+	if !jsonEqual(get(stmt, "predicate", "buildDefinition", "externalParameters", "sourceDateEpoch"), get(meta, "sourceDateEpoch")) {
+		return nil, failf("rebuild: used a different SOURCE_DATE_EPOCH than the flow")
+	}
+	var check Obj
+	for _, c := range Objs(stmt, "predicate", "hwFlow", "checks") {
+		if S(c, "name") == require {
+			check = c
+		}
+	}
+	if check == nil {
+		return nil, failf("rebuild: no %s check", require)
+	}
+	if S(check, "result") != "pass" {
+		return nil, failf("rebuild: %s failed (%s)", require, S(check, "detail"))
+	}
+	return stmt, nil
 }

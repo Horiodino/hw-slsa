@@ -162,9 +162,10 @@ func olProduce(t *testing.T, base string, steps []olStep, stamp int, tw *tweak) 
 	}
 	must(t, WriteJSON(filepath.Join(f.meta, "tools.json"), f.tools))
 	f.pdk = Obj{"name": "sky130A", "digest": Obj{"sha256": strings.Repeat("cc", 32)}, "annotations": Obj{"kind": "pdk"}}
+	f.overlay = Obj{"name": "openlane2-overlay", "digest": Obj{"sha256": strings.Repeat("ee", 32)}, "annotations": Obj{"kind": "overlay"}}
 	image := f.imageRD()
 	image["annotations"] = Obj{"kind": "toolchain"}
-	f.commonDeps = []Obj{f.source, image, f.pdk}
+	f.commonDeps = []Obj{f.source, image, f.pdk, f.overlay}
 	fakeRun(t, f, steps, stamp, tw)
 	err := OpenLaneRelease(bundle, f.RunDir, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), olLock)
 	return olRun{bundle, f.RunDir, keys}, err
@@ -268,6 +269,58 @@ func TestOtherPDKIsCaught(t *testing.T) {
 		}
 	})
 	olRejects(t, run, trust, "PDK")
+}
+
+func TestOtherOverlayIsCaught(t *testing.T) {
+	run, trust := olValid(t)
+	olResign(t, run, S(olEntries(t, run)[4], "attestation"), "flow-platform", func(s Obj) {
+		for _, d := range Objs(s, "predicate", "buildDefinition", "resolvedDependencies") {
+			if S(d, "annotations", "kind") == "overlay" {
+				O(d, "digest")["sha256"] = strings.Repeat("dd", 32)
+			}
+		}
+	})
+	olRejects(t, run, trust, "does not name the flow's script overlay")
+}
+
+func TestOtherSourceDateEpochIsCaught(t *testing.T) {
+	run, trust := olValid(t)
+	olResign(t, run, S(olEntries(t, run)[5], "attestation"), "flow-platform", func(s Obj) {
+		O(s, "predicate", "buildDefinition", "externalParameters")["sourceDateEpoch"] = 1
+	})
+	olRejects(t, run, trust, "SOURCE_DATE_EPOCH differs")
+}
+
+func TestOverlayMustMatchTheImage(t *testing.T) {
+	dir := t.TempDir()
+	overlay := filepath.Join(dir, "overlay")
+	must(t, os.MkdirAll(filepath.Join(overlay, "magic"), 0o755))
+	must(t, os.WriteFile(filepath.Join(overlay, "magic", "mag_gds.tcl"), []byte("gds datestamp 1\n"), 0o644))
+	lockPath := filepath.Join(dir, "lock.json")
+	upstream := strings.Repeat("ab", 32)
+	must(t, WriteJSON(lockPath, Obj{"reproducibility": Obj{"overlay": Obj{"dir": "overlay", "replaces": Obj{"magic/mag_gds.tcl": upstream}}}}))
+	newFlow := func() *Flow {
+		return &Flow{lockPath: lockPath, lock: ok(ReadObj(lockPath))}
+	}
+	image := Obj{"magic/mag_gds.tcl": Obj{"path": "/nix/store/x-openlane/scripts/magic/mag_gds.tcl", "sha256": upstream}}
+
+	f := newFlow()
+	must(t, f.prepareOverlay(image))
+	if len(f.mounts) != 1 || !strings.HasSuffix(f.mounts[0], ":/nix/store/x-openlane/scripts/magic/mag_gds.tcl:ro") {
+		t.Fatalf("mounts %v", f.mounts)
+	}
+	if S(f.overlay, "digest", "sha256") != ok(TreeDigest(overlay)) {
+		t.Fatalf("overlay digest %s", S(f.overlay, "digest", "sha256"))
+	}
+
+	changed := Obj{"magic/mag_gds.tcl": Obj{"path": "/x", "sha256": strings.Repeat("cd", 32)}}
+	if err := newFlow().prepareOverlay(changed); err == nil || !strings.Contains(err.Error(), "the overlay was made from") {
+		t.Fatalf("got %v, want an upstream mismatch", err)
+	}
+	must(t, os.WriteFile(filepath.Join(overlay, "extra.tcl"), nil, 0o644))
+	if err := newFlow().prepareOverlay(image); err == nil || !strings.Contains(err.Error(), "not listed in the lock") {
+		t.Fatalf("got %v, want an unlisted overlay file", err)
+	}
 }
 
 func TestStepSignedByWrongRoleIsCaught(t *testing.T) {
@@ -416,5 +469,123 @@ func TestDeterministicTarOfNestedSource(t *testing.T) {
 	must(t, DeterministicTar(dir, []string{"a/b/f.v"}, filepath.Join(dir, "2.tar")))
 	if !bytes.Equal(ok(os.ReadFile(filepath.Join(dir, "1.tar"))), ok(os.ReadFile(filepath.Join(dir, "2.tar")))) {
 		t.Fatal("tar output differs between runs")
+	}
+}
+
+type olRebuilt struct {
+	record, keys string
+	trust        *TrustRoot
+}
+
+// olRebuild runs the flow again as a second builder with its own keys (and, if
+// builderID is set, its own builder id), compares it with the release in a, and
+// signs the rebuild record with a rebuilder key in a trust root of its own.
+func olRebuild(t *testing.T, dir string, a olRun, stamp int, builderID string) olRebuilt {
+	t.Helper()
+	if builderID != "" {
+		t.Setenv("HSLSA_BUILDER_ID", builderID)
+	}
+	b, err := olProduce(t, filepath.Join(dir, "rebuild"), olSteps, stamp, nil)
+	must(t, err)
+	keys := filepath.Join(dir, "rebuilder-keys")
+	must(t, makeKeys(keys, filepath.Join(keys, "pub"), "rebuilder"))
+	trustPath := filepath.Join(dir, "rebuilder-trust-root.json")
+	must(t, BuildTrustRoot(filepath.Join(keys, "pub"), trustPath))
+	record := filepath.Join(dir, "rebuild.intoto.json")
+	must(t, RebuildRecord(compareRuns(t, a, b), a.bundle, b.bundle, filepath.Join(keys, "rebuilder.key.pem"), record))
+	return olRebuilt{record, keys, ok(LoadTrustRoot(trustPath))}
+}
+
+func olCheckRebuild(t *testing.T, a olRun, r olRebuilt, require string) error {
+	t.Helper()
+	trust := ok(LoadTrustRoot(filepath.Join(a.bundle, "trust-root.json")))
+	records, final, err := OpenLaneVerify(a.bundle, a.runDir, trust)
+	must(t, err)
+	_, err = CheckRebuild(a.bundle, trust, records, final, r.record, r.trust, require)
+	return err
+}
+
+func olReleased(t *testing.T, dir string, stamp int) olRun {
+	t.Helper()
+	a, err := olProduce(t, filepath.Join(dir, "release"), olSteps, stamp, nil)
+	must(t, err)
+	return a
+}
+
+func TestRebuildVerifies(t *testing.T) {
+	dir := t.TempDir()
+	a := olReleased(t, dir, 0)
+	r := olRebuild(t, dir, a, 0, NS+"/test-rebuilder")
+	must(t, olCheckRebuild(t, a, r, "gds-bit-exact"))
+	stmt := ok(DecodeEnvelope(r.record))
+	if !jsonEqual(get(firstSubject(stmt), "digest"), fileDigest(filepath.Join(a.bundle, "artifacts", "spm.gds"))) {
+		t.Fatal("the rebuild record's subject is not the released GDS")
+	}
+	if got := S(stmt, "predicate", "runDetails", "builder", "id"); got != NS+"/test-rebuilder" {
+		t.Fatalf("rebuild builder id %s", got)
+	}
+}
+
+func TestRebuildEqualIgnoringTimestampsNeedsThePolicy(t *testing.T) {
+	dir := t.TempDir()
+	a := olReleased(t, dir, 1)
+	r := olRebuild(t, dir, a, 2, NS+"/test-rebuilder")
+	rejects(t, olCheckRebuild(t, a, r, "gds-bit-exact"), "rebuild: gds-bit-exact failed")
+	must(t, olCheckRebuild(t, a, r, "gds-equal-ignoring-timestamps"))
+}
+
+func TestRebuildSignedByDesignHouseKeyIsCaught(t *testing.T) {
+	dir := t.TempDir()
+	a := olReleased(t, dir, 0)
+	r := olRebuild(t, dir, a, 0, NS+"/test-rebuilder")
+	pub := filepath.Join(dir, "house-as-rebuilder")
+	must(t, os.MkdirAll(pub, 0o755))
+	must(t, copyFile(filepath.Join(a.keys, "flow-platform.pub.pem"), filepath.Join(pub, "rebuilder.pub.pem")))
+	must(t, BuildTrustRoot(pub, filepath.Join(dir, "house-trust-root.json")))
+	resign(t, r.record, a.keys, "flow-platform", nil)
+	r.trust = ok(LoadTrustRoot(filepath.Join(dir, "house-trust-root.json")))
+	rejects(t, olCheckRebuild(t, a, r, "gds-bit-exact"), "is the design house's flow-platform key")
+}
+
+func TestRebuildBySameBuilderIsCaught(t *testing.T) {
+	dir := t.TempDir()
+	a := olReleased(t, dir, 0)
+	r := olRebuild(t, dir, a, 0, "")
+	rejects(t, olCheckRebuild(t, a, r, "gds-bit-exact"), "also ran the flow")
+}
+
+func TestRebuildTamperIsCaught(t *testing.T) {
+	for _, c := range []struct {
+		name, reason string
+		mutate       func(Obj)
+	}{
+		{"other GDS", "rebuilt a different GDS", func(s Obj) {
+			O(Objs(s, "subject")[0], "digest")["sha256"] = strings.Repeat("00", 32)
+		}},
+		{"other PDK", "used a different pdk", func(s Obj) {
+			for _, d := range Objs(s, "predicate", "buildDefinition", "resolvedDependencies") {
+				if S(d, "annotations", "kind") == "pdk" {
+					O(d, "digest")["sha256"] = strings.Repeat("dd", 32)
+				}
+			}
+		}},
+		{"other release", "does not name this release", func(s Obj) {
+			deps := Objs(s, "predicate", "buildDefinition", "resolvedDependencies")
+			O(s, "predicate", "buildDefinition")["resolvedDependencies"] = deps[1:]
+		}},
+		{"other SOURCE_DATE_EPOCH", "different SOURCE_DATE_EPOCH", func(s Obj) {
+			O(s, "predicate", "buildDefinition", "externalParameters")["sourceDateEpoch"] = 0
+		}},
+		{"no bit-exact check", "no gds-bit-exact check", func(s Obj) {
+			O(s, "predicate", "hwFlow")["checks"] = Objs(s, "predicate", "hwFlow", "checks")[1:]
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			a := olReleased(t, dir, 0)
+			r := olRebuild(t, dir, a, 0, NS+"/test-rebuilder")
+			resign(t, r.record, r.keys, "rebuilder", c.mutate)
+			rejects(t, olCheckRebuild(t, a, r, "gds-bit-exact"), c.reason)
+		})
 	}
 }

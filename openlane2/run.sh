@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # OpenLane 2 flow for the spm example with a signed record per step.
 #
-#   openlane2/run.sh produce   freeze the source, run OpenLane, sign each step as it finishes, sign the release
-#   openlane2/run.sh compare A B   verify two produced runs and measure how close they are to bit-exact
+#   openlane2/run.sh produce                     freeze the source, run OpenLane, sign each step as it finishes, sign the release
+#   openlane2/run.sh rebuild RELEASE             as a second builder with its own keys: rebuild the release in bundle RELEASE,
+#                                                compare every step, and sign the rebuild record
+#   openlane2/run.sh verify RELEASE REBUILD      the buyer's tapeout check, with the rebuild record in REBUILD as Design L4 evidence
 #
 # Needs docker, the pinned image and the SKY130 PDK enabled under $PDK_ROOT
 # (see .github/workflows/openlane2-flow.yml). Signing uses local ECDSA P-256
 # keys in DSSE envelopes; nothing is uploaded to a transparency log.
+#
+# OpenLane writes absolute paths into its state files, so a rebuild matches the
+# release byte for byte only when it runs at the same checkout and PDK_ROOT paths.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -40,17 +45,42 @@ produce() {
   rm -rf "$bundle/run" && cp -a "$run_dir" "$bundle/run"
 }
 
-compare() {
-  local a=${1:?first run} b=${2:?second run} report=$OUT/report
-  rm -rf "$report" && mkdir -p "$report"
-  hslsa keygen --out "$report/keys" rebuilder
-  hslsa openlane compare --bundle "$a" --run-dir "$a/run" --trust-root "$a/trust-root.json" \
-    --other-bundle "$b" --other-run-dir "$b/run" --key "$report/keys/rebuilder.key.pem" --report "$report"
-  cp "$report/keys/rebuilder.pub.pem" "$report/" && rm -rf "$report/keys"
+rebuild() {
+  local release=${1:?the released bundle to rebuild} report=$OUT/report
+  release=$(cd "$release" && pwd)
+  mkdir -p "$OUT"
+  case $release/ in "$(cd "$OUT" && pwd)"/*)
+    echo "move the release bundle out of $OUT first; the rebuild runs there" >&2; exit 2 ;;
+  esac
+  # The rebuilder signs as itself, not as the platform that ran the flow.
+  export HSLSA_BUILDER_ID=${HSLSA_BUILDER_ID:-https://github.com/Horiodino/hw-slsa/local-rebuild}
+
+  # Check the release before spending a build on it, then run the same flow
+  # from the pinned inputs under this builder's own flow and release keys.
+  hslsa openlane verify --bundle "$release" --run-dir "$release/run" --trust-root "$release/trust-root.json"
+  produce
+
+  # The rebuild record is signed with a key only the rebuilder holds, in a trust root of its own.
+  rm -rf "$report" "$OUT/rebuilder-keys" && mkdir -p "$report"
+  hslsa keygen --out "$OUT/rebuilder-keys" rebuilder
+  mkdir -p "$OUT/rebuilder-keys/pub" && cp "$OUT/rebuilder-keys/rebuilder.pub.pem" "$OUT/rebuilder-keys/pub/"
+  hslsa trust-root --keys "$OUT/rebuilder-keys/pub" --out "$report/rebuilder-trust-root.json"
+  hslsa openlane compare --bundle "$release" --run-dir "$release/run" --trust-root "$release/trust-root.json" \
+    --other-bundle "$OUT/bundle" --other-run-dir "$OUT/bundle/run" \
+    --key "$OUT/rebuilder-keys/rebuilder.key.pem" --report "$report"
+  rm -rf "$OUT/rebuilder-keys"
+}
+
+verify() {
+  local release=${1:?the released bundle} rebuild=${2:?the rebuild report directory}
+  hslsa openlane verify --bundle "$release" --run-dir "$release/run" --trust-root "$release/trust-root.json" \
+    --rebuild "$rebuild/rebuild.intoto.json" --rebuild-trust-root "$rebuild/rebuilder-trust-root.json" \
+    --rebuild-check "${REBUILD_CHECK:-gds-bit-exact}"
 }
 
 case "${1:-}" in
   produce) produce ;;
-  compare) shift; compare "$@" ;;
-  *) echo "usage: $0 produce | compare <bundle-a> <bundle-b>" >&2; exit 2 ;;
+  rebuild) shift; rebuild "$@" ;;
+  verify) shift; verify "$@" ;;
+  *) echo "usage: $0 produce | rebuild <release-bundle> | verify <release-bundle> <rebuild-dir>" >&2; exit 2 ;;
 esac

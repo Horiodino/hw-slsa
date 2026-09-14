@@ -318,6 +318,9 @@ func openlane(args []string) error {
 	otherBundle := f.str("other-bundle", "compare: the second run's bundle", false)
 	otherRunDir := f.str("other-run-dir", "compare: the second run's run directory", false)
 	report := f.str("report", "compare: directory for the JSON and Markdown report", false)
+	rebuild := f.str("rebuild", "verify: a rebuild record to check as Design L4 evidence", false)
+	rebuildTrust := f.str("rebuild-trust-root", "verify: the trust root naming the rebuilder's key", false)
+	rebuildCheck := f.String("rebuild-check", "gds-bit-exact", "verify: the rebuild check the policy requires ("+strings.Join(hslsa.RebuildChecks, " or ")+")")
 	if err := f.parse(rest); err != nil {
 		return err
 	}
@@ -337,6 +340,22 @@ func openlane(args []string) error {
 		}
 		fmt.Printf("openlane tapeout check: PASSED, %d step records, %s sha256:%s\n",
 			len(records), hslsa.S(final, "name"), hslsa.S(final, "digest", "sha256"))
+		if *rebuild == "" {
+			return nil
+		}
+		if *rebuildTrust == "" {
+			return usageError{"--rebuild needs --rebuild-trust-root"}
+		}
+		rtr, err := hslsa.LoadTrustRoot(*rebuildTrust)
+		if err != nil {
+			return err
+		}
+		stmt, err := hslsa.CheckRebuild(*bundle, tr, records, final, *rebuild, rtr, *rebuildCheck)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("design L4 rebuild check: PASSED, %s by %s\n",
+			*rebuildCheck, hslsa.S(stmt, "predicate", "runDetails", "builder", "id"))
 		return nil
 	}
 	trustA, err := hslsa.LoadTrustRoot(*trust)
@@ -359,7 +378,7 @@ func openlane(args []string) error {
 		return err
 	}
 	if *key != "" {
-		if err := hslsa.RebuildRecord(rep, *bundle, *key, filepath.Join(*report, "rebuild.intoto.json")); err != nil {
+		if err := hslsa.RebuildRecord(rep, *bundle, *otherBundle, *key, filepath.Join(*report, "rebuild.intoto.json")); err != nil {
 			return err
 		}
 	}

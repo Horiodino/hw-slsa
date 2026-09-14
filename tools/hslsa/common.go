@@ -100,21 +100,27 @@ func fileRD(path, name string) (Obj, error) {
 	return rd(name, d), nil
 }
 
-// builder is the identity of the platform running a step, from GitHub Actions when present.
+// builder is the identity of the platform running a step, from GitHub Actions
+// when present. HSLSA_BUILDER_ID overrides the id, for when one workflow hosts
+// two parties, such as a flow and its rebuild.
 func builder() Obj {
+	run := Obj{"builder": Obj{"id": NS + "/local-run"}, "metadata": Obj{"invocationId": "local"}}
 	server := os.Getenv("GITHUB_SERVER_URL")
 	if server != "" && os.Getenv("GITHUB_WORKFLOW_REF") != "" {
-		run := fmt.Sprintf("%s/%s/actions/runs/%s", server, os.Getenv("GITHUB_REPOSITORY"), os.Getenv("GITHUB_RUN_ID"))
+		invocation := fmt.Sprintf("%s/%s/actions/runs/%s", server, os.Getenv("GITHUB_REPOSITORY"), os.Getenv("GITHUB_RUN_ID"))
 		attempt, ok := os.LookupEnv("GITHUB_RUN_ATTEMPT")
 		if !ok {
 			attempt = "1"
 		}
-		return Obj{
+		run = Obj{
 			"builder":  Obj{"id": server + "/" + os.Getenv("GITHUB_WORKFLOW_REF")},
-			"metadata": Obj{"invocationId": run + "/attempts/" + attempt},
+			"metadata": Obj{"invocationId": invocation + "/attempts/" + attempt},
 		}
 	}
-	return Obj{"builder": Obj{"id": NS + "/local-run"}, "metadata": Obj{"invocationId": "local"}}
+	if id := os.Getenv("HSLSA_BUILDER_ID"); id != "" {
+		O(run, "builder")["id"] = id
+	}
+	return run
 }
 
 // githubSourceDep names this repository's commit when running in GitHub Actions.

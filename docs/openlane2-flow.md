@@ -97,13 +97,20 @@ The report (`reproducibility.md`, which also appears in the rebuild job's
 summary, and `reproducibility.json`) names the first step whose outputs differ
 beyond timestamps.
 
-### With the overlay
+### With the overlay (CI run 36564995675, 2026-09-15)
 
-Pending: the per-output result of the first CI run with the overlay goes here.
+The second builder, on its own runner, matched the release on every output:
 
-The logs and reports still differ, in runtimes, memory figures, host names and
-dates. They are byproducts, not design outputs, and nothing downstream reads
-them.
+| | Result |
+| --- | --- |
+| Inputs | Source, image, PDK, overlay, `SOURCE_DATE_EPOCH` and tool digests identical |
+| Step outputs | 176 of 176 bit-exact; every output of all 74 steps |
+| Final GDS | Identical, `spm.gds` sha256 `0fc6c14b7589087d…` in both |
+| Buyer's check | `design L4 rebuild check: PASSED, gds-bit-exact` |
+
+The logs and reports still differ: 89 in timestamps only, 1 in line order, 79
+beyond what the classifier masks, and 8 exist in only one run. They are
+byproducts, not design outputs.
 
 ## The rebuild and the buyer's check
 

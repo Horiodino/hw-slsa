@@ -6,7 +6,12 @@ current time into them. This overlay removes those dates. It is the only
 change to the pinned flow, and every step record names it.
 
 `scripts/` holds patched copies of three files from OpenLane's own `scripts`
-directory, at tag 2.3.10. `hslsa openlane run` bind-mounts each one read-only
+directory, as the pinned image carries them. Two are the files at tag 2.3.10.
+The image's `klayout/stream_out.py` differs from the tag in its first line
+only: the image's Nix build rewrote `#!/usr/bin/env python3` to the store path
+of its own Python, and OpenLane runs the script with its own interpreter, so
+the line is not used. The overlay keeps the image's line, so each patched file
+differs from the file it replaces only by the change below. `hslsa openlane run` bind-mounts each one read-only
 over the image's copy, after checking that the image's copy is the file the
 patch was made from (`reproducibility.overlay.replaces` in
 [`../spm/flow.lock.json`](../spm/flow.lock.json) pins the image's copy of each
@@ -39,7 +44,8 @@ and the released GDS consistent.
 ## Moving to a new OpenLane version
 
 The run stops if the image's copy of a replaced script is not the pinned
-file. To move to a new image, copy the three files from the new
-tag, reapply the changes above, and update the digests in the lock. Newer
+file, and its error names the image's digest and first line for each one that
+differs. To move to a new image, copy the three files out of the new image,
+reapply the changes above, and update the digests in the lock. Newer
 Magic, OpenROAD or KLayout releases may honour `SOURCE_DATE_EPOCH` on their
 own, and then the matching change can go.

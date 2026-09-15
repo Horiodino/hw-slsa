@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/nix/store/7hnr99nxrd2aw6lghybqdmkckq60j6l9-python3-3.11.9/bin/python3
 # Copyright (c) 2021-2022 Efabless Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

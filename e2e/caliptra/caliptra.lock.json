@@ -18,6 +18,7 @@
   "rtl": {
     "top": "caliptra_top",
     "fileList": "src/integration/config/caliptra_top.vf",
+    "benchFileList": "src/integration/config/caliptra_top_tb.vf",
     "verilatorFlags": [
       "--timing", "--timescale", "1ns/1ps", "-Wno-fatal", "+define+RV_OPENSOURCE", "+define+VERILATOR",
       "-Wno-WIDTH", "-Wno-UNOPTFLAT", "-Wno-LITENDIAN", "-Wno-CMPCONST", "-Wno-MULTIDRIVEN", "-Wno-UNPACKED",

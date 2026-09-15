@@ -7,6 +7,9 @@
 #   e2e/caliptra/run.sh verify    boot the received units, run every check, emit VSAs, verify them with slsa-verifier
 #   e2e/caliptra/run.sh all       all of the above
 #
+#   e2e/caliptra/run.sh build-rtl   Verilate the released design into a second device model (after produce)
+#   e2e/caliptra/run.sh verify-rtl  boot RTL_UNITS received units (default 1) on the RTL and run the same checks
+#
 # Nothing here uploads to a transparency log: every signature is a DSSE
 # envelope made with a local key, as in e2e/run.sh.
 set -euo pipefail
@@ -20,6 +23,7 @@ BUNDLE=$OUT/bundle
 DEVICES=$OUT/devices
 KEYS=$OUT/keys
 DEVICE_BIN=${DEVICE_BIN:-$BUILD/hslsa-caliptra-device}
+DEVICE_RTL_BIN=${DEVICE_RTL_BIN:-$BUILD/hslsa-caliptra-device-rtl}
 # The Go reference tool; set HSLSA to use a prebuilt binary instead of building it here.
 if [[ -z "${HSLSA:-}" ]]; then
   HSLSA=$ROOT/bin/hslsa
@@ -102,6 +106,28 @@ produce() {
     --key "$KEYS/product-owner.key.pem"
 }
 
+# The fab for the RTL boot: build the device from the released design itself.
+# hslsa unpacks the released design and adds the testbench, coverage and
+# assertion files caliptra-rtl's Verilator harness reads, refusing any that
+# would replace a released file. caliptra-sw's hw-model then Verilates that
+# tree in place of its own caliptra-rtl submodule.
+build_rtl() {
+  local model=$BUILD/rtl-model sw=$SRC/caliptra-sw
+  hslsa caliptra rtl-model --bundle "$BUNDLE" --lock "$E2E/caliptra.lock.json" --out "$model/rtl"
+  [[ -L $sw/hw/latest/rtl ]] || rmdir "$sw/hw/latest/rtl"
+  ln -sfn "$model/rtl" "$sw/hw/latest/rtl"
+  # Never reuse a model Verilated from another tree.
+  rm -rf "$sw/hw/verilated/out"
+  verilator --version | tee "$BUILD/verilator-version.txt"
+  # caliptra-sw's harness compiles with -Os on one thread; -O3 with a thread
+  # per core boots faster. Neither changes the design.
+  (cd "$E2E/device" &&
+    MAKEFLAGS="VERILATOR_MAKE_FLAGS=OPT_FAST=-O3 EXTRA_VERILATOR_FLAGS=--threads\\ ${RTL_THREADS:-$(nproc)}" \
+    CALIPTRA_VERILATOR_JOBS=$(nproc) cargo build -q --locked --release --features verilator --target-dir "$BUILD/rtl-target")
+  cp "$BUILD/rtl-target/release/hslsa-caliptra-device" "$DEVICE_RTL_BIN"
+  echo "build-rtl: device model Verilated from the released design"
+}
+
 expect_fail() {
   local what=$1; shift
   if "$@" >/dev/null 2>&1; then
@@ -112,6 +138,11 @@ expect_fail() {
 }
 
 boot() {
+  if [[ -n ${RTL:-} ]]; then
+    # An RTL boot takes hours; show its progress lines as they come.
+    "$DEVICE_BIN" boot --rom "$DEVICES/rom.bin" --fw "$2" --fuses "$3" --out "$1" 2>&1 | tee "$1.trace" | grep --line-buffered '^boot:'
+    return "${PIPESTATUS[0]}"
+  fi
   "$DEVICE_BIN" boot --rom "$DEVICES/rom.bin" --fw "$2" --fuses "$3" --out "$1" > "$1.trace" 2>&1
 }
 
@@ -127,16 +158,22 @@ expect_refused() {
 }
 
 verify() {
-  local boots=$OUT/boots vsa_dir=$OUT/vsa vkey=$OUT/verifier-key
+  local units=${UNITS:-$E2E/received-units.txt} boots=$OUT/boots${RTL:+-rtl} vsa_dir=$OUT/vsa${RTL:+-rtl} vkey=$OUT/verifier-key
   rm -rf "$boots" "$vsa_dir" "$vkey" && mkdir -p "$boots" "$vsa_dir" "$vkey"
 
   echo "== power on the received units"
   while read -r unit; do
     [[ -n $unit ]] || continue
     boot "$boots/$unit" "$DEVICES/$unit/flash.bin" "$DEVICES/$unit/fuses.json"
-    echo "$unit: booted to runtime, $(grep -c . "$boots/$unit/boot.log") lines of UART log"
-  done < "$E2E/received-units.txt"
+    echo "$unit: booted to runtime on $(jq -r .model "$boots/$unit/device.json"), $(grep -c . "$boots/$unit/boot.log") lines of UART log"
+  done < "$units"
 
+  # On the RTL each refused boot would take hours more; the emulator run covers them.
+  [[ -n ${RTL:-} ]] || refusals
+  buyer_checks "$units" "$boots" "$vsa_dir" "$vkey"
+}
+
+refusals() {
   echo "== secure boot refuses altered firmware or fuses"
   local unit tampered=$OUT/tampered
   unit=$(head -1 "$E2E/received-units.txt")
@@ -150,7 +187,10 @@ verify() {
   expect_refused "a runtime image with one bit flipped" 0x000b0016 "$tampered/rt" "$tampered/flash.bin" "$DEVICES/$unit/fuses.json"
   jq --arg zero "$(printf '0%.0s' $(seq 96))" '.vendorPkHash = $zero' "$DEVICES/$unit/fuses.json" > "$tampered/fuses.json"
   expect_refused "firmware on a unit fused for another vendor key" 0x000b0003 "$tampered/vk" "$DEVICES/$unit/flash.bin" "$tampered/fuses.json"
+}
 
+buyer_checks() {
+  local units=$1 boots=$2 vsa_dir=$3 vkey=$4
   echo "== buyer checks"
   if [[ -n "${HSLSA_VSA_SIGNING_KEY:-}" ]]; then
     echo "VSA signing key: repository secret HSLSA_VSA_SIGNING_KEY"
@@ -161,7 +201,7 @@ verify() {
   fi
   hslsa pubkey --key "$vkey/verifier.key.pem" --out "$vsa_dir/verifier.pub.pem"
   hslsa caliptra verify --bundle "$BUNDLE" --trust-root "$BUNDLE/trust-root.json" --policy "$BUNDLE/policy.json" \
-    --units "$E2E/received-units.txt" --boots "$boots" --vsa-key "$vkey/verifier.key.pem" --vsa-out "$vsa_dir"
+    --units "$units" --boots "$boots" --vsa-key "$vkey/verifier.key.pem" --vsa-out "$vsa_dir"
 
   local sv=${SLSA_VERIFIER:-slsa-verifier} keyid
   keyid=$(hslsa keyid --key "$vsa_dir/verifier.pub.pem")
@@ -183,15 +223,21 @@ verify() {
   while read -r unit; do
     [[ -n $unit ]] || continue
     check_vsa "device-$unit.vsa.intoto.json" "" HSLSA_FIRMWARE_LEVEL_2 HSLSA_PACKAGE_TEST_LEVEL_2
-  done < "$E2E/received-units.txt"
+  done < "$units"
 
   echo "== slsa-verifier negative cases"
-  local first; first=$(head -1 "$E2E/received-units.txt")
+  local first; first=$(head -1 "$units")
   [[ -f $vsa_dir/device-$first.vsa.intoto.json ]] || { echo "FAIL: no VSA for $first" >&2; exit 1; }
   expect_fail "Firmware L3 for a device verified at L2" check_vsa "device-$first.vsa.intoto.json" "" HSLSA_FIRMWARE_LEVEL_3
   expect_fail "SLSA Build L3 for the firmware" check_vsa firmware.vsa.intoto.json "hslsa:firmware:caliptra-fw-bundle.bin" SLSA_BUILD_LEVEL_3
   expect_fail "one unit's VSA for another unit" check_vsa "device-$first.vsa.intoto.json" "urn:hslsa:unit:CLP-00006" HSLSA_FIRMWARE_LEVEL_2
   rm -rf "$vkey"
+}
+
+verify_rtl() {
+  local units=$OUT/rtl-units.txt
+  head -"${RTL_UNITS:-1}" "$E2E/received-units.txt" > "$units"
+  DEVICE_BIN=$DEVICE_RTL_BIN RTL=1 UNITS=$units verify
 }
 
 case "${1:-}" in
@@ -200,5 +246,7 @@ case "${1:-}" in
   produce) produce ;;
   verify) verify ;;
   all) fetch; build; produce; verify ;;
-  *) echo "usage: $0 fetch|build|produce|verify|all" >&2; exit 2 ;;
+  build-rtl) build_rtl ;;
+  verify-rtl) verify_rtl ;;
+  *) echo "usage: $0 fetch|build|produce|verify|all|build-rtl|verify-rtl" >&2; exit 2 ;;
 esac

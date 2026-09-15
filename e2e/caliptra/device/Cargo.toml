@@ -11,6 +11,11 @@ publish = false
 
 [workspace]
 
+[features]
+# Build against the Verilated caliptra-rtl instead of the emulator. Needs
+# Verilator 5 and the pinned caliptra-rtl at caliptra-sw/hw/latest/rtl.
+verilator = ["caliptra-hw-model/verilator"]
+
 [dependencies]
 anyhow = "1.0.70"
 caliptra-api = { path = "../.src/caliptra-sw/api" }

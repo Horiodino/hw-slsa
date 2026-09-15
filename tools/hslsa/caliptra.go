@@ -364,6 +364,12 @@ func rtlEnv(root string) [][2]string {
 // rtlFiles is every file the lint command reads: the file list, the files it
 // names and everything in its include directories.
 func rtlFiles(root, fileList string) ([]string, error) {
+	return vfFiles(root, fileList, "")
+}
+
+// vfFiles reads a Verilator file list like rtlFiles, leaving out lines that
+// contain skip (when not empty).
+func vfFiles(root, fileList, skip string) ([]string, error) {
 	env := append([][2]string{{"CALIPTRA_ROOT", root}}, rtlEnv(root)...)
 	files := map[string]bool{fileList: true}
 	text, err := os.ReadFile(filepath.Join(root, fileList))
@@ -382,7 +388,7 @@ func rtlFiles(root, fileList string) ([]string, error) {
 		for _, kv := range env {
 			line = strings.ReplaceAll(line, "${"+kv[0]+"}", kv[1])
 		}
-		if line == "" || strings.HasPrefix(line, "//") {
+		if line == "" || strings.HasPrefix(line, "//") || (skip != "" && strings.Contains(line, skip)) {
 			continue
 		}
 		if strings.HasPrefix(line, "+incdir+") {
@@ -752,6 +758,83 @@ func CaliptraFab(bundle, devices string) error {
 		return err
 	}
 	fmt.Printf("fab: mask ROM sha384:%s... taken from the released design\n", sha384Bytes(rom)[:16])
+	return nil
+}
+
+// CaliptraRTLModel lays out the sources of the Verilated device for the RTL
+// boot: the released design, unpacked byte for byte, plus the testbench,
+// coverage and assertion files caliptra-rtl's Verilator harness reads that are
+// not part of the design. It refuses a bench file that would replace a
+// released one, and writes rtl-model.json next to out naming both sets.
+func CaliptraRTLModel(bundle, lockPath, out string) error {
+	lock, err := ReadObj(lockPath)
+	if err != nil {
+		return err
+	}
+	src, err := srcDir(lockPath)
+	if err != nil {
+		return err
+	}
+	rel, err := releasedSubject(bundle)
+	if err != nil {
+		return err
+	}
+	design := filepath.Join(bundle, "artifacts", S(rel, "name"))
+	if d, err := sha256File(design); err != nil || d != S(rel, "digest", "sha256") {
+		return fmt.Errorf("released design does not match its release record")
+	}
+	released, err := tarNames(design)
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(out); err != nil {
+		return err
+	}
+	if err := unpack(design, out); err != nil {
+		return err
+	}
+	inRelease := map[string]bool{}
+	for _, n := range released {
+		inRelease[filepath.Clean(n)] = true
+	}
+	// Axi4PC.sv comes from caliptra-sw's harness directory, not from caliptra-rtl.
+	root := filepath.Join(src, "caliptra-rtl")
+	benchList := S(lock, "rtl", "benchFileList")
+	names, err := vfFiles(root, benchList, "${CALIPTRA_AXI4PC_DIR}")
+	if err != nil {
+		return err
+	}
+	var bench []Obj
+	for _, n := range names {
+		if inRelease[n] {
+			a, errA := sha256File(filepath.Join(root, n))
+			b, errB := sha256File(filepath.Join(out, n))
+			if errA != nil || errB != nil || a != b {
+				return fmt.Errorf("%s: the pinned checkout differs from the released design", n)
+			}
+			continue
+		}
+		if err := copyFile(filepath.Join(root, n), filepath.Join(out, n)); err != nil {
+			return err
+		}
+		d, err := sha256File(filepath.Join(out, n))
+		if err != nil {
+			return err
+		}
+		bench = append(bench, Obj{"name": n, "digest": Obj{"sha256": d}})
+	}
+	manifest := Obj{
+		"release":       Obj{"name": S(rel, "name"), "digest": get(rel, "digest")},
+		"releasedFiles": len(released),
+		"benchFileList": benchList,
+		"benchSource":   Obj{"uri": "git+" + S(lock, "caliptraRtl", "repo"), "digest": Obj{"gitCommit": S(lock, "caliptraRtl", "commit")}},
+		"benchFiles":    bench,
+	}
+	if err := WriteJSON(filepath.Clean(out)+".json", manifest); err != nil {
+		return err
+	}
+	fmt.Printf("rtl-model: %d files of the released design sha256:%s... plus %d bench files\n",
+		len(released), S(rel, "digest", "sha256")[:16], len(bench))
 	return nil
 }
 

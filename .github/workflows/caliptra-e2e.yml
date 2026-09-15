@@ -8,6 +8,10 @@
 # emulator running that ROM and firmware), walks the chain from each device's
 # certificates back to the RTL, signs VSAs and checks them with slsa-verifier.
 #
+# "verify-rtl" is the same buyer with the device built from the released RTL
+# instead of the emulator. One RTL boot takes hours, so it runs only when
+# dispatched by hand with rtl set.
+#
 # Private by design, like hslsa-e2e.yml: local keys and DSSE envelopes, no OIDC
 # token, nothing sent to Sigstore. See docs/caliptra-e2e.md.
 name: HSLSA Caliptra end-to-end
@@ -24,6 +28,15 @@ on:
       - hbom/**
       - .github/workflows/caliptra-e2e.yml
   workflow_dispatch:
+    inputs:
+      rtl:
+        description: Also boot units on the Verilated RTL (takes hours)
+        type: boolean
+        default: false
+      rtl-units:
+        description: How many received units to boot on the RTL
+        type: number
+        default: 1
 
 permissions:
   contents: read
@@ -155,5 +168,73 @@ jobs:
           path: |
             out/caliptra/boots
             out/caliptra/vsa
+          if-no-files-found: warn
+          retention-days: 14
+
+  verify-rtl:
+    name: Verify on the RTL (buyer boots units on the Verilated design)
+    needs: produce
+    if: github.event_name == 'workflow_dispatch' && inputs.rtl
+    runs-on: ubuntu-24.04
+    # GitHub's limit for a hosted job; the boot is most of it.
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install Verilator
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends verilator
+      - name: Install Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          echo "CARGO_TERM_COLOR=never" >> "$GITHUB_ENV"
+      - name: Fetch Caliptra sources at the pinned commits
+        run: e2e/caliptra/run.sh fetch
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hslsa-caliptra-bundle
+          path: out/caliptra/bundle
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hslsa-caliptra-devices
+          path: out/caliptra/devices
+      - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
+            "https://github.com/slsa-framework/slsa-verifier/releases/download/${SLSA_VERIFIER_VERSION}/slsa-verifier-linux-amd64"
+          echo "${SLSA_VERIFIER_SHA256}  $RUNNER_TEMP/slsa-verifier" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/slsa-verifier"
+          echo "SLSA_VERIFIER=$RUNNER_TEMP/slsa-verifier" >> "$GITHUB_ENV"
+      # No cache on purpose: the model is Verilated fresh from the released design on every run.
+      - name: Verilate the released design into the device model
+        run: e2e/caliptra/run.sh build-rtl
+      - name: Boot the units on the RTL, check the chain, sign VSAs, verify them with slsa-verifier
+        env:
+          HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
+          RTL_UNITS: ${{ inputs.rtl-units }}
+        run: e2e/caliptra/run.sh verify-rtl | tee verify-rtl.log
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## HSLSA Caliptra on the RTL"
+            echo '```'
+            cat out/caliptra/build/verilator-version.txt 2>/dev/null || true
+            grep -v "^PASSED: SLSA verification passed$\|^$" verify-rtl.log 2>/dev/null | grep -v "^boot: .* cycles, " || true
+            grep "^boot: .* cycles, " verify-rtl.log 2>/dev/null | tail -1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: hslsa-caliptra-rtl-boots
+          path: |
+            out/caliptra/build/rtl-model/rtl.json
+            out/caliptra/build/verilator-version.txt
+            out/caliptra/boots-rtl
+            out/caliptra/vsa-rtl
           if-no-files-found: warn
           retention-days: 14

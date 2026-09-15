@@ -387,7 +387,7 @@ func openlane(args []string) error {
 }
 
 func caliptra(args []string) error {
-	act, rest, err := action(args, "ca", "firmware", "design", "fab", "provision", "hbom", "verify")
+	act, rest, err := action(args, "ca", "firmware", "design", "fab", "rtl-model", "provision", "hbom", "verify")
 	if err != nil {
 		return err
 	}
@@ -440,6 +440,12 @@ func caliptra(args []string) error {
 			return err
 		}
 		return hslsa.CaliptraFab(*bundle, *devices)
+	case "rtl-model":
+		bundle, lock, out := f.str("bundle", "", true), f.str("lock", "", true), f.str("out", "", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.CaliptraRTLModel(*bundle, *lock, *out)
 	case "provision":
 		bundle, devices, keys := f.str("bundle", "", true), f.str("devices", "", true), f.str("keys", "", true)
 		deviceBin, scenario, lock := f.str("device-bin", "", true), f.str("scenario", "", true), f.str("lock", "", true)

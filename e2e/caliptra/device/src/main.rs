@@ -23,6 +23,7 @@ use caliptra_image_types::ImageManifest;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha384};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 use zerocopy::{FromBytes, IntoBytes};
 
 // Set in the DBG_MANUF_SERVICE register to make the ROM export its IDevID CSR.
@@ -30,6 +31,8 @@ const GENERATE_IDEVID_CSR: u32 = 1;
 const RT_READY: &str = "[rt] RT listening for mailbox commands...\n";
 // TCG UEID type RAND; the 16 bytes that follow are the unit serial.
 const UEID_TYPE_RAND: u32 = 1;
+// Report progress about this often; on the Verilated RTL a boot takes a long time.
+const PROGRESS_SECS: u64 = 60;
 
 fn arg(args: &[String], name: &str) -> Result<PathBuf> {
     args.windows(2)
@@ -160,20 +163,44 @@ fn csr(args: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// Step the device until `done` holds, reporting cycles and the boot status
+/// every PROGRESS_SECS, since on the Verilated RTL a boot takes a long time.
+fn step_until<M: HwModel>(hw: &mut M, what: &str, start: Instant, cycles: &mut u64, mut done: impl FnMut(&mut M) -> bool) {
+    let mut next = PROGRESS_SECS;
+    while !done(hw) {
+        hw.step();
+        *cycles += 1;
+        if *cycles % 1024 == 0 && start.elapsed().as_secs() >= next {
+            next += PROGRESS_SECS;
+            let status = hw.soc_ifc().cptra_boot_status().read();
+            eprintln!("boot: {what}: {} cycles, boot status 0x{status:x}, {}s", *cycles, start.elapsed().as_secs());
+        }
+    }
+}
+
 fn boot(args: &[String]) -> Result<()> {
     let rom = read(&arg(args, "--rom")?)?;
     let fw = read(&arg(args, "--fw")?)?;
     let out = arg(args, "--out")?;
     let (fuses, state) = load_unit(&arg(args, "--fuses")?)?;
+    let start = Instant::now();
+    // Power on and release the boot FSM; the firmware is uploaded below, once
+    // the ROM asks for it, so the wait can report progress.
     let mut hw = caliptra_hw_model::new(
         InitParams { fuses, rom: &rom, security_state: state, ..Default::default() },
-        BootParams { fw_image: Some(&fw), ..Default::default() },
+        BootParams::default(),
     )
     .map_err(|e| anyhow!("model: {e}"))?;
-    let booted = hw.step_until_output_contains(RT_READY);
+    eprintln!("boot: device model {}", hw.type_name());
+    let mut cycles = 0u64;
+    step_until(&mut hw, "ROM, waiting for firmware", start, &mut cycles, |hw| hw.ready_for_fw());
+    hw.output().set_search_term(RT_READY);
+    hw.upload_firmware(&fw).map_err(|e| anyhow!("firmware upload: {e}"))?;
+    eprintln!("boot: firmware accepted by the ROM after {:.0}s", start.elapsed().as_secs_f64());
+    step_until(&mut hw, "FMC and runtime", start, &mut cycles, |hw| hw.output().search_matched());
     let log = hw.output().take(usize::MAX);
     write(&out, "boot.log", log.as_bytes())?;
-    booted.map_err(|e| anyhow!("device did not reach runtime: {e} (see boot.log)"))?;
+    eprintln!("boot: runtime ready after {:.0}s", start.elapsed().as_secs_f64());
 
     let ldev = hw.mailbox_execute_req(GetLdevEcc384CertReq::default()).map_err(|e| anyhow!("{e:?}"))?;
     write(&out, "ldevid-ecc384.der", ldev.data().ok_or_else(|| anyhow!("empty LDevID cert"))?)?;
@@ -181,6 +208,8 @@ fn boot(args: &[String]) -> Result<()> {
     write(&out, "fmc-alias-ecc384.der", fmc.data().ok_or_else(|| anyhow!("empty FMC alias cert"))?)?;
     let rt = hw.mailbox_execute_req(GetRtAliasEcc384CertReq::default()).map_err(|e| anyhow!("{e:?}"))?;
     write(&out, "rt-alias-ecc384.der", rt.data().ok_or_else(|| anyhow!("empty RT alias cert"))?)?;
+    let model = json!({"model": hw.type_name(), "seconds": start.elapsed().as_secs()});
+    write(&out, "device.json", serde_json::to_string_pretty(&model)?.as_bytes())?;
     println!("boot: runtime ready, LDevID, FMC alias and RT alias certificates read");
     Ok(())
 }

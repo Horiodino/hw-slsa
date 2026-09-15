@@ -17,6 +17,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use caliptra_api::mailbox::{GetFmcAliasEcc384CertReq, GetLdevEcc384CertReq, GetRtAliasEcc384CertReq};
+use caliptra_api::SocManager;
 use caliptra_api_types::{DeviceLifecycle, Fuses};
 use caliptra_hw_model::{BootParams, HwModel, InitParams, SecurityState};
 use caliptra_image_types::ImageManifest;
@@ -29,6 +30,7 @@ use zerocopy::{FromBytes, IntoBytes};
 // Set in the DBG_MANUF_SERVICE register to make the ROM export its IDevID CSR.
 const GENERATE_IDEVID_CSR: u32 = 1;
 const RT_READY: &str = "[rt] RT listening for mailbox commands...\n";
+const FIRMWARE_LOAD: u32 = 0x4657_4c44; // "FWLD"
 // TCG UEID type RAND; the 16 bytes that follow are the unit serial.
 const UEID_TYPE_RAND: u32 = 1;
 // Report progress about this often; on the Verilated RTL a boot takes a long time.
@@ -152,6 +154,10 @@ fn csr(args: &[String]) -> Result<()> {
         BootParams { initial_dbg_manuf_service_reg: GENERATE_IDEVID_CSR, ..Default::default() },
     )
     .map_err(|e| anyhow!("model: {e}"))?;
+    let (start, mut cycles) = (Instant::now(), 0u64);
+    step_until(&mut hw, "ROM, deriving the IDevID key", start, &mut cycles, |hw| {
+        hw.soc_ifc().cptra_flow_status().read().idevid_csr_ready()
+    });
     let mut txn = hw.wait_for_mailbox_receive().map_err(|e| anyhow!("mailbox: {e:?}"))?;
     let envelope = std::mem::take(&mut txn.req.data);
     txn.respond_success();
@@ -172,8 +178,11 @@ fn step_until<M: HwModel>(hw: &mut M, what: &str, start: Instant, cycles: &mut u
         *cycles += 1;
         if *cycles % 1024 == 0 && start.elapsed().as_secs() >= next {
             next += PROGRESS_SECS;
-            let status = hw.soc_ifc().cptra_boot_status().read();
-            eprintln!("boot: {what}: {} cycles, boot status 0x{status:x}, {}s", *cycles, start.elapsed().as_secs());
+            let soc = hw.soc_ifc();
+            let (boot, flow) = (soc.cptra_boot_status().read(), u32::from(soc.cptra_flow_status().read()));
+            let (fatal, non_fatal) = (soc.cptra_fw_error_fatal().read(), soc.cptra_fw_error_non_fatal().read());
+            eprintln!("boot: {what}: {} cycles, boot status 0x{boot:x}, flow status 0x{flow:x}, \
+                       fw error 0x{fatal:x}/0x{non_fatal:x}, {}s", *cycles, start.elapsed().as_secs());
         }
     }
 }
@@ -195,7 +204,13 @@ fn boot(args: &[String]) -> Result<()> {
     let mut cycles = 0u64;
     step_until(&mut hw, "ROM, waiting for firmware", start, &mut cycles, |hw| hw.ready_for_fw());
     hw.output().set_search_term(RT_READY);
-    hw.upload_firmware(&fw).map_err(|e| anyhow!("firmware upload: {e}"))?;
+    // FIRMWARE_LOAD, as HwModel::upload_firmware sends it, but waited on here
+    // so the ROM's image verification also reports progress.
+    hw.start_mailbox_execute(FIRMWARE_LOAD, &fw).map_err(|e| anyhow!("firmware upload: {e}"))?;
+    step_until(&mut hw, "ROM, verifying firmware", start, &mut cycles, |hw| !hw.soc_mbox().status().read().status().cmd_busy());
+    if hw.finish_mailbox_execute().map_err(|e| anyhow!("firmware upload: {e}"))?.is_some() {
+        bail!("firmware upload: unexpected response from the ROM");
+    }
     eprintln!("boot: firmware accepted by the ROM after {:.0}s", start.elapsed().as_secs_f64());
     step_until(&mut hw, "FMC and runtime", start, &mut cycles, |hw| hw.output().search_matched());
     let log = hw.output().take(usize::MAX);

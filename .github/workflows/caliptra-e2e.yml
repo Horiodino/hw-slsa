@@ -9,8 +9,10 @@
 # certificates back to the RTL, signs VSAs and checks them with slsa-verifier.
 #
 # "verify-rtl" is the same buyer with the device built from the released RTL
-# instead of the emulator. One RTL boot takes hours, so it runs only when
-# dispatched by hand with rtl set.
+# instead of the emulator. The RTL runs about a thousand cycles a second, so it
+# runs only when dispatched by hand with rtl set. rtl-stage "identity" runs the
+# ROM until it exports each unit's IDevID CSR, which fits a hosted runner;
+# "boot" boots to runtime and needs a runner without the 6-hour job limit.
 #
 # Private by design, like hslsa-e2e.yml: local keys and DSSE envelopes, no OIDC
 # token, nothing sent to Sigstore. See docs/caliptra-e2e.md.
@@ -34,9 +36,18 @@ on:
         type: boolean
         default: false
       rtl-units:
-        description: How many received units to boot on the RTL
+        description: How many received units to run on the RTL
         type: number
         default: 1
+      rtl-stage:
+        description: "identity: ROM to the IDevID CSR (about 2 hours). boot: to runtime (longer than a hosted runner allows)"
+        type: choice
+        options: [identity, boot]
+        default: identity
+      rtl-runner:
+        description: Runner label for the RTL job (a self-hosted runner for rtl-stage boot)
+        type: string
+        default: ubuntu-24.04
 
 permissions:
   contents: read
@@ -175,9 +186,9 @@ jobs:
     name: Verify on the RTL (buyer boots units on the Verilated design)
     needs: produce
     if: github.event_name == 'workflow_dispatch' && inputs.rtl
-    runs-on: ubuntu-24.04
-    # GitHub's limit for a hosted job; the boot is most of it.
-    timeout-minutes: 360
+    runs-on: ${{ inputs.rtl-runner }}
+    # 6 hours is GitHub's limit for a hosted job; a self-hosted one may run 5 days.
+    timeout-minutes: ${{ inputs.rtl-stage == 'boot' && 7200 || 360 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -211,10 +222,11 @@ jobs:
       # No cache on purpose: the model is Verilated fresh from the released design on every run.
       - name: Verilate the released design into the device model
         run: e2e/caliptra/run.sh build-rtl
-      - name: Boot the units on the RTL, check the chain, sign VSAs, verify them with slsa-verifier
+      - name: Run the units on the RTL and check them (${{ inputs.rtl-stage }})
         env:
           HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
           RTL_UNITS: ${{ inputs.rtl-units }}
+          RTL_STAGE: ${{ inputs.rtl-stage }}
         run: e2e/caliptra/run.sh verify-rtl | tee verify-rtl.log
       - name: Summary
         if: always()
@@ -236,5 +248,6 @@ jobs:
             out/caliptra/build/verilator-version.txt
             out/caliptra/boots-rtl
             out/caliptra/vsa-rtl
+            out/caliptra/identity-rtl
           if-no-files-found: warn
           retention-days: 14

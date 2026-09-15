@@ -8,7 +8,9 @@
 #   e2e/caliptra/run.sh all       all of the above
 #
 #   e2e/caliptra/run.sh build-rtl   Verilate the released design into a second device model (after produce)
-#   e2e/caliptra/run.sh verify-rtl  boot RTL_UNITS received units (default 1) on the RTL and run the same checks
+#   e2e/caliptra/run.sh verify-rtl  on the RTL, for RTL_UNITS received units (default 1): with RTL_STAGE=identity
+#                                   (default) run the ROM until it exports the IDevID CSR and check the key;
+#                                   with RTL_STAGE=boot boot to runtime and run the same checks as verify
 #
 # Nothing here uploads to a transparency log: every signature is a DSSE
 # envelope made with a local key, as in e2e/run.sh.
@@ -234,10 +236,43 @@ buyer_checks() {
   rm -rf "$vkey"
 }
 
+# The ROM alone, on the RTL: each unit, in the Manufacturing lifecycle,
+# derives its IDevID key from its fuses and exports a CSR. The key must be the
+# one the identity CA endorsed from the CSR the programming station read.
+rtl_identity() {
+  local units=$1 dir=$OUT/identity-rtl unit csr cert
+  rm -rf "$dir" && mkdir -p "$dir"
+  echo "== the RTL derives each unit's IDevID key"
+  while read -r unit; do
+    [[ -n $unit ]] || continue
+    jq '.lifecycle = "manufacturing"' "$DEVICES/$unit/fuses.json" > "$dir/$unit.fuses.json"
+    "$DEVICE_BIN" csr --rom "$DEVICES/rom.bin" --fuses "$dir/$unit.fuses.json" --out "$dir/$unit" 2>&1 |
+      tee "$dir/$unit.trace" | grep --line-buffered '^boot:\|^csr:'
+    [[ ${PIPESTATUS[0]} == 0 ]] || { echo "FAIL: $unit exported no IDevID CSR on the RTL" >&2; tail -20 "$dir/$unit.trace" >&2; exit 1; }
+    csr=$dir/$unit/idevid-csr-ecc384.der cert=$BUNDLE/artifacts/identity/$unit.idevid.der
+    openssl req -inform der -in "$csr" -verify -noout 2>/dev/null ||
+      { echo "FAIL: $unit: the RTL's CSR does not verify under its own key" >&2; exit 1; }
+    if [[ $(openssl req -inform der -in "$csr" -pubkey -noout) != $(openssl x509 -inform der -in "$cert" -pubkey -noout) ]]; then
+      echo "FAIL: $unit: the RTL derives a different IDevID key from the one the identity CA endorsed" >&2
+      exit 1
+    fi
+    if cmp -s "$csr" "$BUNDLE/artifacts/identity/$unit.csr.der"; then
+      echo "$unit: the RTL derives the endorsed IDevID key; its CSR is byte for byte the one read at test"
+    else
+      echo "$unit: the RTL derives the endorsed IDevID key"
+    fi
+  done < "$units"
+}
+
 verify_rtl() {
   local units=$OUT/rtl-units.txt
   head -"${RTL_UNITS:-1}" "$E2E/received-units.txt" > "$units"
-  DEVICE_BIN=$DEVICE_RTL_BIN RTL=1 UNITS=$units verify
+  DEVICE_BIN=$DEVICE_RTL_BIN
+  case ${RTL_STAGE:-identity} in
+    identity) rtl_identity "$units" ;;
+    boot) RTL=1 UNITS=$units verify ;;
+    *) echo "RTL_STAGE must be identity or boot" >&2; exit 2 ;;
+  esac
 }
 
 case "${1:-}" in

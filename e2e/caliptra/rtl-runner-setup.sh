@@ -2,10 +2,11 @@
 # Prepares the runner for the RTL job: Verilator 5.004 or later (caliptra-sw's
 # minimum), a C++ toolchain, jq, openssl and rustup.
 #
-# GitHub's Ubuntu runners get the missing tools from apt. A self-hosted runner,
+# GitHub's Ubuntu runners get missing packages from apt. A self-hosted runner,
 # such as an Arch Linux machine, gets them from pacman, but only when the runner
 # can use sudo without a password; otherwise the job stops and prints the one
-# command to run on it.
+# command to run on it. rustup needs no package: when the runner has none, it is
+# installed into the runner's tool cache, leaving the user's home alone.
 set -euo pipefail
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -29,7 +30,6 @@ for tool in make g++ pkg-config perl jq openssl git curl; do
   have "$tool" || missing+=("$tool")
 done
 verilator_ok || missing+=(verilator)
-have rustup || missing+=(rustup)
 
 if ((${#missing[@]})); then
   echo "missing: ${missing[*]}"
@@ -39,8 +39,6 @@ if ((${#missing[@]})); then
   elif have pacman; then
     update=()
     install=(pacman -S --needed --noconfirm verilator base-devel jq openssl git curl)
-    # rustup replaces Arch's rust package, which pacman will not do unattended.
-    if ! have rustup && ! pacman -Q rust >/dev/null 2>&1; then install+=(rustup); fi
   else
     echo "::error::No apt-get or pacman on this runner. Install: ${missing[*]}"
     exit 1
@@ -58,14 +56,19 @@ if ((${#missing[@]})); then
 fi
 
 if ! have rustup; then
-  # Arch's rust package is installed and has no rustup; install rustup for the
-  # runner's user only, without touching the system.
-  curl -sSfL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --default-toolchain none --no-modify-path
-  export PATH=$HOME/.cargo/bin:$PATH
-  [[ -z ${GITHUB_PATH:-} ]] || echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+  tools=${RUNNER_TOOL_CACHE:-$HOME/.cache}
+  export RUSTUP_HOME=$tools/rustup CARGO_HOME=$tools/cargo PATH=$tools/cargo/bin:$PATH
+  if [[ ! -x $CARGO_HOME/bin/rustup ]]; then
+    echo "installing rustup into $tools"
+    curl -sSfL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --default-toolchain none --no-modify-path
+  fi
+  if [[ -n ${GITHUB_ENV:-} ]]; then
+    printf 'RUSTUP_HOME=%s\nCARGO_HOME=%s\n' "$RUSTUP_HOME" "$CARGO_HOME" >> "$GITHUB_ENV"
+    echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+  fi
 fi
 
 verilator_ok || { echo "::error::Verilator 5.004 or later is needed; found: $(verilator --version 2>&1)"; exit 1; }
 verilator --version
 g++ --version | head -1
-rustup --version 2>/dev/null
+rustup --version 2>/dev/null || true

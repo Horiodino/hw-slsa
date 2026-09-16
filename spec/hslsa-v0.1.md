@@ -602,11 +602,11 @@ Four examples run in this repository's GitHub Actions and exercise the spec end 
 | PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]`, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
-| Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
+| Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key derived on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
 The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, and signs VSAs. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
-What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key is simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated, and Caliptra units run on its emulator rather than on the RTL.
+What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key is simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated, and Caliptra units boot on its emulator. On the Verilated RTL the example has run the ROM only as far as the IDevID CSR, since a full boot runs past a hosted runner's six-hour job limit.
 
 ## Decisions and open questions
 
@@ -658,7 +658,8 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Pin the dates Magic, KLayout, STA and RCX embed, so the OpenLane 2 GDS is bit-exact and the verifier can require `gds-bit-exact` ([overlay](../openlane2/overlay/README.md)).
 - [x] Have a second builder, with its own keys and trust root, sign a `rebuild` record for a released design, and check it at tapeout ([openlane2-flow.md](../docs/openlane2-flow.md#the-rebuild-and-the-buyers-check)).
 - [ ] Run that second builder under a separate operator, such as another CI account or organization.
-- [ ] Boot the Caliptra ROM on the Verilated RTL instead of the emulator, so the booted device is the design itself.
+- [x] Run the Caliptra ROM on the Verilated released design and check that it derives each unit's endorsed IDevID key ([caliptra-e2e.md](../docs/caliptra-e2e.md#booting-on-the-rtl)).
+- [ ] Boot the Caliptra units to runtime on the Verilated RTL instead of the emulator, so the booted device is the design itself. The job exists and needs a runner without the six-hour limit.
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
@@ -674,6 +675,7 @@ Starts phase 0 of the [roadmap](../docs/roadmap.md), toward v0.2.
 - **Inspection records.** An L4 inspection record names the regions and layers imaged and the imaging technique.
 - **Bit-exact design flows.** A flow MAY replace files inside a pinned image, pinned as a `kind: overlay` dependency, and pass tools a `SOURCE_DATE_EPOCH` in `externalParameters`; every step names the same ones (see [Pinning tools and PDKs](#pinning-tools-and-pdks)). The OpenLane 2 example uses both to make its GDS byte-identical across builders.
 - **Rebuild record.** The record lists the inputs it built from next to the release it rebuilt, and the spec lists what the verifier checks before it accepts one: a rebuilder key in its own trust root that is not a design-house key, a builder other than the flow's, the released GDS, the same inputs, and the check the policy requires. The OpenLane 2 example's tapeout check now requires a bit-exact rebuild from a second builder under its own trust root.
+- **Caliptra on the RTL.** The Caliptra example can build its device from the released design, Verilated, and run the unit's ROM, fuses and flash on it. On demand, the RTL derives each unit's IDevID key, and the buyer checks it against the endorsed IDevID certificate; in CI its CSR matched the one read at test byte for byte. A boot to runtime on the RTL is wired up but has not yet finished within a hosted runner's six-hour limit, so pull requests still boot the emulator.
 
 ### Revision 2 (2026-09-12)
 

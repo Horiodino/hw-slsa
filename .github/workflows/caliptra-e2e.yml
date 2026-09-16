@@ -9,10 +9,11 @@
 # certificates back to the RTL, signs VSAs and checks them with slsa-verifier.
 #
 # "verify-rtl" is the same buyer with the device built from the released RTL
-# instead of the emulator. The RTL runs about a thousand cycles a second, so it
-# runs only when dispatched by hand with rtl set. rtl-stage "identity" runs the
-# ROM until it exports each unit's IDevID CSR, which fits a hosted runner;
-# "boot" boots to runtime and needs a runner without the 6-hour job limit.
+# instead of the emulator. The RTL runs a few hundred to a thousand cycles a
+# second, so it runs only when dispatched by hand with rtl set. rtl-stage
+# "identity" runs the ROM until it exports each unit's IDevID CSR, which fits a
+# hosted runner (about 3.5 hours for one unit); "boot" boots to runtime and
+# needs a runner without the 6-hour job limit.
 #
 # Private by design, like hslsa-e2e.yml: local keys and DSSE envelopes, no OIDC
 # token, nothing sent to Sigstore. See docs/caliptra-e2e.md.

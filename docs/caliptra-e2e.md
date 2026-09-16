@@ -8,6 +8,7 @@ The workflow in [`.github/workflows/caliptra-e2e.yml`](../.github/workflows/cali
 | --- | --- | --- |
 | Produce | Firmware team, design house, tapeout authority, fab, sort house, OSAT, test house and its programming station, product owner | Builds the ROM and the signed FMC + runtime bundle with `caliptra-builder`, lints the RTL, merges the ROM into the design, releases it, signs F1 to F4 for a lot, programs every shipped unit and exports its IDevID CSR from the real ROM, endorses it, signs one `fw-provisioning` record per unit, builds the HBOM |
 | Verify | Buyer | Boots the three units it received, checks that the ROM refuses tampered firmware, runs the tapeout, lot, firmware and at-boot checks, signs six SLSA VSAs, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
+| Verify on the RTL | Buyer, with the device built from the released design | Verilates the released design, then for one received unit (`rtl-units` sets how many) either runs the ROM until it exports the IDevID CSR and checks the key against the endorsed IDevID certificate (`rtl-stage: identity`, the default), or boots to runtime and runs the same checks and slsa-verifier calls as Verify (`rtl-stage: boot`). Runs only when dispatched by hand with `rtl` set; see [Booting on the RTL](#booting-on-the-rtl) |
 
 All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/caliptra.lock.json): caliptra-sw at tag `fw-2.1.3`, and the caliptra-rtl and adams-bridge commits that tag uses, each checked by commit and git tree.
 
@@ -16,7 +17,7 @@ All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/ca
 - **ROM and firmware.** Built by Caliptra's own `caliptra-builder` with the recipe of its frozen-image check. The ROM comes out bit for bit equal to the digest the Caliptra TAC froze in `FROZEN_IMAGES.sha384sum`, and the `rom-merge` step records that as the `rom-matches-frozen` check. That is an independent rebuild of the mask ROM, done by a second party (CHIPS Alliance's CI) with the same result.
 - **RTL.** Step 0 freezes the 671 files Verilator reads for `caliptra_top`, and step 1 lints them with Verilator using the flags caliptra-sw's own verilated build uses.
 - **ROM merge.** Step 6a writes the ROM in the `$readmemh` format caliptra-rtl loads into its ROM macro, checks it fits the macro size defined in the frozen RTL (`CALIPTRA_IMEM_BYTE_SIZE`, 98304 bytes), and reads the bits back out of the merged design before signing (`rom-readback`).
-- **The device.** Each unit is Caliptra's emulator from caliptra-sw (`caliptra-hw-model`), running the ROM taken out of the released design and the firmware bundle written to that unit's flash, with that unit's fuses. The IDevID CSR at provisioning and the LDevID, FMC alias and RT alias certificates at boot all come from that ROM and firmware; [`e2e/caliptra/device`](../e2e/caliptra/device/src/main.rs) only sets fuses, uploads firmware and asks for certificates.
+- **The device.** In every run each unit is Caliptra's emulator from caliptra-sw (`caliptra-hw-model`), running the ROM taken out of the released design and the firmware bundle written to that unit's flash, with that unit's fuses. The RTL job runs the same ROM, flash and fuses on the released design itself, Verilated. The IDevID CSR at provisioning and the LDevID, FMC alias and RT alias certificates at boot all come from that ROM and firmware; [`e2e/caliptra/device`](../e2e/caliptra/device/src/main.rs) only sets fuses, uploads firmware and asks for certificates.
 - **Identity.** Each unit gets its own UDS seed and field entropy, and its serial goes into the UEID fuses, so every certificate the device issues names the unit. The buyer checks the chain identity CA, IDevID, LDevID, FMC alias, RT alias.
 - **Secure boot.** The verify job flips one bit in a unit's runtime image and boots it: the ROM refuses it with `IMAGE_VERIFIER_ERR_RUNTIME_DIGEST_MISMATCH`. A unit fused for another vendor key is refused with `IMAGE_VERIFIER_ERR_VENDOR_PUB_KEY_DIGEST_INVALID`.
 
@@ -25,8 +26,37 @@ All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/ca
 **Not run yet:**
 
 - Physical design. Caliptra's SystemVerilog does not go through Yosys, so there is no synthesis, place and route or GDS. The release subject is the RTL with the ROM merged, standing in for the GDS.
-- Booting on the RTL. Caliptra's emulator models the RTL. Booting the same ROM on caliptra-sw's Verilator model would make the booted device the RTL itself, but it needs Verilator 5.006 built from source and a much larger runner than a standard one.
+- A full boot on the RTL. The RTL job derives each unit's identity on the RTL, but a boot to runtime has not yet finished inside a hosted runner's six-hour limit; see [Booting on the RTL](#booting-on-the-rtl). Pull requests and pushes boot the emulator.
 - Only the ECC P-384 half of Caliptra's certificate chain is checked. Caliptra 2.x also issues an ML-DSA-87 chain; Go's `crypto/x509`, which the verifier uses, cannot verify ML-DSA certificates.
+
+## Booting on the RTL
+
+The emulator is a software model of the RTL, so a chain that ends at it ends at a model of the design. The RTL job ends at the design.
+
+**The device is the released design.** `hslsa caliptra rtl-model` unpacks the released design (`caliptra-design.tar`, checked against the release record) and adds only what caliptra-rtl's Verilator harness reads that is not part of the design: 51 testbench, coverage and assertion files from `caliptra_top_tb.vf` at the pinned caliptra-rtl commit. It refuses a bench file that would replace a released one, and lists every bench file with its digest in `rtl.json`, which the job uploads. caliptra-sw's `hw-model` then Verilates that tree in place of its own caliptra-rtl submodule, and no Verilated model is reused between runs. The unit runs the mask ROM taken out of the released design, with the fuses and flash the programming station wrote.
+
+The job has two stages, picked with `rtl-stage`:
+
+| Stage | What runs on the RTL | What the buyer checks | Measured on a standard hosted runner |
+| --- | --- | --- | --- |
+| `identity` (default) | The ROM, with the unit's fuses in the manufacturing lifecycle, until it exports the IDevID CSR | The CSR verifies under its own key, and that key is the one in the IDevID certificate the identity CA endorsed from the CSR read at test | Passed ([run 36622030110](https://github.com/Horiodino/hw-slsa/actions/runs/36622030110)): CSR after 3.67 million cycles and 3 hours 4 minutes, byte for byte the CSR the emulator exported at test. The whole job, with a 25-minute model build, took about 3.5 hours for one unit |
+| `boot` | The ROM, the firmware upload and verification, then FMC and runtime | The same tapeout, lot, firmware and at-boot checks as Verify, the same VSAs, and slsa-verifier. The LDevID certificate must verify under the endorsed IDevID key | Not finished. The ROM asked for firmware after 5.4 million cycles (91 minutes), then was still verifying it when GitHub stopped the job at six hours. The emulator reaches runtime in about 8.1 million cycles |
+
+The `identity` stage shows that the design itself derives the identity the chain was endorsed with: the key the identity CA certified, and every certificate the buyer later trusts from it, comes from the released RTL and ROM with that unit's fuses, not only from the emulator's model of them.
+
+The `boot` stage needs a runner without the six-hour job limit: set `rtl-runner` to a self-hosted runner's label, and the job then allows up to five days. The first attempt printed nothing while the ROM verified firmware; the device tool now prints the cycle count and Caliptra's boot and error status every minute in every phase, so the next run shows whether verification is slow or stuck.
+
+The secure-boot refusal checks stay on the emulator, since each refused boot would take hours more on the RTL.
+
+Speed is the cost. Caliptra 2.1 has ML-DSA, ML-KEM and AES engines, and its Verilated model ran at 330 to 1,000 clock cycles a second on a four-core hosted runner, depending on the runner. The job builds the model with `-O3` and one Verilator thread per core in place of caliptra-sw's `-Os` on one thread. That changes compile options, not the design. The job summary shows the last cycle count.
+
+To run it, dispatch the workflow from the Actions tab with `rtl` set, or locally after `produce`:
+
+```sh
+e2e/caliptra/run.sh build-rtl
+RTL_UNITS=1 RTL_STAGE=identity e2e/caliptra/run.sh verify-rtl
+RTL_UNITS=1 RTL_STAGE=boot SLSA_VERIFIER=/path/to/slsa-verifier e2e/caliptra/run.sh verify-rtl
+```
 
 ## Levels claimed
 

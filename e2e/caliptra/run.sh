@@ -120,11 +120,12 @@ build_rtl() {
   ln -sfn "$model/rtl" "$sw/hw/latest/rtl"
   # Never reuse a model Verilated from another tree.
   rm -rf "$sw/hw/verilated/out"
-  verilator --version | tee "$BUILD/verilator-version.txt"
   # caliptra-sw's harness compiles with -Os on one thread; -O3 with a thread
-  # per core boots faster. Neither changes the design.
+  # per core, up to 8, boots faster. Neither changes the design.
+  local threads=${RTL_THREADS:-$(( $(nproc) < 8 ? $(nproc) : 8 ))}
+  { verilator --version; echo "threads: $threads, -O3"; } | tee "$BUILD/verilator-version.txt"
   (cd "$E2E/device" &&
-    MAKEFLAGS="VERILATOR_MAKE_FLAGS=OPT_FAST=-O3 EXTRA_VERILATOR_FLAGS=--threads\\ ${RTL_THREADS:-$(nproc)}" \
+    MAKEFLAGS="VERILATOR_MAKE_FLAGS=OPT_FAST=-O3 EXTRA_VERILATOR_FLAGS=--threads\\ $threads" \
     CALIPTRA_VERILATOR_JOBS=$(nproc) cargo build -q --locked --release --features verilator --target-dir "$BUILD/rtl-target")
   cp "$BUILD/rtl-target/release/hslsa-caliptra-device" "$DEVICE_RTL_BIN"
   echo "build-rtl: device model Verilated from the released design"

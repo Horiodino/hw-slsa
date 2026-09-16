@@ -46,7 +46,7 @@ on:
         options: [identity, boot]
         default: identity
       rtl-runner:
-        description: Runner label for the RTL job (a self-hosted runner for rtl-stage boot)
+        description: Runner label for the RTL job; self-hosted for rtl-stage boot, which runs past the 6-hour hosted limit
         type: string
         default: ubuntu-24.04
 
@@ -197,8 +197,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Install Verilator
-        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends verilator
+      # apt on GitHub's runners, pacman on a self-hosted Arch Linux runner.
+      - name: Install Verilator and build tools
+        run: e2e/caliptra/rtl-runner-setup.sh
       - name: Install Rust ${{ env.RUST_TOOLCHAIN }}
         run: |
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal

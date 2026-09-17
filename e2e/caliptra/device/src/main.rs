@@ -35,6 +35,7 @@ const FIRMWARE_LOAD: u32 = 0x4657_4c44; // "FWLD"
 const UEID_TYPE_RAND: u32 = 1;
 // Report progress about this often; on the Verilated RTL a boot takes a long time.
 const PROGRESS_SECS: u64 = 60;
+const POLL_STEPS: u64 = 64;
 
 fn arg(args: &[String], name: &str) -> Result<PathBuf> {
     args.windows(2)
@@ -154,8 +155,8 @@ fn csr(args: &[String]) -> Result<()> {
         BootParams { initial_dbg_manuf_service_reg: GENERATE_IDEVID_CSR, ..Default::default() },
     )
     .map_err(|e| anyhow!("model: {e}"))?;
-    let (start, mut cycles) = (Instant::now(), 0u64);
-    step_until(&mut hw, "ROM, deriving the IDevID key", start, &mut cycles, |hw| {
+    let start = Instant::now();
+    step_until(&mut hw, "ROM, deriving the IDevID key", start, |hw| {
         hw.soc_ifc().cptra_flow_status().read().idevid_csr_ready()
     });
     let mut txn = hw.wait_for_mailbox_receive().map_err(|e| anyhow!("mailbox: {e:?}"))?;
@@ -171,18 +172,26 @@ fn csr(args: &[String]) -> Result<()> {
 
 /// Step the device until `done` holds, reporting cycles and the boot status
 /// every PROGRESS_SECS, since on the Verilated RTL a boot takes a long time.
-fn step_until<M: HwModel>(hw: &mut M, what: &str, start: Instant, cycles: &mut u64, mut done: impl FnMut(&mut M) -> bool) {
-    let mut next = PROGRESS_SECS;
+///
+/// `done` is checked every POLL_STEPS steps: on the RTL a register read is a
+/// bus transaction, and polling every cycle only adds bus traffic.
+fn step_until<M: HwModel>(hw: &mut M, what: &str, start: Instant, mut done: impl FnMut(&mut M) -> bool) {
+    let (mut next, mut polls) = (PROGRESS_SECS, 0u64);
     while !done(hw) {
-        hw.step();
-        *cycles += 1;
-        if *cycles % 1024 == 0 && start.elapsed().as_secs() >= next {
+        for _ in 0..POLL_STEPS {
+            hw.step();
+        }
+        polls += 1;
+        if polls % 16 == 0 && start.elapsed().as_secs() >= next {
             next += PROGRESS_SECS;
+            // The model's own count includes the cycles bus transactions took.
+            let now = hw.output().sink().now();
             let soc = hw.soc_ifc();
             let (boot, flow) = (soc.cptra_boot_status().read(), u32::from(soc.cptra_flow_status().read()));
             let (fatal, non_fatal) = (soc.cptra_fw_error_fatal().read(), soc.cptra_fw_error_non_fatal().read());
-            eprintln!("boot: {what}: {} cycles, boot status 0x{boot:x}, flow status 0x{flow:x}, \
-                       fw error 0x{fatal:x}/0x{non_fatal:x}, {}s", *cycles, start.elapsed().as_secs());
+            let secs = start.elapsed().as_secs();
+            eprintln!("boot: {what}: {now} cycles, {} a second, boot status 0x{boot:x}, flow status 0x{flow:x}, \
+                       fw error 0x{fatal:x}/0x{non_fatal:x}, {secs}s", now / secs.max(1));
         }
     }
 }
@@ -201,21 +210,21 @@ fn boot(args: &[String]) -> Result<()> {
     )
     .map_err(|e| anyhow!("model: {e}"))?;
     eprintln!("boot: device model {}", hw.type_name());
-    let mut cycles = 0u64;
-    step_until(&mut hw, "ROM, waiting for firmware", start, &mut cycles, |hw| hw.ready_for_fw());
+    step_until(&mut hw, "ROM, waiting for firmware", start, |hw| hw.ready_for_fw());
+    eprintln!("boot: ROM ready for firmware after {} cycles, {:.0}s", hw.output().sink().now(), start.elapsed().as_secs_f64());
     hw.output().set_search_term(RT_READY);
     // FIRMWARE_LOAD, as HwModel::upload_firmware sends it, but waited on here
     // so the ROM's image verification also reports progress.
     hw.start_mailbox_execute(FIRMWARE_LOAD, &fw).map_err(|e| anyhow!("firmware upload: {e}"))?;
-    step_until(&mut hw, "ROM, verifying firmware", start, &mut cycles, |hw| !hw.soc_mbox().status().read().status().cmd_busy());
+    step_until(&mut hw, "ROM, verifying firmware", start, |hw| !hw.soc_mbox().status().read().status().cmd_busy());
     if hw.finish_mailbox_execute().map_err(|e| anyhow!("firmware upload: {e}"))?.is_some() {
         bail!("firmware upload: unexpected response from the ROM");
     }
-    eprintln!("boot: firmware accepted by the ROM after {:.0}s", start.elapsed().as_secs_f64());
-    step_until(&mut hw, "FMC and runtime", start, &mut cycles, |hw| hw.output().search_matched());
+    eprintln!("boot: firmware accepted by the ROM after {} cycles, {:.0}s", hw.output().sink().now(), start.elapsed().as_secs_f64());
+    step_until(&mut hw, "FMC and runtime", start, |hw| hw.output().search_matched());
     let log = hw.output().take(usize::MAX);
     write(&out, "boot.log", log.as_bytes())?;
-    eprintln!("boot: runtime ready after {:.0}s", start.elapsed().as_secs_f64());
+    eprintln!("boot: runtime ready after {} cycles, {:.0}s", hw.output().sink().now(), start.elapsed().as_secs_f64());
 
     let ldev = hw.mailbox_execute_req(GetLdevEcc384CertReq::default()).map_err(|e| anyhow!("{e:?}"))?;
     write(&out, "ldevid-ecc384.der", ldev.data().ok_or_else(|| anyhow!("empty LDevID cert"))?)?;

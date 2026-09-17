@@ -124,10 +124,36 @@ build_rtl() {
   # per core, up to 8, boots faster. Neither changes the design.
   local threads=${RTL_THREADS:-$(( $(nproc) < 8 ? $(nproc) : 8 ))}
   { verilator --version; echo "threads: $threads, -O3"; } | tee "$BUILD/verilator-version.txt"
+
+  # With RTL_MODEL_CACHE set, a model built earlier on this machine is reused
+  # when everything it was built from is the same: the released design's
+  # digest and every bench file's, the caliptra-sw commit, the device tool,
+  # the compilers and the build options.
+  local key cached=
+  if [[ -n ${RTL_MODEL_CACHE:-} ]]; then
+    key=$({ cat "$model/rtl.json" "$BUILD/verilator-version.txt"
+            git -C "$sw" rev-parse HEAD
+            (cd "$E2E/device" && cat Cargo.toml Cargo.lock rust-toolchain.toml src/*.rs && rustc -Vv)
+            g++ --version | sed -n 1p; } | sha256sum | cut -c1-64)
+    cached=$RTL_MODEL_CACHE/$key/hslsa-caliptra-device
+  fi
+  if [[ -n $cached && -x $cached ]]; then
+    cp "$cached" "$DEVICE_RTL_BIN"
+    echo "model: reused, built $(date -u -r "$cached" +%FT%TZ) from the same inputs (key $key)" | tee -a "$BUILD/verilator-version.txt"
+    echo "build-rtl: device model Verilated from the released design, reused from this machine's cache"
+    return
+  fi
   (cd "$E2E/device" &&
     MAKEFLAGS="VERILATOR_MAKE_FLAGS=OPT_FAST=-O3 EXTRA_VERILATOR_FLAGS=--threads\\ $threads" \
     CALIPTRA_VERILATOR_JOBS=$(nproc) cargo build -q --locked --release --features verilator --target-dir "$BUILD/rtl-target")
   cp "$BUILD/rtl-target/release/hslsa-caliptra-device" "$DEVICE_RTL_BIN"
+  if [[ -n $cached ]]; then
+    mkdir -p "${cached%/*}"
+    cp "$DEVICE_RTL_BIN" "$cached.tmp" && mv "$cached.tmp" "$cached"
+    # Keep the three newest models.
+    ls -1dt "$RTL_MODEL_CACHE"/*/ | tail -n +4 | xargs -r rm -rf
+    echo "model: built now, cached (key $key)" | tee -a "$BUILD/verilator-version.txt"
+  fi
   echo "build-rtl: device model Verilated from the released design"
 }
 

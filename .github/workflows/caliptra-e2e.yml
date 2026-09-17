@@ -221,8 +221,12 @@ jobs:
           echo "${SLSA_VERIFIER_SHA256}  $RUNNER_TEMP/slsa-verifier" | sha256sum -c -
           chmod +x "$RUNNER_TEMP/slsa-verifier"
           echo "SLSA_VERIFIER=$RUNNER_TEMP/slsa-verifier" >> "$GITHUB_ENV"
-      # No cache on purpose: the model is Verilated fresh from the released design on every run.
+      # GitHub's runners Verilate the released design on every run. A self-hosted
+      # runner keeps its three newest models and reuses one only when the
+      # released design, bench files, sources, compilers and options all match.
       - name: Verilate the released design into the device model
+        env:
+          RTL_MODEL_CACHE: ${{ runner.environment == 'self-hosted' && format('{0}/hslsa-rtl-models', runner.tool_cache) || '' }}
         run: e2e/caliptra/run.sh build-rtl
       - name: Run the units on the RTL and check them (${{ inputs.rtl-stage }})
         env:
@@ -237,8 +241,8 @@ jobs:
             echo "## HSLSA Caliptra on the RTL"
             echo '```'
             cat out/caliptra/build/verilator-version.txt 2>/dev/null || true
-            grep -v "^PASSED: SLSA verification passed$\|^$" verify-rtl.log 2>/dev/null | grep -v "^boot: .* cycles, " || true
-            grep "^boot: .* cycles, " verify-rtl.log 2>/dev/null | tail -1 || true
+            grep -v "^PASSED: SLSA verification passed$\|^$" verify-rtl.log 2>/dev/null | grep -v "^boot: .* a second, " || true
+            grep "^boot: .* a second, " verify-rtl.log 2>/dev/null | tail -1 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

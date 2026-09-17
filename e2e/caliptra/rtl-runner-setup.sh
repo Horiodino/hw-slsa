@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
-# Prepares the runner for the RTL job: Verilator 5.004 or later (caliptra-sw's
-# minimum), a C++ toolchain, jq, openssl and rustup.
+# Prepares the runner for the RTL job: Verilator 5.020, a C++ toolchain, jq,
+# openssl and rustup.
 #
-# GitHub's Ubuntu runners get missing packages from apt. A self-hosted runner,
-# such as an Arch Linux machine, gets them from pacman, but only when the runner
-# can use sudo without a password; otherwise the job stops and prints the one
-# command to run on it. rustup needs no package: when the runner has none, it is
-# installed into the runner's tool cache, leaving the user's home alone.
+# Every RTL run uses Verilator 5.020, the version in GitHub's ubuntu-24.04
+# image, which the identity run used. caliptra-sw fw-2.1.3's harness does not
+# build with newer Verilator, whose wide signals no longer convert to pointers.
+# A runner with another Verilator, such as an Arch Linux machine, builds 5.020
+# from its git tag into the runner's tool cache once and reuses it.
+#
+# GitHub's Ubuntu runners get missing packages from apt, and an Arch Linux
+# runner from pacman, but only when the runner can use sudo without a password;
+# otherwise the job stops and prints the one command to run on it. rustup needs
+# no package: when the runner has none, it is installed into the tool cache.
 set -euo pipefail
 
+VERILATOR_VERSION=5.020
+
 have() { command -v "$1" >/dev/null 2>&1; }
+verilator_is() { [[ $("${1:-verilator}" --version 2>/dev/null | awk '{print $2}') == "$VERILATOR_VERSION" ]]; }
 
 os=$( (. /etc/os-release && echo "${PRETTY_NAME:-$ID}") 2>/dev/null || uname -s)
 echo "runner: $os, $(uname -m), $(nproc) CPUs, $(awk '/^MemTotal:/ {printf "%d GB", $2 / 1048576}' /proc/meminfo) RAM"
@@ -18,27 +26,34 @@ if [[ $(uname -m) != x86_64 ]]; then
   exit 1
 fi
 
-verilator_ok() {
-  have verilator || return 1
-  local v
-  v=$(verilator --version | awk '{print $2}')
-  [[ $v =~ ^5\.([0-9]+) ]] && ((10#${BASH_REMATCH[1]} >= 4))
-}
+tools=${RUNNER_TOOL_CACHE:-$HOME/.cache}
+prefix=$tools/verilator/$VERILATOR_VERSION
+use_prefix= build_verilator=
+if have apt-get && ! have verilator; then
+  : # apt installs it below
+elif ! verilator_is; then
+  use_prefix=1
+  verilator_is "$prefix/bin/verilator" || build_verilator=1
+fi
 
 missing=()
-for tool in make g++ pkg-config perl jq openssl git curl; do
+needed=(make g++ pkg-config perl jq openssl git curl)
+[[ -z $build_verilator ]] || needed+=(autoconf flex bison python3)
+for tool in "${needed[@]}"; do
   have "$tool" || missing+=("$tool")
 done
-verilator_ok || missing+=(verilator)
+# Verilator's lexer needs flex's C++ header (Arch's flex, Debian's libfl-dev).
+[[ -z $build_verilator || -e /usr/include/FlexLexer.h ]] || missing+=(FlexLexer.h)
+if have apt-get && ! have verilator; then missing+=(verilator); fi
 
 if ((${#missing[@]})); then
   echo "missing: ${missing[*]}"
   if have apt-get; then
     update=(apt-get update -q)
-    install=(apt-get install -y -q --no-install-recommends verilator build-essential pkg-config jq openssl git curl)
+    install=(apt-get install -y -q --no-install-recommends verilator build-essential pkg-config autoconf flex libfl-dev bison python3 jq openssl git curl)
   elif have pacman; then
     update=()
-    install=(pacman -S --needed --noconfirm verilator base-devel jq openssl git curl)
+    install=(pacman -S --needed --noconfirm base-devel python perl jq openssl git curl)
   else
     echo "::error::No apt-get or pacman on this runner. Install: ${missing[*]}"
     exit 1
@@ -53,10 +68,32 @@ if ((${#missing[@]})); then
   fi
   if ((${#update[@]})); then "${sudo[@]}" "${update[@]}"; fi
   "${sudo[@]}" "${install[@]}"
+  if ! verilator_is; then
+    use_prefix=1
+    verilator_is "$prefix/bin/verilator" || build_verilator=1
+  fi
+fi
+
+if [[ -n $build_verilator ]]; then
+  echo "building Verilator $VERILATOR_VERSION into $prefix (runner has: $(verilator --version 2>/dev/null || echo none))"
+  src=$tools/verilator/src-$VERILATOR_VERSION
+  rm -rf "$src" "$prefix"
+  git -c advice.detachedHead=false clone -q --depth 1 -b "v$VERILATOR_VERSION" https://github.com/verilator/verilator "$src"
+  # No man pages: those need help2man, and the job does not read them.
+  (cd "$src" && autoconf && ./configure -q --prefix="$prefix" &&
+    make -s -j"$(nproc)" verilator_exe && make -s installbin installdata) > "$tools/verilator/build-$VERILATOR_VERSION.log" 2>&1 ||
+    { tail -40 "$tools/verilator/build-$VERILATOR_VERSION.log"; echo "::error::Building Verilator $VERILATOR_VERSION failed"; exit 1; }
+  rm -rf "$src"
+fi
+if [[ -n $use_prefix ]]; then
+  export PATH=$prefix/bin:$PATH PKG_CONFIG_PATH=$prefix/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}
+  if [[ -n ${GITHUB_ENV:-} ]]; then
+    echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
+    echo "$prefix/bin" >> "$GITHUB_PATH"
+  fi
 fi
 
 if ! have rustup; then
-  tools=${RUNNER_TOOL_CACHE:-$HOME/.cache}
   export RUSTUP_HOME=$tools/rustup CARGO_HOME=$tools/cargo PATH=$tools/cargo/bin:$PATH
   if [[ ! -x $CARGO_HOME/bin/rustup ]]; then
     echo "installing rustup into $tools"
@@ -68,7 +105,9 @@ if ! have rustup; then
   fi
 fi
 
-verilator_ok || { echo "::error::Verilator 5.004 or later is needed; found: $(verilator --version 2>&1)"; exit 1; }
+verilator_is || { echo "::error::Verilator $VERILATOR_VERSION is needed; found: $(verilator --version 2>&1)"; exit 1; }
+[[ $(pkg-config --modversion verilator) == "$VERILATOR_VERSION" ]] ||
+  { echo "::error::pkg-config finds Verilator $(pkg-config --modversion verilator), not $VERILATOR_VERSION"; exit 1; }
 verilator --version
 g++ --version | head -1
 rustup --version 2>/dev/null || true

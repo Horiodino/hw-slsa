@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Prepares the runner for the RTL job: Verilator 5.020, a C++ toolchain, jq,
+# Prepares the runner for the RTL job: Verilator 5.052, a C++ toolchain, jq,
 # openssl and rustup.
 #
-# Every RTL run uses Verilator 5.020, the version in GitHub's ubuntu-24.04
-# image, which the identity run used. caliptra-sw fw-2.1.3's harness does not
-# build with newer Verilator, whose wide signals no longer convert to pointers.
-# A runner with another Verilator, such as an Arch Linux machine, builds 5.020
-# from its git tag into the runner's tool cache once and reuses it.
+# Every RTL run uses Verilator 5.052. On this design it runs about four times
+# as many cycles a second as 5.020, the version in GitHub's ubuntu-24.04 image,
+# which the identity run used. A runner without 5.052 builds it from its git
+# tag into the runner's tool cache, once on a self-hosted runner, which then
+# reuses it.
 #
 # GitHub's Ubuntu runners get missing packages from apt, and an Arch Linux
 # runner from pacman, but only when the runner can use sudo without a password;
@@ -14,7 +14,7 @@
 # no package: when the runner has none, it is installed into the tool cache.
 set -euo pipefail
 
-VERILATOR_VERSION=5.020
+VERILATOR_VERSION=5.052
 
 have() { command -v "$1" >/dev/null 2>&1; }
 verilator_is() { [[ $("${1:-verilator}" --version 2>/dev/null | awk '{print $2}') == "$VERILATOR_VERSION" ]]; }
@@ -29,9 +29,7 @@ fi
 tools=${RUNNER_TOOL_CACHE:-$HOME/.cache}
 prefix=$tools/verilator/$VERILATOR_VERSION
 use_prefix= build_verilator=
-if have apt-get && ! have verilator; then
-  : # apt installs it below
-elif ! verilator_is; then
+if ! verilator_is; then
   use_prefix=1
   verilator_is "$prefix/bin/verilator" || build_verilator=1
 fi
@@ -44,13 +42,12 @@ for tool in "${needed[@]}"; do
 done
 # Verilator's lexer needs flex's C++ header (Arch's flex, Debian's libfl-dev).
 [[ -z $build_verilator || -e /usr/include/FlexLexer.h ]] || missing+=(FlexLexer.h)
-if have apt-get && ! have verilator; then missing+=(verilator); fi
 
 if ((${#missing[@]})); then
   echo "missing: ${missing[*]}"
   if have apt-get; then
     update=(apt-get update -q)
-    install=(apt-get install -y -q --no-install-recommends verilator build-essential pkg-config autoconf flex libfl-dev bison python3 jq openssl git curl)
+    install=(apt-get install -y -q --no-install-recommends build-essential pkg-config autoconf flex libfl-dev bison python3 jq openssl git curl)
   elif have pacman; then
     update=()
     install=(pacman -S --needed --noconfirm base-devel python perl jq openssl git curl)
@@ -68,10 +65,6 @@ if ((${#missing[@]})); then
   fi
   if ((${#update[@]})); then "${sudo[@]}" "${update[@]}"; fi
   "${sudo[@]}" "${install[@]}"
-  if ! verilator_is; then
-    use_prefix=1
-    verilator_is "$prefix/bin/verilator" || build_verilator=1
-  fi
 fi
 
 if [[ -n $build_verilator ]]; then

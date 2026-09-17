@@ -120,19 +120,26 @@ build_rtl() {
   ln -sfn "$model/rtl" "$sw/hw/latest/rtl"
   # Never reuse a model Verilated from another tree.
   rm -rf "$sw/hw/verilated/out"
+  # caliptra-sw fw-2.1.3's harness, not part of the design, passes two wide
+  # inputs to memcpy as pointers; Verilator 5.052 wraps wide signals in VlWide,
+  # so pass its data(), which 5.020 also has.
+  sed -i 's/memcpy(result->v\.\(cptra_obf_key\|cptra_csr_hmac_key\), /memcpy(result->v.\1.data(), /' \
+    "$sw/hw/verilated/caliptra_verilated.cpp"
   # caliptra-sw's harness compiles with -Os on one thread; -O3 with a thread
-  # per core, up to 8, boots faster. Neither changes the design.
-  local threads=${RTL_THREADS:-$(( $(nproc) < 8 ? $(nproc) : 8 ))}
+  # per core, up to 4, boots faster. More threads barely helped: on four
+  # cores two threads ran 840 cycles a second, four 870. Neither changes the
+  # design.
+  local threads=${RTL_THREADS:-$(( $(nproc) < 4 ? $(nproc) : 4 ))}
   { verilator --version; echo "threads: $threads, -O3"; } | tee "$BUILD/verilator-version.txt"
 
   # With RTL_MODEL_CACHE set, a model built earlier on this machine is reused
   # when everything it was built from is the same: the released design's
-  # digest and every bench file's, the caliptra-sw commit, the device tool,
-  # the compilers and the build options.
+  # digest and every bench file's, the caliptra-sw commit and harness change,
+  # the device tool, the compilers and the build options.
   local key cached=
   if [[ -n ${RTL_MODEL_CACHE:-} ]]; then
     key=$({ cat "$model/rtl.json" "$BUILD/verilator-version.txt"
-            git -C "$sw" rev-parse HEAD
+            git -C "$sw" rev-parse HEAD && git -C "$sw" diff
             (cd "$E2E/device" && cat Cargo.toml Cargo.lock rust-toolchain.toml src/*.rs && rustc -Vv)
             g++ --version | sed -n 1p; } | sha256sum | cut -c1-64)
     cached=$RTL_MODEL_CACHE/$key/hslsa-caliptra-device

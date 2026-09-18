@@ -264,6 +264,14 @@ func TestFailedGate(t *testing.T) {
 	rejects(t, chipCheck(t, bundle, nil), "design simulation: gate failed: testbench-finished")
 }
 
+func TestStepNamedDifferentlyInHwFlow(t *testing.T) {
+	bundle := chipBundle(t)
+	chipResign(t, bundle, AttName("synthesis"), "flow-platform", func(s Obj) {
+		O(s, "predicate", "hwFlow")["step"] = "place-and-route"
+	})
+	rejects(t, chipCheck(t, bundle, nil), `design synthesis: hwFlow.step "place-and-route" is not the design step synthesis`)
+}
+
 func TestUnapprovedTool(t *testing.T) {
 	bundle := chipBundle(t)
 	chipResign(t, bundle, AttName("synthesis"), "flow-platform", func(s Obj) {

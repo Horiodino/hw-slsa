@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 3 (2026-09-13). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 4 (2026-09-18). See the [changelog](#changelog).
 
 ## Overview
 
@@ -73,7 +73,7 @@ Each cell adds to the one on its left.
 | Wafer | Lot record names the fab, mask set revision, GDS digest and probe program version | Each step signs with a site key; wafer fab names the wafer lot as subject; from sort onward, records name each unit | Keys held in HSMs at accredited sites (for example DMEA or O-TTPS); the fab verifies the design release attestation before mask making and records the mask-vs-GDS XOR; identities provisioned at sort are rooted in an on-die RoT (DICE or Caliptra class) and issued by an HSM-backed CA |
 | Package/Test | Record names the OSAT, assembly lot and test program version for each lot | Each step signs with a site key; records name each unit, with genealogy to wafer and die position; every unit has a unique identity by final test; final test signs the shipped lot digest | Keys held in HSMs at accredited sites; every unit answers an identity challenge at final test, rooted in hardware; the shipped lot digest covers the units' certificate digests |
 | Assembly | Board HBOM with lot and date code for every part, plus IPC-1782 style build records per serial number | Each assembly step signs its record against the board serial and the identities of its key components; every part lot arrives with a [distribution record](#distribution-record) signed by its shipper, and the assembler runs the lot receipt check on each chip before placement; a part without a hardware identity is named only by lot and date code, which cannot detect a swap inside a lot | Signing at accredited sites; every component with a hardware identity is checked by attestation at build; a platform certificate binds the system to those parts; parts without an identity stay at lot-level naming, as at L2 |
-| Firmware | SLSA Build L1 provenance and an SBOM for every image; mask ROM content is proven by the Design track's ROM merge step | SLSA Build L2; images are signed and verified before the SoC runs them, by a secure-boot ROM on the silicon or by an attested board-level root of trust (proposed); a part with neither stops at Firmware L1 | SLSA Build L3; firmware is independently reviewed (S.A.F.E. style); releases appear in a transparency log; the device reports firmware measurements under a DICE or Caliptra class identity, and they match the attested image digests |
+| Firmware | SLSA Build L1 provenance and an SBOM for every image; mask ROM content is proven by the Design track's ROM merge step | SLSA Build L2; images are signed and verified before the SoC runs them, by a secure-boot ROM on the silicon or by an attested board-level root of trust (see below); a part with neither stops at Firmware L1 | SLSA Build L3; firmware is independently reviewed, shown by a signed OCP S.A.F.E. report (see [Firmware review](#firmware-review)); releases appear in a transparency log; the device reports firmware measurements under a DICE or Caliptra class identity, and they match the attested image digests |
 
 Three rules apply across tracks:
 
@@ -81,7 +81,7 @@ Three rules apply across tracks:
 2. **Provisioning is Firmware, rated by its site.** Firmware Ln needs every provisioning site rated at least Ln in its own track (Wafer, Package/Test or Assembly).
 3. **One check for the buyer.** At every level the buyer collects the attestations, confirms each subject matches the identity the device proves at boot, and compares the stated levels against policy. From Design L3, the tapeout check also requires the equivalence record.
 
-**Firmware L2 through a board-level root of trust (proposed resolution).** A part without a secure-boot ROM MAY reach Firmware L2 on a board whose root of trust verifies the external flash, but only when that root of trust is itself attested (its own HBOM entry, Firmware provenance and provisioning record at L2 or higher) and it verifies each image before the SoC is released from reset. The claim is made for the board, not the bare part. This answers the open question in the level scheme and still needs the owner's sign-off.
+**Firmware L2 through a board-level root of trust.** A part without a secure-boot ROM MAY reach Firmware L2 on a board whose root of trust verifies the external flash, but only when that root of trust is itself attested (its own HBOM entry, Firmware provenance and provisioning record at L2 or higher) and it verifies each image before the SoC is released from reset. The claim is made for the board, not the bare part: the bare part stays at Firmware L1, and the board's verification summary states Firmware L2. The board HBOM lists the root of trust in `parts[]` with its own chain, which the board receipt check verifies like any other chip's.
 
 ### L4 defense profile
 
@@ -117,11 +117,30 @@ Every record in HSLSA is an [in-toto Statement v1](https://github.com/in-toto/at
 | Physical inspection (L4) | `https://github.com/Horiodino/hw-slsa/physical-inspection/v0.1` | none | Independent lab | Shipped lot and each sampled unit or board |
 | Firmware image build | `https://slsa.dev/provenance/v1` (unchanged), buildType named for the builder (for example `.../firmware/caliptra-builder@v1`) | none | Firmware build platform | Image digest |
 | Firmware provisioning | `https://github.com/Horiodino/hw-slsa/fw-provisioning/v0.1`, buildType `.../fw-provisioning/step/provision@v1` | `hwProvision` | Programming station at fab, OSAT or EMS | Each unit written |
-| Firmware review | `https://github.com/Horiodino/hw-slsa/fw-review/v0.1`, wrapping an OCP S.A.F.E. report | none | Review provider | Image digest |
+| Firmware review | None of its own: the OCP S.A.F.E. short-form report, used as published (see [Firmware review](#firmware-review)) | none | Review provider | Image digest, inside the report |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | none | Product owner | Design (final GDS or board design) and lot (shipped lot or board lot) |
 | Verification summary | `https://slsa.dev/verification_summary/v1` | none | Vendor or buyer verifier | Any subject above |
 
 Step types are named `https://github.com/Horiodino/hw-slsa/design-flow/step/<step>@v1` and `https://github.com/Horiodino/hw-slsa/mfg/step/<step>@v1`. A flow platform MAY instead name the tool that ran the step, as in `.../design-flow/step/openlane2@v1`, when it also states the spec step in `hwFlow.step` (see [Per-tool design steps](#per-tool-design-steps)). A verification summary reports levels as `HSLSA_<TRACK>_LEVEL_<n>` (for example `HSLSA_WAFER_LEVEL_3`); SLSA allows custom `verifiedLevels` values that do not start with `SLSA_`.
+
+**Design step names.** A design step record's `hwFlow.step` and the HBOM's `design.flow[].step` take their value from one list, so a verifier can match each HBOM entry to the record it points at. The names follow the [steps](#steps) of the chain:
+
+| Name | Step |
+| --- | --- |
+| `source-freeze` | 0. Source freeze |
+| `simulation` | 1. Simulation and lint, including a lint-only run |
+| `synthesis` | 2. Synthesis |
+| `floorplan` | 3. Floorplan and power |
+| `place-cts` | 4. Placement and CTS |
+| `routing` | 5. Routing |
+| `signoff` | 6. Signoff, including STA, DRC, LVS and extraction, whose results are checks in the record |
+| `rom-merge` | 6a. ROM merge |
+| `gds-stream-out` | 7. GDS stream-out |
+| `release` | Release |
+| `rebuild` | Rebuild (L4) |
+| `other` | A tool step that fits none of the above; it covers no spec step |
+
+A record named with a spec step type (`.../design-flow/step/<step>@v1`) uses the same name in `hwFlow.step`. An HBOM entry's `step` is the `hwFlow.step` of the record its `provenanceRef` names.
 
 ### Naming subjects
 
@@ -205,7 +224,7 @@ A flow MAY replace files inside a pinned image, for example so that tools stop w
 
 A flow tool usually runs many small steps for each spec step (OpenLane 2's Classic flow runs 74 for steps 1 to 7). A flow platform MAY sign one record per tool step, with buildType `.../design-flow/step/<tool>@v1`, as long as each record:
 
-- states the spec step it belongs to in `hwFlow.step` (`simulation`, `synthesis`, `floorplan`, `place-cts`, `routing`, `signoff` or `gds-stream-out`), and the tool's own step name in a tool-specific field (`hwFlow.openlaneStep` with its `ordinal`);
+- states the spec step it belongs to in `hwFlow.step`, one of the [design step names](#predicate-types) (`other` for a tool step that belongs to none), and the tool's own step name in a tool-specific field (`hwFlow.openlaneStep` with its `ordinal`);
 - lists every input design view by digest, each an output of an earlier record, and the previous record itself;
 - carries the step's resolved configuration by digest, and the metrics the step changed in `hwFlow.metrics`.
 
@@ -290,6 +309,16 @@ A `fw-provisioning` record is SLSA Provenance v1 with buildType `.../fw-provisio
 
 `resolvedDependencies` lists each image's provenance and the images, and for a part with an identity the exported CSR and the endorsed certificate. The subject is the unit, named as in [Naming subjects](#naming-subjects). The [Caliptra example](../docs/caliptra-e2e.md) signs one per unit.
 
+#### Firmware review
+
+Firmware L3 asks for an independent review of each image. HSLSA defines no record of its own for it: the evidence is the [OCP S.A.F.E.](https://github.com/opencomputeproject/OCP-Security-SAFE/blob/main/Documentation/framework.md) short-form report, as the review provider signed and published it. The report already names the firmware by digest and carries the provider's signature, and S.A.F.E. defines it as a CoRIM profile, so a wrapper would add a second signature over the same claim. A verifier accepts a report for an image when:
+
+1. its signature verifies with a key the policy lists for an allowed review provider;
+2. a firmware digest in the report equals the image's digest under the same algorithm, so the image's provenance lists a digest in each algorithm the report uses;
+3. the report's scope and open issues meet the policy (for example, no unresolved issue above a severity the policy names).
+
+An image with no such report cannot count toward Firmware L3.
+
 ## The attestation chain
 
 A verifier holding a booted device can walk by digest alone from its identity certificate to the shipped lot, back through packaging and the wafer lot to the signed GDS, and from there to reviewed RTL and every tool and PDK used. Each step lists the previous step's subjects in `resolvedDependencies`, and every manufacturing step copies the GDS release into `hwMfg.designRef`.
@@ -372,7 +401,7 @@ The programming station is the firmware's last builder. For every part it writes
 **At tapeout**, before the GDS leaves for the foundry:
 
 1. The GDS digest matches the release attestation, signed by an allowed tapeout authority.
-2. Every step from source freeze to stream-out is present, signed by an allowed builder, and linked by digest. With [per-tool records](#per-tool-design-steps), each spec step is covered by at least one record and every input view is an output of an earlier record.
+2. Every step from source freeze to stream-out is present, signed by an allowed builder, and linked by digest, and each record's `hwFlow.step` is a [design step name](#predicate-types): the one its step type names, or for a per-tool record the spec step it covers. With [per-tool records](#per-tool-design-steps), each spec step is covered by at least one record and every input view is an output of an earlier record.
 3. Every tool and PDK digest (or the image and PDK tree digests that pin them) is on the approved list, and every step names the same ones.
 4. Every required gate passed, every waiver is signed by a signoff owner, and a chip with a mask ROM passed `rom-readback`.
 5. From Design L2, the source freeze consumes a tag signed by an allowed source owner and a source review of the same commit by someone other than its author, and the verifier walks git's object hashes from the tag to every file in the source archive. Every IP block the release lists has provenance signed by its vendor, and the IP files in the archive match it.
@@ -405,7 +434,7 @@ The [board example](../docs/board-example.md) runs these checks and breaks each 
 
 1. Check the device's certificate chain to the identity CA in the trust root, as any DICE verifier does, and check that every certificate names the unit (its UEID) and that the unit is in the shipped lot.
 2. Find the `fw-provisioning` record whose subject is the IDevID public key digest. It must be signed by an allowed station site, name this unit, this lot and this design release, and have all its gates passed; it gives the site, fuse state and images written.
-3. For each FWID in the alias certificates (TCG DICE TcbInfo), find image provenance with that digest as subject, and check its level (and, for L3, review and log inclusion). Where the device also measures its fuses (Caliptra's vendor and owner fuse info, for example), recompute those measurements from the fuses the provisioning record says were burned; they must match what the device reports.
+3. For each FWID in the alias certificates (TCG DICE TcbInfo), find image provenance with that digest as subject, and check its level (and, for L3, an accepted [S.A.F.E. report](#firmware-review) and log inclusion). Where the device also measures its fuses (Caliptra's vendor and owner fuse info, for example), recompute those measurements from the fuses the provisioning record says were burned; they must match what the device reports.
 4. Confirm the HBOM's GDS has a Design chain whose ROM merge step consumed the ROM image named by its provenance and passed `rom-readback`; that is the only way the mask ROM, which took the first measurement, is covered. If the policy asks for it, `rom-matches-frozen` must also have passed.
 5. Check that the SVN the device reports equals the image's SVN in its provenance, and that it is not below the anti-rollback fuse value in the provisioning record or the policy minimum.
 
@@ -446,7 +475,7 @@ The HBOM is the one document a buyer starts from: it lists what the product is m
 
 1. The lot subject is renamed from `urn:hbom:lot:` to `urn:hslsa:lot:` and names the shipped lot, with the lot digest defined above (serials at Package/Test L2, certificate digests at L3).
 2. The supplier slices the draft left undefined are the `manufacturing-step` records defined here: `fab.attestationRef` points at F1, `assembly.attestationRef` at F3, and `test[].resultsRef` at the F2 or F4 results that record signs.
-3. `flowStep.step` gains `rom-merge` and `release`, so the HBOM can reference every Design step.
+3. `flowStep.step` uses the [design step names](#predicate-types) shared with `hwFlow.step`, so every HBOM entry names the step its record states. The draft's `lint` is part of `simulation`, `sta`, `drc` and `lvs` are checks under `signoff`, `place-and-route` is split into `place-cts` and `routing`, and `gds-merge` is `gds-stream-out`.
 4. `product.level` keeps its name but is documented as the hierarchy level only; assurance levels are not stated in the HBOM (see open questions).
 5. `manufacturing.fab` is required only for dies and packages; boards, modules and systems require `manufacturing.boardAssembly` and `parts[]` instead.
 6. New `manufacturing.boardAssembly` block: `ems`, `boardLot`, and `attestationRef` to A1.
@@ -454,7 +483,7 @@ The HBOM is the one document a buyer starts from: it lists what the product is m
 
 The JSON Schema and the worked examples are in this repository at [`hbom/hbom-predicate-v0.1.schema.json`](../hbom/hbom-predicate-v0.1.schema.json), [`hbom/picosoc-sky130.hbom.intoto.json`](../hbom/picosoc-sky130.hbom.intoto.json) and [`hbom/picosoc-devboard.hbom.intoto.json`](../hbom/picosoc-devboard.hbom.intoto.json), all current with these changes. [`hbom/picosoc-sky130.shipped-lot.txt`](../hbom/picosoc-sky130.shipped-lot.txt) and [`hbom/picosoc-devboard.board-lot.txt`](../hbom/picosoc-devboard.board-lot.txt) are their canonical unit and board lists, so both lot digests can be recomputed.
 
-**Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L2: the flow platform signs every step, the source freeze is an SSH-signed git tag with a source review by someone other than the author, and PicoRV32 arrives with IP provenance signed by a key standing in for its vendor. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the proposed board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1.
+**Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L2: the flow platform signs every step, the source freeze is an SSH-signed git tag with a source review by someone other than the author, and PicoRV32 arrives with IP provenance signed by a key standing in for its vendor. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1.
 
 ## Threat model
 
@@ -584,7 +613,7 @@ HSLSA reuses an existing standard wherever one fits and adds only the glue: per-
 | Artifact digest | Device identity as the subject of a physical part | [TCG DICE](https://trustedcomputinggroup.org/resource/dice-attestation-architecture/), [Caliptra](https://www.chipsalliance.org/news/caliptra2-1/), [DMTF SPDM](https://www.dmtf.org/standards/spdm) |
 | Sigstore, Rekor | Keyless signing for design and firmware platforms; public or private logs | Sigstore, [IETF SCITT (RFC 9943)](https://www.rfc-editor.org/rfc/rfc9943), RFC 9162 |
 | Verification before use | Tapeout, lot receipt and boot checks | [IETF RATS (RFC 9334)](https://www.rfc-editor.org/rfc/rfc9334), [TCG Platform Certificate](https://trustedcomputinggroup.org/resource/tcg-platform-certificate-profile/), [CoRIM](https://datatracker.ietf.org/doc/draft-ietf-rats-corim/) (still an Internet-Draft) |
-| Independent review | Firmware L3 review; `fw-review` | [OCP S.A.F.E.](https://github.com/opencomputeproject/OCP-Security-SAFE/blob/main/Documentation/framework.md) |
+| Independent review | Firmware L3 review, using the S.A.F.E. short-form report as is | [OCP S.A.F.E.](https://github.com/opencomputeproject/OCP-Security-SAFE/blob/main/Documentation/framework.md) |
 | Build records | Wafer, Package/Test and Assembly step records | [IPC-1782](https://standards.globalspec.com/std/14358527/ipc-1782) traceability, SEMI E142 wafer maps, STDF test results |
 | Supplier assessment | L3 accredited sites | [DMEA Trusted Supplier](https://www.acq.osd.mil/asds/dmea/tapo/trusted-supplier-programs.html), [O-TTPS (ISO/IEC 20243)](https://www.opengroup.org/open-trusted-technology-provider%E2%84%A2-standard-o-ttps-approved-isoiec-international-standard), SEMI E187 for equipment |
 | Dependency integrity | Signed IP provenance; encrypted IP flag | [IEEE 1735-2023](https://standards.ieee.org/standard/1735-2014.html), [Accellera SA-EDI](https://www.accellera.org/news/press-releases/373-accelleras-security-annotation-for-electronic-design-integration-standard-1-0-moves-toward-ieee-standardization) |
@@ -620,22 +649,21 @@ The source drafts were not edited; this spec settles each difference as follows.
 | Physical names | `urn:hbom:lot:` and `urn:hbom:unit:` in the HBOM and firmware docs; `urn:hslsa:` for wafer lots, assembly lots and boards | One prefix, `urn:hslsa:`, for every physical subject |
 | Lot subject and digest | HBOM: "the assembly lot", digest of its unit list, format undefined; fab doc: shipped lot from F4 with an exact formula | The shipped lot, with the fab doc's lot digest as the only definition |
 | Unit naming | HBOM: serials or certificate digests; fab doc: serial at Package/Test L2, certificate digest at L3 | Tied to the level, as in the fab doc |
-| Firmware L2 without a secure-boot ROM | Open question in the level scheme | Allowed through an attested board-level root of trust that verifies before the SoC runs, claimed for the board (proposed) |
+| Firmware L2 without a secure-boot ROM | Open question in the level scheme | Allowed through an attested board-level root of trust that verifies before the SoC runs, claimed for the board |
+| Firmware review record | Firmware doc: a thin `fw-review` wrapper around the S.A.F.E. report | No wrapper; the signed S.A.F.E. short-form report is the record |
 | Supplier predicates for fab, assembly and test | HBOM left them open | The `manufacturing-step` predicate, referenced from the HBOM's `attestationRef` fields |
 | Tapeout release record | Design doc names it but gives no step type | `design-flow` with buildType `.../step/release@v1` |
 | Verification summary levels | Firmware doc defines `HSLSA_FIRMWARE_LEVEL_n` only | `HSLSA_<TRACK>_LEVEL_<n>` for all five tracks |
-| HBOM flow steps | HBOM enum lacks the ROM merge and release | `rom-merge` and `release` added |
+| HBOM flow steps | HBOM enum lacks the ROM merge and release, and names steps differently from `hwFlow.step` | One list of [design step names](#predicate-types) for both |
 
 ### Open questions
 
 - [ ] Where do IP, PDK and site signing keys live, and who runs the trust roots: each buyer, an industry body, or the accreditors (DMEA, The Open Group)?
-- [ ] Should the board-level root of trust rule for Firmware L2 be adopted as written?
 - [ ] Should source integrity (reviewed RTL) and dependency integrity (IP, PDK, cell libraries) become their own tracks, as SLSA did with Source? Today they sit inside Design L2 and L3.
 - [ ] Can analog and mixed-signal flows, mostly manual layout, reach Design L3?
 - [ ] What sampling rate makes an L4 claim meaningful for a given lot size, and who accredits the inspection labs?
 - [ ] Should the HBOM carry claimed levels per track, so one document states them, or should levels live only in verification summaries?
 - [ ] Should HBOM `firmware[]` entries gain a provenance reference and expected boot measurement, and should reference values be published as CoRIM?
-- [ ] Is the `fw-review` wrapper needed, given S.A.F.E. reports are already signed and defined as a CoRIM profile?
 - [ ] Who endorses IDevID certificates when the OSAT, not the chip vendor, holds the provisioning station?
 - [ ] Should the foundry verify provenance at GDS intake, or only the design house before release? (Wafer L3 already asks the fab to verify the release.)
 - [ ] How much of `hwFlow.metrics` and `hwMfg` data is safe to disclose to the next party, and are salted digests enough for encrypted IP and NDA-bound PDKs, or is verifier escrow needed?
@@ -643,7 +671,6 @@ The source drafts were not edited; this spec settles each difference as follows.
 - [ ] Which neutral home should own the spec long term (OpenSSF, CHIPS Alliance, OCP or a joint group), beyond the owner's repository?
 - [ ] Track SPDX 3.1 from release candidate to final, and CoRIM from Internet-Draft to RFC.
 - [ ] Should Design L4 accept `gds-equal-ignoring-timestamps` by default, or only `gds-bit-exact`? This spec requires bit-exact unless the policy says otherwise.
-- [ ] The HBOM's `design.flow[].step` enum (`place-and-route`, `sta`, `drc`, `lvs`, ...) is coarser than and named differently from `hwFlow.step` (`place-cts`, `routing`, `gds-stream-out`, ...). Should the two share one list?
 - [ ] How should a verifier treat post-quantum identity chains (Caliptra 2.x also issues ML-DSA-87 certificates) until common X.509 libraries can verify them?
 - [ ] What identity should a board carry once it has one: a platform certificate, a board-level DICE identity, or the identity of its root of trust?
 
@@ -663,6 +690,14 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 4 (2026-09-18)
+
+Settles the three questions phase 0 of the [roadmap](../docs/roadmap.md) left to the owner.
+
+- **Board-level root of trust.** Adopted the rule for Firmware L2 as written: a part without a secure-boot ROM reaches Firmware L2 on a board whose attested root of trust verifies each image before the SoC leaves reset. The claim is the board's, and the board HBOM lists the root of trust with its own chain.
+- **Firmware review.** Dropped the `fw-review` wrapper. Firmware L3 takes the signed OCP S.A.F.E. short-form report as it is, and the spec lists what a verifier checks before it accepts one ([Firmware review](#firmware-review)).
+- **Design step names.** `hwFlow.step` and the HBOM's `design.flow[].step` share one list of names. The HBOM schema drops `lint`, `place-and-route`, `sta`, `drc`, `lvs` and `gds-merge` and gains `source-freeze`, `place-cts`, `routing`, `gds-stream-out` and `rebuild`. The Caliptra example's lint step is now named `simulation`, and the reference tool copies each HBOM entry's step from its record and rejects a design record whose step is not on the list.
 
 ### Revision 3 (2026-09-13)
 

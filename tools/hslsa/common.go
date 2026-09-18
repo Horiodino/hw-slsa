@@ -39,6 +39,13 @@ const (
 	PayloadType   = "application/vnd.in-toto+json"
 )
 
+// DesignStepNames is the one list of design step names that hwFlow.step and
+// the HBOM's design.flow[].step both use (spec: Design step names).
+var DesignStepNames = []string{
+	"source-freeze", "simulation", "synthesis", "floorplan", "place-cts", "routing",
+	"signoff", "rom-merge", "gds-stream-out", "release", "rebuild", "other",
+}
+
 func designStepType(step string) string { return NS + "/design-flow/step/" + step + "@v1" }
 func mfgStepType(step string) string    { return NS + "/mfg/step/" + step + "@v1" }
 

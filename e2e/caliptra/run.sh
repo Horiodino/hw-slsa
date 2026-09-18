@@ -96,7 +96,7 @@ produce() {
   local lock=$E2E/caliptra.lock.json
   hslsa caliptra firmware --bundle "$BUNDLE" --lock "$lock" --build-dir "$BUILD" --key "$KEYS/firmware-platform.key.pem"
   hslsa caliptra design source-freeze --bundle "$BUNDLE" --lock "$lock" --key "$KEYS/flow-platform.key.pem"
-  hslsa caliptra design lint          --bundle "$BUNDLE" --lock "$lock" --key "$KEYS/flow-platform.key.pem"
+  hslsa caliptra design simulation    --bundle "$BUNDLE" --lock "$lock" --key "$KEYS/flow-platform.key.pem"
   hslsa caliptra design rom-merge     --bundle "$BUNDLE" --lock "$lock" --key "$KEYS/flow-platform.key.pem"
   hslsa caliptra design release       --bundle "$BUNDLE" --lock "$lock" --key "$KEYS/tapeout-authority.key.pem" \
     --trust-root "$BUNDLE/trust-root.json" --policy "$BUNDLE/policy.json"

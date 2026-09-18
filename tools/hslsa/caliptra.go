@@ -485,7 +485,7 @@ func CaliptraSourceFreeze(bundle, lockPath, key string) error {
 	return finish(bundle, "source-freeze", []Obj{subject}, pred, signer)
 }
 
-// CaliptraLint is step 1: Verilator lint of the whole Caliptra top level from the frozen archive.
+// CaliptraLint is step 1 (simulation): Verilator lint of the whole Caliptra top level from the frozen archive.
 func CaliptraLint(bundle, lockPath, key string) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
@@ -526,7 +526,7 @@ func CaliptraLint(bundle, lockPath, key string) error {
 		return err
 	}
 	command := strings.Join(append([]string{"verilator"}, args[:len(args)-4]...), " ") + " -f <fileList> --top-module <top>"
-	pred := designPredicate("lint", Obj{"top": top, "command": command},
+	pred := designPredicate("simulation", Obj{"top": top, "command": command},
 		[]Obj{rtlRD}, []Obj{verilator},
 		[]Obj{check("verilator-lint", proc.Code == 0 && errs == 0, fmt.Sprintf("exit %d, %d errors", proc.Code, errs))},
 		nil, started)
@@ -543,7 +543,7 @@ func CaliptraLint(bundle, lockPath, key string) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "lint", []Obj{subject}, pred, signer)
+	return finish(bundle, "simulation", []Obj{subject}, pred, signer)
 }
 
 // RomHex is the ROM in the format caliptra-rtl's testbench loads into its ROM
@@ -1266,8 +1266,7 @@ func CaliptraHBOM(bundle, lockPath, scenarioPath, key string) error {
 	if err != nil {
 		return err
 	}
-	enum := map[string]string{"source-freeze": "other", "lint": "lint", "rom-merge": "rom-merge", "release": "release"}
-	flow, err := flowEntries(bundle, []string{"source-freeze", "lint", "rom-merge", "release"}, enum)
+	flow, err := flowEntries(bundle, []string{"source-freeze", "simulation", "rom-merge", "release"})
 	if err != nil {
 		return err
 	}

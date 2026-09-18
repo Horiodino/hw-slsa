@@ -393,7 +393,7 @@ func caliptra(args []string) error {
 	}
 	step := ""
 	if act == "design" {
-		if step, rest, err = action(rest, "source-freeze", "lint", "rom-merge", "release"); err != nil {
+		if step, rest, err = action(rest, "source-freeze", "simulation", "rom-merge", "release"); err != nil {
 			return err
 		}
 	}
@@ -422,7 +422,7 @@ func caliptra(args []string) error {
 		switch step {
 		case "source-freeze":
 			return hslsa.CaliptraSourceFreeze(*bundle, *lock, *key)
-		case "lint":
+		case "simulation":
 			return hslsa.CaliptraLint(*bundle, *lock, *key)
 		case "rom-merge":
 			return hslsa.CaliptraRomMerge(*bundle, *lock, *key)

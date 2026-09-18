@@ -118,6 +118,9 @@ func TapeoutCheck(bundle string, trust *TrustRoot, policy Obj, release bool) (*D
 		if buildType(stmt) != designStepType(step) {
 			return nil, failf("%s: wrong buildType %s", label, buildType(stmt))
 		}
+		if !contains(DesignStepNames, step) || S(stmt, "predicate", "hwFlow", "step") != step {
+			return nil, failf("%s: hwFlow.step %q is not the design step %s", label, S(stmt, "predicate", "hwFlow", "step"), step)
+		}
 		if err := asSLSAProvenance(stmt, label); err != nil {
 			return nil, err
 		}

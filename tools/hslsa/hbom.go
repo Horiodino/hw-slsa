@@ -72,8 +72,9 @@ func fileRef(bundle, rel string) Obj {
 	return Obj{"uri": "file:" + rel, "digest": fileDigest(filepath.Join(bundle, rel))}
 }
 
-// flowEntries lists each design step for the HBOM's design.flow.
-func flowEntries(bundle string, steps []string, enum map[string]string) ([]Obj, error) {
+// flowEntries lists each design step for the HBOM's design.flow, named by
+// the hwFlow.step of its record.
+func flowEntries(bundle string, steps []string) ([]Obj, error) {
 	var flow []Obj
 	for _, step := range steps {
 		stmt, err := DecodeEnvelope(filepath.Join(bundle, "att", AttName(step)))
@@ -87,7 +88,11 @@ func flowEntries(bundle string, steps []string, enum map[string]string) ([]Obj, 
 		if len(tools) == 0 {
 			tools = []Obj{{"name": "hslsa", "version": "0.1"}}
 		}
-		flow = append(flow, Obj{"step": enum[step], "tools": tools, "provenanceRef": attRef(bundle, AttName(step))})
+		name := S(stmt, "predicate", "hwFlow", "step")
+		if !contains(DesignStepNames, name) {
+			return nil, fmt.Errorf("%s: hwFlow.step %q is not a design step name", AttName(step), name)
+		}
+		flow = append(flow, Obj{"step": name, "tools": tools, "provenanceRef": attRef(bundle, AttName(step))})
 	}
 	return flow, nil
 }
@@ -162,8 +167,7 @@ func BuildHBOM(bundle, lockPath, scenarioPath, key string) error {
 		return err
 	}
 	src := O(lock, "source")
-	enum := map[string]string{"source-freeze": "other", "simulation": "simulation", "synthesis": "synthesis", "release": "release"}
-	flow, err := flowEntries(bundle, append(append([]string{}, DesignSteps...), "release"), enum)
+	flow, err := flowEntries(bundle, append(append([]string{}, DesignSteps...), "release"))
 	if err != nil {
 		return err
 	}

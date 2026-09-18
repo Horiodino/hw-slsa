@@ -153,19 +153,19 @@
       "additionalProperties": false,
       "properties": {
         "step": {
+          "description": "the design step name shared with hwFlow.step in design-flow records (spec: Design step names)",
           "enum": [
-            "lint",
+            "source-freeze",
             "simulation",
             "synthesis",
             "floorplan",
-            "place-and-route",
-            "sta",
-            "drc",
-            "lvs",
+            "place-cts",
+            "routing",
             "signoff",
             "rom-merge",
-            "gds-merge",
+            "gds-stream-out",
             "release",
+            "rebuild",
             "other"
           ]
         },

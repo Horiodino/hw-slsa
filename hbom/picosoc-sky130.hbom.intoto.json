@@ -98,8 +98,10 @@
             "digest": {"sha256": "8048f7c30b224754081e0043e4d80c698c9b353ad086a11b2dcc000951c30af5"}
           }
         },
+        {"step": "floorplan", "tools": [{"name": "OpenLane", "version": "2.x"}, {"name": "OpenROAD", "version": "<commit>"}]},
+        {"step": "place-cts", "tools": [{"name": "OpenLane", "version": "2.x"}, {"name": "OpenROAD", "version": "<commit>"}]},
         {
-          "step": "place-and-route",
+          "step": "routing",
           "tools": [{"name": "OpenLane", "version": "2.x"}, {"name": "OpenROAD", "version": "<commit>"}],
           "outputs": [
             {
@@ -112,8 +114,8 @@
             "digest": {"sha256": "90b91f6b17c02f4377e84fb4114a8f751fd87d047a9208ed8d6c75a70b8b115f"}
           }
         },
-        {"step": "drc", "tools": [{"name": "Magic", "version": "8.3"}, {"name": "KLayout", "version": "0.29"}]},
-        {"step": "lvs", "tools": [{"name": "Netgen", "version": "1.5"}]},
+        {"step": "signoff", "tools": [{"name": "Magic", "version": "8.3"}, {"name": "KLayout", "version": "0.29"}, {"name": "Netgen", "version": "1.5"}]},
+        {"step": "gds-stream-out", "tools": [{"name": "Magic", "version": "8.3"}]},
         {
           "step": "release",
           "tools": [{"name": "cosign", "version": "2.4.1", "purl": "pkg:github/sigstore/cosign@v2.4.1"}],

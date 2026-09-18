@@ -156,7 +156,7 @@ func calWork(t *testing.T) string {
 				return err
 			}
 		}
-		for _, step := range []string{"source-freeze", "lint"} {
+		for _, step := range []string{"source-freeze", "simulation"} {
 			if err := resignFile(filepath.Join(bundle, "att", AttName(step)), filepath.Join(keys, "flow-platform.key.pem"), nil); err != nil {
 				return err
 			}
@@ -410,10 +410,10 @@ func TestReleasedDesignSwapped(t *testing.T) {
 
 func TestLintFailureRecorded(t *testing.T) {
 	work := calWork(t)
-	calResign(t, work, AttName("lint"), "flow-platform", func(s Obj) {
+	calResign(t, work, AttName("simulation"), "flow-platform", func(s Obj) {
 		Objs(s, "predicate", "hwFlow", "checks")[0]["result"] = "fail"
 	})
-	calRejects(t, work, "design lint: gate failed: verilator-lint")
+	calRejects(t, work, "design simulation: gate failed: verilator-lint")
 }
 
 func TestCaliptraUnitListTampered(t *testing.T) {

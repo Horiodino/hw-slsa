@@ -852,6 +852,9 @@ func checkChain(bundle, runDir string, trust *TrustRoot) ([]olRecord, error) {
 		if buildType(stmt) != openlaneStepType {
 			return nil, failf("%s: wrong buildType", label)
 		}
+		if step := S(stmt, "predicate", "hwFlow", "step"); !contains(DesignStepNames, step) {
+			return nil, failf("%s: hwFlow.step %q is not a design step name", label, step)
+		}
 		if len(failedChecks(Objs(stmt, "predicate", "hwFlow", "checks"))) > 0 {
 			return nil, failf("%s: a gate failed", label)
 		}

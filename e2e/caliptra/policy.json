@@ -1,7 +1,7 @@
 {
   "design": {
-    "requiredSteps": ["source-freeze", "lint", "rom-merge"],
-    "consumes": {"lint": ["source-freeze"], "rom-merge": ["source-freeze"]},
+    "requiredSteps": ["source-freeze", "simulation", "rom-merge"],
+    "consumes": {"simulation": ["source-freeze"], "rom-merge": ["source-freeze"]},
     "finalArtifactFrom": "rom-merge",
     "allowedTools": ["verilator"]
   },

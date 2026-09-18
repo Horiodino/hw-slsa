@@ -36,7 +36,7 @@ Work that needs no partner. Target: spec v0.2.
 5. **Independent rebuild.** A second builder under a separate trust root (a different CI account and key) signs the `rebuild` record, so the OpenLane 2 example shows real Design L4 evidence.
 6. **Boot on the RTL.** Boot the Caliptra ROM on the Verilated RTL instead of the emulator, so the booted device is the design itself. Done: on a self-hosted runner a unit boots to runtime on the Verilated released design in about 2.5 hours and passes the buyer checks ([caliptra-e2e.md](caliptra-e2e.md#booting-on-the-rtl)).
 7. **Licensed tools at L3.** Allow a declared license server as the only permitted network egress for a Design L3 step, with its address and the checked-out features recorded in `hwFlow`.
-8. **Close the blocking open questions.** Decide the board-level root of trust rule for Firmware L2, whether `fw-review` is needed, and one shared step list for `hwFlow.step` and the HBOM's `design.flow[].step`.
+8. **Close the blocking open questions.** Decide the board-level root of trust rule for Firmware L2, whether `fw-review` is needed, and one shared step list for `hwFlow.step` and the HBOM's `design.flow[].step`. Done in spec revision 4: the board-level rule is adopted as written, the `fw-review` wrapper is dropped in favor of the signed S.A.F.E. report, and both fields use one list of design step names.
 
 **Exit:** spec v0.2 with a threat model, and CI verifying Design L2 and a Design L4 rebuild record from a separate trust root.
 

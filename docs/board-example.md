@@ -46,7 +46,7 @@ The EMS receives 8 chips from shipped lot `ASM-EXAMPLE-17`, runs the chip's tape
 
 The board VSA claims `HSLSA_ASSEMBLY_LEVEL_2`: A1 is signed with the EMS site key against each board serial and the serial of its key component. It is not Assembly L3, which needs an accredited site with an HSM-held key, component identities checked by attestation at build (the chip has serials, not a hardware identity) and a platform certificate. The chip keeps its own VSA with its own levels.
 
-The board stays at Firmware L1 and records no firmware yet. The flash images would be written by the EMS in a `fw-provisioning` record, and the proposed board-level root of trust rule does not apply because this board has no root of trust.
+The board stays at Firmware L1 and records no firmware yet. The flash images would be written by the EMS in a `fw-provisioning` record, and the [board-level root of trust rule](../spec/hslsa-v0.1.md#core-requirements) for Firmware L2 does not apply because this board has no root of trust.
 
 ## Schema changes
 

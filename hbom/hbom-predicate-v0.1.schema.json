@@ -48,7 +48,7 @@
       "additionalProperties": false,
       "properties": {
         "name": {"type": "string"},
-        "id": {"type": "string", "description": "LEI, DUNS or CAGE, prefixed: lei:, duns:, cage:"},
+        "id": {"type": "string", "pattern": "^(lei|duns|cage|uei|gln):[A-Za-z0-9]+$", "description": "LEI, DUNS, CAGE, UEI or GLN, prefixed: lei:, duns:, cage:, uei:, gln:"},
         "country": {"type": "string", "pattern": "^[A-Z]{2}$"},
         "site": {"type": "string"}
       }

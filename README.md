@@ -15,6 +15,7 @@ Status: working draft, version 0.1.
 | Path | What it is |
 | --- | --- |
 | [`spec/hslsa-v0.1.md`](spec/hslsa-v0.1.md) | The framework specification |
+| [`spec/nist-ir-8536-profile.md`](spec/nist-ir-8536-profile.md) | HSLSA as the semiconductor profile of NIST IR 8536: event and record mapping, profile requirements, gaps on both sides |
 | [`hbom/hbom-predicate-v0.1.schema.json`](hbom/hbom-predicate-v0.1.schema.json) | JSON Schema (2020-12) for the HBOM predicate |
 | [`hbom/picosoc-sky130.hbom.intoto.json`](hbom/picosoc-sky130.hbom.intoto.json) | Worked example: a PicoRV32 SoC on SkyWater SKY130 |
 | [`hbom/picosoc-sky130.shipped-lot.txt`](hbom/picosoc-sky130.shipped-lot.txt) | The example's shipped-lot unit list, for recomputing its lot digest |

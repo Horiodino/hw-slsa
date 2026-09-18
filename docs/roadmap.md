@@ -44,7 +44,7 @@ Work that needs no partner. Target: spec v0.2.
 
 Target: spec v0.3 and a profile document.
 
-1. **HSLSA as a NIST IR 8536 profile.** Map each HSLSA record onto the IR 8536 meta-framework's provenance chain and event model, and check that its open-source reference implementation can ingest HSLSA records, or that a thin adapter can. Publish the mapping as `spec/nist-ir-8536-profile.md`.
+1. **HSLSA as a NIST IR 8536 profile.** Map each HSLSA record onto the IR 8536 meta-framework's provenance chain and event model, and check that its open-source reference implementation can ingest HSLSA records, or that a thin adapter can. Publish the mapping as `spec/nist-ir-8536-profile.md`. The mapping is published in [nist-ir-8536-profile.md](../spec/nist-ir-8536-profile.md); the ingest check waits for NIST to publish the reference implementation.
 2. **Selective disclosure.** Design a verifier-escrow mode: an accredited auditor sees full records, the buyer sees only check results and a signed VSA. Measure what salted digests still leak (record counts, lot sizes, timing) and say what the escrow mode hides.
 3. **Output formats.** Emit the HBOM as CycloneDX 1.6 and as SPDX 3.1 once 3.1 is final. Publish firmware reference measurements as CoRIM, so standard RATS verifiers can run part of the at-boot check.
 4. **Transparency logs.** Show SEMI T26 (ledger-based traceability) or a private RFC 9162 log as the L3 log for manufacturing records.

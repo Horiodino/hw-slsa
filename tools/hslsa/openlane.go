@@ -1495,6 +1495,7 @@ func RebuildRecord(report Obj, bundleA, bundleB, key, out string) error {
 		return "fail"
 	}
 	run := builder()
+	O(run, "metadata")["finishedOn"] = Now()
 	run["byproducts"] = []Obj{rd("rebuild/"+S(g, "path"), S(g, "b"))}
 	pred := Obj{
 		"buildDefinition": Obj{

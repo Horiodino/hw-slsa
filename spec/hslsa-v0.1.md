@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 4 (2026-09-18). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 5 (2026-09-18). See the [changelog](#changelog).
 
 ## Overview
 
@@ -620,7 +620,7 @@ HSLSA reuses an existing standard wherever one fits and adds only the glue: per-
 | Counterfeit detection | Assembly L4 inspection | SAE AS5553, AS6171, AS6081 |
 | Assurance tiers | L3 and the L4 profile (alignment inferred) | [DoD Microelectronics Levels of Assurance](https://media.defense.gov/2022/Jul/14/2003034921/-1/-1/0/CTR_DOD_MICROELECTRONICS_LEVELS_OF_ASSURANCE_DEFINITIONS_AND_APPLICATIONS_20220714.PDF) |
 
-Traceability work under way at [NIST IR 8536](https://www.semiconductors.org/wp-content/uploads/2025/10/SIA-Final-Comments-on-NIST-IR-8536-2pd_10.03.pdf) and [STAMP](https://csrc.nist.gov/csrc/media/Presentations/2025/semiconductor-traceability/images-media/WedAM2.2-STAMP_Intro_NIST_SSCA.pdf) could become the data layer under the manufacturing records; that is not yet decided.
+HSLSA is written up as the semiconductor profile of [NIST IR 8536](https://doi.org/10.6028/NIST.IR.8536), the NIST manufacturing traceability meta-framework, in [nist-ir-8536-profile.md](nist-ir-8536-profile.md). The profile maps each HSLSA step onto an IR 8536 event, fills its record elements from HSLSA fields, adds four requirements for exchange with other IR 8536 ecosystems, and lists the gaps on both sides. Whether [STAMP](https://csrc.nist.gov/csrc/media/Presentations/2025/semiconductor-traceability/images-media/WedAM2.2-STAMP_Intro_NIST_SSCA.pdf) could become the data layer under the manufacturing records is not yet decided.
 
 ## Worked examples and reference implementation
 
@@ -690,6 +690,12 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 5 (2026-09-18)
+
+Starts phase 1 of the [roadmap](../docs/roadmap.md).
+
+- **NIST IR 8536 profile.** Added [nist-ir-8536-profile.md](nist-ir-8536-profile.md), which presents HSLSA as the semiconductor profile of the final NIST IR 8536. It maps every step to an IR 8536 event (Make, Assemble, Ship; receipt, storage and transfers between fab and OSAT have no record yet) and every record type to a data type identifier, and it requires a standard organization identifier, an event time and links by record digest. The HBOM schema's `org.id` now accepts `uei:` and `gln:` as well as `lei:`, `duns:` and `cage:`, and rejects any other form. The rebuild record now carries `finishedOn`.
 
 ### Revision 4 (2026-09-18)
 

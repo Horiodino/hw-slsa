@@ -118,6 +118,7 @@ Every record in HSLSA is an [in-toto Statement v1](https://github.com/in-toto/at
 | Firmware image build | `https://slsa.dev/provenance/v1` (unchanged), buildType named for the builder (for example `.../firmware/caliptra-builder@v1`) | none | Firmware build platform | Image digest |
 | Firmware provisioning | `https://github.com/Horiodino/hw-slsa/fw-provisioning/v0.1`, buildType `.../fw-provisioning/step/provision@v1` | `hwProvision` | Programming station at fab, OSAT or EMS | Each unit written |
 | Firmware review | None of its own: the OCP S.A.F.E. short-form report, used as published (see [Firmware review](#firmware-review)) | none | Review provider | Image digest, inside the report |
+| Firmware reference values | Not an in-toto predicate: a signed CoRIM with profile `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` (see [Firmware reference values](#firmware-reference-values)) | none | Firmware build platform | Each measured image's digest, as the reference value for the device layer that measures it |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | none | Product owner | Design (final GDS or board design) and lot (shipped lot or board lot) |
 | Verification summary | `https://slsa.dev/verification_summary/v1` | none | Vendor or buyer verifier | Any subject above |
 
@@ -319,6 +320,27 @@ Firmware L3 asks for an independent review of each image. HSLSA defines no recor
 
 An image with no such report cannot count toward Firmware L3.
 
+#### Firmware reference values
+
+The measurements a device reports at boot are published as reference values in a [CoRIM](https://datatracker.ietf.org/doc/draft-ietf-rats-corim/) (draft-ietf-rats-corim-11), so a RATS verifier that maps DICE evidence onto CoRIM can appraise them without code specific to HSLSA. For every firmware release whose images a device with an identity measures, the firmware build platform signs one CoRIM:
+
+- a signed CoRIM (COSE_Sign1, media type `application/rim+cose`) whose `profile` is `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1`, signed with a key the trust root lists for the firmware build platform;
+- listed as a byproduct in the provenance of the images it covers, so the provenance signature also binds it;
+- holding one CoMID reference-value triple for each layer that measures an image of the release, and nothing about a single unit.
+
+A layer is described the way DICE describes it, and each TcbInfo field maps to one CoMID field:
+
+| TcbInfo | CoMID reference value |
+| --- | --- |
+| `type` | `class-id`, as tagged bytes (CBOR tag 560) |
+| `vendor`, `model`, `layer`, `index` | `vendor`, `model`, `layer`, `index` in the class |
+| `svn` | `svn`, as an exact value, the number the device reports |
+| `fwids` | `digests`, under the matching named-information hash algorithm (sha-256, sha-384, sha-512) |
+
+A field the device leaves out of its TcbInfo is left out of the class. The SVN is the value the device writes, even where the part encodes it (Caliptra reports `0x100 | svn`), so that matching needs no knowledge of the part. Per-unit measurements, such as fuse state, stay in the [provisioning record](#firmware-provisioning-record), and a mask ROM, which nothing on the device measures, stays covered by [step 6a](#mask-rom).
+
+A verifier accepts the CoRIM for a release when its signature verifies with a firmware build platform key, it names the HSLSA profile, the provenance's byproduct digest matches it, and its reference values are exactly those the provenance implies: each measured image's digest, with the release's SVN. It appraises a TcbInfo against a reference value when every class field the reference value names has the same value in the TcbInfo; the measurement matches when the SVN is the same and every FWID under an algorithm the reference value uses is one of its digests. The HBOM's `firmware[]` entry for each measured image points at the CoRIM with `referenceValuesRef`.
+
 ## The attestation chain
 
 A verifier holding a booted device can walk by digest alone from its identity certificate to the shipped lot, back through packaging and the wafer lot to the signed GDS, and from there to reviewed RTL and every tool and PDK used. Each step lists the previous step's subjects in `resolvedDependencies`, and every manufacturing step copies the GDS release into `hwMfg.designRef`.
@@ -434,7 +456,7 @@ The [board example](../docs/board-example.md) runs these checks and breaks each 
 
 1. Check the device's certificate chain to the identity CA in the trust root, as any DICE verifier does, and check that every certificate names the unit (its UEID) and that the unit is in the shipped lot.
 2. Find the `fw-provisioning` record whose subject is the IDevID public key digest. It must be signed by an allowed station site, name this unit, this lot and this design release, and have all its gates passed; it gives the site, fuse state and images written.
-3. For each FWID in the alias certificates (TCG DICE TcbInfo), find image provenance with that digest as subject, and check its level (and, for L3, an accepted [S.A.F.E. report](#firmware-review) and log inclusion). Where the device also measures its fuses (Caliptra's vendor and owner fuse info, for example), recompute those measurements from the fuses the provisioning record says were burned; they must match what the device reports.
+3. Appraise each firmware measurement in the alias certificates (TCG DICE TcbInfo) against the release's [firmware reference values](#firmware-reference-values): it must match a reference value for its layer. Because the verifier accepts the CoRIM only when it holds exactly the digests of the release's provenance, a match finds the image provenance with that digest as subject; check its level (and, for L3, an accepted [S.A.F.E. report](#firmware-review) and log inclusion). This step needs only the CoRIM and the certificates, so a RATS verifier can run it. Where the device also measures its fuses (Caliptra's vendor and owner fuse info, for example), recompute those measurements from the fuses the provisioning record says were burned; they must match what the device reports.
 4. Confirm the HBOM's GDS has a Design chain whose ROM merge step consumed the ROM image named by its provenance and passed `rom-readback`; that is the only way the mask ROM, which took the first measurement, is covered. If the policy asks for it, `rom-matches-frozen` must also have passed.
 5. Check that the SVN the device reports equals the image's SVN in its provenance, and that it is not below the anti-rollback fuse value in the provisioning record or the policy minimum.
 
@@ -467,7 +489,7 @@ The HBOM is the one document a buyer starts from: it lists what the product is m
 | `renderings[]` | Full CycloneDX or SPDX documents for the same product | Each by digest |
 | `design` | IP blocks (kind, supplier, license, IEEE 1735 flag), RTL sources by commit, PDK, flow steps and tools, final layout | Each flow step's `design-flow` attestation via `provenanceRef` |
 | `manufacturing` | Foundry, process node, mask set, shuttle, wafer lots, OSAT and package, test stages and programs; for boards, the EMS and board lot in `boardAssembly` | F1 via `fab.attestationRef`, F3 via `assembly.attestationRef`, F2 and F4 results via `test[].resultsRef`, A1 via `boardAssembly.attestationRef` |
-| `firmware[]` | Each image's name, role, storage (mask-rom, otp, on-die-flash, external-flash) and digest | Its SBOM via `sbomRef` |
+| `firmware[]` | Each image's name, role, storage (mask-rom, otp, on-die-flash, external-flash) and digest | Its SBOM via `sbomRef`; for an image the device measures, the [firmware reference values](#firmware-reference-values) via `referenceValuesRef` |
 | `parts[]` | For boards: reference designators, manufacturer, MPN, date code, lot, distributor, authorized channel | The part's own HBOM via `hbomRef`; the shipment via `distributionRef` |
 | `redactions[]` | JSON Pointers to withheld fields and their salted digests | Nothing |
 
@@ -612,7 +634,7 @@ HSLSA reuses an existing standard wherever one fits and adds only the glue: per-
 | SBOM | HBOM; per-image firmware SBOMs | [CycloneDX 1.6](https://cyclonedx.org/docs/1.6/json/) (ECMA-424), [SPDX 3.1 RC](https://spdx.dev/spdx-3-1-ontology-and-schema-available-for-review/), [CISA HBOM framework](https://www.cisa.gov/resources-tools/resources/hardware-bill-materials-hbom-framework-supply-chain-risk-management) |
 | Artifact digest | Device identity as the subject of a physical part | [TCG DICE](https://trustedcomputinggroup.org/resource/dice-attestation-architecture/), [Caliptra](https://www.chipsalliance.org/news/caliptra2-1/), [DMTF SPDM](https://www.dmtf.org/standards/spdm) |
 | Sigstore, Rekor | Keyless signing for design and firmware platforms; public or private logs | Sigstore, [IETF SCITT (RFC 9943)](https://www.rfc-editor.org/rfc/rfc9943), RFC 9162 |
-| Verification before use | Tapeout, lot receipt and boot checks | [IETF RATS (RFC 9334)](https://www.rfc-editor.org/rfc/rfc9334), [TCG Platform Certificate](https://trustedcomputinggroup.org/resource/tcg-platform-certificate-profile/), [CoRIM](https://datatracker.ietf.org/doc/draft-ietf-rats-corim/) (still an Internet-Draft) |
+| Verification before use | Tapeout, lot receipt and boot checks | [IETF RATS (RFC 9334)](https://www.rfc-editor.org/rfc/rfc9334), [TCG Platform Certificate](https://trustedcomputinggroup.org/resource/tcg-platform-certificate-profile/), [CoRIM](https://datatracker.ietf.org/doc/draft-ietf-rats-corim/) (still an Internet-Draft) for [firmware reference values](#firmware-reference-values) |
 | Independent review | Firmware L3 review, using the S.A.F.E. short-form report as is | [OCP S.A.F.E.](https://github.com/opencomputeproject/OCP-Security-SAFE/blob/main/Documentation/framework.md) |
 | Build records | Wafer, Package/Test and Assembly step records | [IPC-1782](https://standards.globalspec.com/std/14358527/ipc-1782) traceability, SEMI E142 wafer maps, STDF test results |
 | Supplier assessment | L3 accredited sites | [DMEA Trusted Supplier](https://www.acq.osd.mil/asds/dmea/tapo/trusted-supplier-programs.html), [O-TTPS (ISO/IEC 20243)](https://www.opengroup.org/open-trusted-technology-provider%E2%84%A2-standard-o-ttps-approved-isoiec-international-standard), SEMI E187 for equipment |
@@ -631,9 +653,9 @@ Four examples run in this repository's GitHub Actions and exercise the spec end 
 | PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]`, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
-| Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
+| Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, firmware reference values as a signed CoRIM, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
-The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, and signs VSAs. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
+The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, and signs VSAs. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
 What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key is simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
 
@@ -663,7 +685,7 @@ The source drafts were not edited; this spec settles each difference as follows.
 - [ ] Can analog and mixed-signal flows, mostly manual layout, reach Design L3?
 - [ ] What sampling rate makes an L4 claim meaningful for a given lot size, and who accredits the inspection labs?
 - [ ] Should the HBOM carry claimed levels per track, so one document states them, or should levels live only in verification summaries?
-- [ ] Should HBOM `firmware[]` entries gain a provenance reference and expected boot measurement, and should reference values be published as CoRIM?
+- [ ] Should HBOM `firmware[]` entries also carry a provenance reference? Revision 5 answered the rest of this question: reference values are published as a signed CoRIM, and `referenceValuesRef` points at it.
 - [ ] Who endorses IDevID certificates when the OSAT, not the chip vendor, holds the provisioning station?
 - [ ] Should the foundry verify provenance at GDS intake, or only the design house before release? (Wafer L3 already asks the fab to verify the release.)
 - [ ] How much of `hwFlow.metrics` and `hwMfg` data is safe to disclose to the next party, and are salted digests enough for encrypted IP and NDA-bound PDKs, or is verifier escrow needed?
@@ -696,6 +718,7 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 Starts phase 1 of the [roadmap](../docs/roadmap.md).
 
 - **NIST IR 8536 profile.** Added [nist-ir-8536-profile.md](nist-ir-8536-profile.md), which presents HSLSA as the semiconductor profile of the final NIST IR 8536. It maps every step to an IR 8536 event (Make, Assemble, Ship; receipt, storage and transfers between fab and OSAT have no record yet) and every record type to a data type identifier, and it requires a standard organization identifier, an event time and links by record digest. The HBOM schema's `org.id` now accepts `uei:` and `gln:` as well as `lei:`, `duns:` and `cage:`, and rejects any other form. The rebuild record now carries `finishedOn`.
+- **Firmware reference values as CoRIM.** The firmware build platform publishes the measurements a device reports at boot as a signed CoRIM with the HSLSA profile, listed as a byproduct of the images' provenance; each DICE TcbInfo field maps to one CoMID field ([Firmware reference values](#firmware-reference-values)). Step 3 of the at-boot check appraises the alias certificates against it, so a RATS verifier can run that step. The HBOM's `firmware[]` entries gain `referenceValuesRef`, which answers most of the open question on expected boot measurements. The Caliptra example signs one for its FMC and runtime, the at-boot check uses it, the reference tool gains `hslsa corim show` and `hslsa corim appraise`, and Veraison's `cocli` decodes the file in CI.
 
 ### Revision 4 (2026-09-18)
 

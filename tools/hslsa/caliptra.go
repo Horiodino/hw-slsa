@@ -34,6 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -333,6 +334,14 @@ func CaliptraFirmware(bundle, lockPath, buildDir, key string) error {
 		return err
 	}
 	fwSvn := get(lock, "firmware", "fwSvn")
+	svn, ok := Int(manifest, "svn")
+	if !ok {
+		return fmt.Errorf("fw-manifest.json: no svn")
+	}
+	corimRD, err := WriteCaliptraCoRIM(bundle, subjects[0], subjects[1], subjects[2], svn, signer)
+	if err != nil {
+		return err
+	}
 	fw, err := fwStatement(subjects, "fw",
 		Obj{
 			"source":      S(sw, "repo"),
@@ -341,15 +350,56 @@ func CaliptraFirmware(bundle, lockPath, buildDir, key string) error {
 			"fwSvn":       fwSvn,
 			"signingKeys": "caliptra-image-fake-keys (Caliptra's public test keys)",
 		},
-		deps, []Obj{sboms["fmc"], sboms["runtime"], manifestRD, fwLog}, started)
+		deps, []Obj{sboms["fmc"], sboms["runtime"], manifestRD, corimRD, fwLog}, started)
 	if err != nil {
 		return err
 	}
 	if _, err := Sign(fw, signer, filepath.Join(bundle, "att", FWAtt["bundle"])); err != nil {
 		return err
 	}
-	fmt.Printf("firmware: ROM sha384:%s..., bundle svn %s, signed\n", S(romRD, "digest", "sha384")[:16], num(get(manifest, "svn")))
+	fmt.Printf("firmware: ROM sha384:%s..., bundle svn %s, signed, reference values in %s\n",
+		S(romRD, "digest", "sha384")[:16], num(get(manifest, "svn")), CoRIMFile)
 	return nil
+}
+
+// Firmware reference values
+
+// CoRIMFile is the firmware CoRIM in the bundle's artifacts.
+const CoRIMFile = "caliptra-fw.corim"
+
+// The TcbInfo types Caliptra's FMC and runtime alias certificates carry for the layer they measured.
+const (
+	FMCTcbType = "CALIPTRA_2_X_FMC_FIRMWARE_INFO"
+	RTTcbType  = "CALIPTRA_2_X_RT_FIRMWARE_INFO"
+)
+
+// CaliptraTcbSVN is an SVN as Caliptra reports it in TcbInfo: 0x100 | svn, so
+// the DER integer has a fixed width (caliptra-sw x509/gen/src/x509.rs, fixed_width_svn).
+func CaliptraTcbSVN(svn int64) uint64 { return 0x100 | uint64(svn&0xff) }
+
+// CaliptraRefValues are the reference values for one firmware bundle: the FMC
+// and runtime digests that the ROM and the FMC measure, with their SVN.
+func CaliptraRefValues(fmcSha384, rtSha384 string, svn int64) []RefValue {
+	s := CaliptraTcbSVN(svn)
+	return []RefValue{
+		{Env: DiceEnv{Type: FMCTcbType}, Digests: []FWID{{SHA384OID, fmcSha384}}, SVN: &s},
+		{Env: DiceEnv{Type: RTTcbType}, Digests: []FWID{{SHA384OID, rtSha384}}, SVN: &s},
+	}
+}
+
+// WriteCaliptraCoRIM signs the firmware CoRIM for a bundle into artifacts/ and describes it.
+func WriteCaliptraCoRIM(bundle string, fwBundle, fmc, rt Obj, svn int64, signer *Signer) (Obj, error) {
+	path := filepath.Join(bundle, "artifacts", CoRIMFile)
+	id := S(fwBundle, "name") + "@sha256:" + S(fwBundle, "digest", "sha256")
+	refs := CaliptraRefValues(S(fmc, "digest", "sha384"), S(rt, "digest", "sha384"), svn)
+	if err := WriteCoRIM(path, id, "HSLSA firmware build platform", "firmware-platform", refs, signer); err != nil {
+		return nil, err
+	}
+	return fileRD(path, "")
+}
+
+func sameRefValues(a, b []RefValue) bool {
+	return len(a) == len(b) && slices.EqualFunc(a, b, RefValue.equal)
 }
 
 // Design track
@@ -1285,10 +1335,17 @@ func CaliptraHBOM(bundle, lockPath, scenarioPath, key string) error {
 		if err != nil {
 			return nil, err
 		}
-		return Obj{
+		entry := Obj{
 			"name": name, "version": tag, "role": role, "storage": storage,
 			"digest": r["digest"], "sbomRef": fileRef(bundle, "artifacts/sbom-"+image+".cdx.json"),
-		}, nil
+		}
+		// The ROM is not measured on the device; the FMC and runtime are, against the firmware CoRIM.
+		if image != "rom" {
+			ref := fileRef(bundle, "artifacts/"+CoRIMFile)
+			ref["mediaType"] = CoRIMMediaType
+			entry["referenceValuesRef"] = ref
+		}
+		return entry, nil
 	}
 	var firmware []Obj
 	for _, f := range [][4]string{
@@ -1363,11 +1420,13 @@ func openFW(bundle string, trust *TrustRoot, which string) (Obj, error) {
 type FirmwareResult struct {
 	ROM, FMC, Runtime, Bundle Obj
 	Manifest                  Obj
-	Inputs                    []Obj
+	// RefValues are the firmware CoRIM's reference values, which the at-boot check appraises against.
+	RefValues []RefValue
+	Inputs    []Obj
 }
 
 // FirmwareCheck is the Firmware L1 and L2 image check: provenance, SBOMs, the
-// frozen ROM, and the ROM merge that put it in silicon.
+// firmware CoRIM, the frozen ROM, and the ROM merge that put it in silicon.
 func FirmwareCheck(bundle string, trust *TrustRoot, policy Obj) (*FirmwareResult, error) {
 	pol := O(policy, "firmware")
 	rom, err := openFW(bundle, trust, "rom")
@@ -1425,6 +1484,28 @@ func FirmwareCheck(bundle string, trust *TrustRoot, policy Obj) (*FirmwareResult
 		return nil, failf("firmware bundle: signed with vendor keys the policy does not allow")
 	}
 
+	// The firmware CoRIM is a byproduct of this build, signed by the same
+	// platform, and holds exactly the reference values its images imply.
+	var corimRD Obj
+	for _, b := range byproducts {
+		if S(b, "name") == CoRIMFile {
+			corimRD = b
+		}
+	}
+	corimPath := filepath.Join(bundle, "artifacts", CoRIMFile)
+	if corimRD == nil || !jsonEqual(fileDigest(corimPath), get(corimRD, "digest")) {
+		return nil, failf("firmware bundle: %s does not match its provenance", CoRIMFile)
+	}
+	rim, err := OpenCoRIM(corimPath, trust.Roles["firmware-platform"], "firmware CoRIM")
+	if err != nil {
+		return nil, err
+	}
+	svn, _ := Int(manifest, "svn")
+	want := CaliptraRefValues(S(subjects[Images["fmc"]], "digest", "sha384"), S(subjects[Images["runtime"]], "digest", "sha384"), svn)
+	if !sameRefValues(rim.RefValues, want) {
+		return nil, failf("firmware CoRIM: reference values differ from the image provenance")
+	}
+
 	// The mask ROM is covered only through the Design track: the ROM merge step must consume this image.
 	merge, err := DecodeEnvelope(filepath.Join(bundle, "att", AttName("rom-merge")))
 	if err != nil {
@@ -1456,14 +1537,19 @@ func FirmwareCheck(bundle string, trust *TrustRoot, policy Obj) (*FirmwareResult
 		if d := fileDigest(sbom); d == nil || !jsonEqual(d, get(entry, "sbomRef", "digest")) {
 			return nil, failf("hbom: SBOM for %s does not match its reference", pair.name)
 		}
+		if pair.name != "caliptra-rom" && (S(entry, "referenceValuesRef", "uri") != "file:artifacts/"+CoRIMFile ||
+			!jsonEqual(get(entry, "referenceValuesRef", "digest"), corimRD["digest"])) {
+			return nil, failf("hbom: firmware entry %s does not point at the firmware CoRIM", pair.name)
+		}
 	}
 	return &FirmwareResult{
-		ROM:      romImage,
-		FMC:      subjects[Images["fmc"]],
-		Runtime:  subjects[Images["runtime"]],
-		Bundle:   subjects[Images["bundle"]],
-		Manifest: manifest,
-		Inputs:   []Obj{envRD(bundle, FWAtt["rom"]), envRD(bundle, FWAtt["bundle"])},
+		ROM:       romImage,
+		FMC:       subjects[Images["fmc"]],
+		Runtime:   subjects[Images["runtime"]],
+		Bundle:    subjects[Images["bundle"]],
+		Manifest:  manifest,
+		RefValues: rim.RefValues,
+		Inputs:    []Obj{envRD(bundle, FWAtt["rom"]), envRD(bundle, FWAtt["bundle"])},
 	}, nil
 }
 
@@ -1634,24 +1720,27 @@ func DeviceCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResu
 		}
 	}
 
-	// 3. Every measurement matches an image with provenance.
-	fmcTcb, err := tcbInfoOfType(certs["fmc-alias"], "CALIPTRA_2_X_FMC_FIRMWARE_INFO", label)
+	// 3. Every firmware measurement matches a reference value in the firmware
+	// CoRIM, which FirmwareCheck tied to the images' provenance.
+	fmcTcb, err := tcbInfoOfType(certs["fmc-alias"], FMCTcbType, label)
 	if err != nil {
 		return nil, err
 	}
-	rtTcb, err := tcbInfoOfType(certs["rt-alias"], "CALIPTRA_2_X_RT_FIRMWARE_INFO", label)
+	rtTcb, err := tcbInfoOfType(certs["rt-alias"], RTTcbType, label)
 	if err != nil {
 		return nil, err
 	}
-	if id, err := fwid(fmcTcb, label); err != nil {
-		return nil, err
-	} else if id != S(fw.FMC, "digest", "sha384") {
-		return nil, failf("%s: FMC measurement matches no FMC image with provenance", label)
-	}
-	if id, err := fwid(rtTcb, label); err != nil {
-		return nil, err
-	} else if id != S(fw.Runtime, "digest", "sha384") {
-		return nil, failf("%s: runtime measurement matches no runtime image with provenance", label)
+	for _, m := range []struct {
+		tcb  TcbInfo
+		what string
+	}{{fmcTcb, "FMC"}, {rtTcb, "runtime"}} {
+		named, err := Appraise(fw.RefValues, m.tcb)
+		if !named {
+			return nil, failf("%s: the firmware CoRIM has no reference value for the %s layer", label, m.what)
+		}
+		if err != nil {
+			return nil, failf("%s: %s measurement matches no reference value in the firmware CoRIM", label, m.what)
+		}
 	}
 	var written Obj
 	for _, i := range Objs(hp, "images") {

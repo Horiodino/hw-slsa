@@ -6,8 +6,8 @@ The workflow in [`.github/workflows/caliptra-e2e.yml`](../.github/workflows/cali
 
 | Job | Plays | Does |
 | --- | --- | --- |
-| Produce | Firmware team, design house, tapeout authority, fab, sort house, OSAT, test house and its programming station, product owner | Builds the ROM and the signed FMC + runtime bundle with `caliptra-builder`, lints the RTL, merges the ROM into the design, releases it, signs F1 to F4 for a lot, programs every shipped unit and exports its IDevID CSR from the real ROM, endorses it, signs one `fw-provisioning` record per unit, builds the HBOM |
-| Verify | Buyer | Boots the three units it received, checks that the ROM refuses tampered firmware, runs the tapeout, lot, firmware and at-boot checks, signs six SLSA VSAs, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
+| Produce | Firmware team, design house, tapeout authority, fab, sort house, OSAT, test house and its programming station, product owner | Builds the ROM and the signed FMC + runtime bundle with `caliptra-builder`, lints the RTL, merges the ROM into the design, releases it, signs F1 to F4 for a lot, programs every shipped unit and exports its IDevID CSR from the real ROM, endorses it, signs one `fw-provisioning` record per unit, signs a CoRIM with the reference values for the FMC and runtime, builds the HBOM |
+| Verify | Buyer | Boots the three units it received, checks that the ROM refuses tampered firmware, runs the tapeout, lot, firmware and at-boot checks, appraises each unit's measurements against the CoRIM and has Veraison's cocli decode it, signs six SLSA VSAs, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
 | Verify on the RTL | Buyer, with the device built from the released design | Verilates the released design, then for one received unit (`rtl-units` sets how many) either runs the ROM until it exports the IDevID CSR and checks the key against the endorsed IDevID certificate (`rtl-stage: identity`, the default), or boots to runtime and runs the same checks and slsa-verifier calls as Verify (`rtl-stage: boot`). Runs only when dispatched by hand with `rtl` set; see [Booting on the RTL](#booting-on-the-rtl) |
 
 All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/caliptra.lock.json): caliptra-sw at tag `fw-2.1.3`, and the caliptra-rtl and adams-bridge commits that tag uses, each checked by commit and git tree.
@@ -20,6 +20,7 @@ All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/ca
 - **The device.** In every run each unit is Caliptra's emulator from caliptra-sw (`caliptra-hw-model`), running the ROM taken out of the released design and the firmware bundle written to that unit's flash, with that unit's fuses. The RTL job runs the same ROM, flash and fuses on the released design itself, Verilated. The IDevID CSR at provisioning and the LDevID, FMC alias and RT alias certificates at boot all come from that ROM and firmware; [`e2e/caliptra/device`](../e2e/caliptra/device/src/main.rs) only sets fuses, uploads firmware and asks for certificates.
 - **Identity.** Each unit gets its own UDS seed and field entropy, and its serial goes into the UEID fuses, so every certificate the device issues names the unit. The buyer checks the chain identity CA, IDevID, LDevID, FMC alias, RT alias.
 - **Secure boot.** The verify job flips one bit in a unit's runtime image and boots it: the ROM refuses it with `IMAGE_VERIFIER_ERR_RUNTIME_DIGEST_MISMATCH`. A unit fused for another vendor key is refused with `IMAGE_VERIFIER_ERR_VENDOR_PUB_KEY_DIGEST_INVALID`.
+- **Reference values.** The firmware build signs a [CoRIM](#firmware-reference-values-corim) with the FMC and runtime measurements a unit booting this bundle must report, and the at-boot check compares each unit's alias certificates against it. Veraison's `cocli`, which this project did not write, decodes it.
 
 **Simulated:** wafer maps, genealogy and test results come from [`e2e/caliptra/mfg-scenario.json`](../e2e/caliptra/mfg-scenario.json) (8 units packaged, 1 fails final test, 7 shipped). The programming station's HSM is `os.urandom`, and fuse and flash readback re-reads the files it wrote. The identity CA is a local P-384 key.
 
@@ -83,17 +84,43 @@ Firmware L3 is out of reach: it needs SLSA Build L3, an independent review, and 
 
 1. **Certificate chain.** The IDevID certificate is endorsed by the identity CA in the trust root. LDevID, FMC alias and RT alias each verify under their parent, and every certificate's UEID names the unit, which must be in the shipped lot.
 2. **Provisioning record.** The `fw-provisioning` record whose subject is the digest of that IDevID public key is signed by the test house. It names this unit, this lot and this design release, and all its gates passed.
-3. **Measurements.** The FMC FWID in the FMC alias certificate and the runtime FWID in the RT alias certificate equal the SHA-384 subjects of the firmware provenance. The fuse measurements Caliptra takes (`CALIPTRA_2_X_FUSE_VENDOR_INFO` and `_OWNER_INFO`) are recomputed from the fuses the provisioning record says were burned, and must match.
+3. **Measurements.** The FMC TcbInfo in the FMC alias certificate and the runtime TcbInfo in the RT alias certificate each match a reference value in the firmware CoRIM: the same SHA-384 FWID and SVN. The firmware check has already required that the CoRIM is signed by the firmware build platform, is a byproduct of the bundle's provenance, and holds exactly that provenance's FMC and runtime digests and SVN, so a match ties the measurement to an image with provenance. The fuse measurements Caliptra takes (`CALIPTRA_2_X_FUSE_VENDOR_INFO` and `_OWNER_INFO`) are recomputed from the fuses the provisioning record says were burned, and must match.
 4. **ROM coverage.** The ROM's provenance names the TAC-frozen image, the `rom-merge` step consumed that image and its provenance, and `rom-readback` passed.
 5. **Anti-rollback.** The SVN the device reports equals the image's SVN, and it is not below the fuse or the policy minimum.
 
+## Firmware reference values (CoRIM)
+
+`hslsa caliptra firmware` signs `artifacts/caliptra-fw.corim` along with the bundle's provenance, which lists it as a byproduct. It is a signed CoRIM (a COSE_Sign1 envelope, [draft-ietf-rats-corim-11](https://datatracker.ietf.org/doc/draft-ietf-rats-corim/)), signed with the firmware platform's key and naming the profile `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1`. It holds one CoMID with two reference values, one for each layer Caliptra measures:
+
+| Environment (class-id, tagged bytes) | Measured by | Digest | SVN |
+| --- | --- | --- | --- |
+| `CALIPTRA_2_X_FMC_FIRMWARE_INFO` | ROM, reported in the FMC alias certificate | SHA-384 of the FMC image | 257 |
+| `CALIPTRA_2_X_RT_FIRMWARE_INFO` | FMC, reported in the RT alias certificate | SHA-384 of the runtime image | 257 |
+
+The SVN is 257 for firmware SVN 1 because that is the number the device reports: Caliptra writes `0x100 | svn` into TcbInfo so that the DER integer has a fixed width. A reference value holds what the device reports, so a verifier that maps TcbInfo onto CoRIM directly needs no Caliptra knowledge to match it. The HBOM's `caliptra-fmc` and `caliptra-runtime` entries point at the CoRIM with `referenceValuesRef`.
+
+What it leaves out: the mask ROM, which nothing on the device measures (it is covered by the ROM merge), and the fuse measurements (`CALIPTRA_2_X_FUSE_*`), which depend on each unit's fuses and stay in its provisioning record.
+
+The reference tool can show a CoRIM and appraise any DICE certificates against it:
+
+```sh
+hslsa corim show --corim out/caliptra/bundle/artifacts/caliptra-fw.corim \
+  --trust-root out/caliptra/bundle/trust-root.json --role firmware-platform
+hslsa corim appraise --corim out/caliptra/bundle/artifacts/caliptra-fw.corim \
+  --trust-root out/caliptra/bundle/trust-root.json --role firmware-platform \
+  out/caliptra/boots/CLP-00002/fmc-alias-ecc384.der out/caliptra/boots/CLP-00002/rt-alias-ecc384.der
+```
+
+The verify job runs both, then decodes the file with [Veraison's `cocli`](https://github.com/veraison/cocli) (`corim display`), a CoRIM tool from outside this project, and fails if cocli does not read it as a signed CoRIM with one CoMID. cocli does not check the signature here: its `corim verify` loads a JWK through a function that accepts only private keys, so a buyer holding the public key cannot use it. The reference tool checks the signature instead. The reference tool and cocli both use [Veraison's corim library](https://github.com/veraison/corim), whose last release (v1.1.2, April 2024) predates draft 11, so both are pinned to commits on its main branch.
+
 ## What the tamper tests prove
 
-[`tools/hslsa/caliptra_test.go`](../tools/hslsa/caliptra_test.go) breaks the chain in 22 ways and requires each to fail for the stated reason. As in the PicoRV32 tests, the fixture re-signs the bundle with test keys so it can forge validly signed records:
+[`tools/hslsa/caliptra_test.go`](../tools/hslsa/caliptra_test.go) breaks the chain in 28 ways and requires each to fail for the stated reason. As in the PicoRV32 tests, the fixture re-signs the bundle with test keys so it can forge validly signed records:
 
 - **The device:** a certificate from another unit, a missing alias certificate, an LDevID certificate with the right names signed by the wrong key, a received unit that failed final test.
 - **Provisioning:** another unit's record, a record signed by the wrong site, a record edited without re-signing, an IDevID endorsed by another CA. Also records that lie about the vendor fuses, the SVN fuse or the design release, and a policy minimum SVN above the image.
-- **Firmware:** provenance, manifest and HBOM that all agree on an FMC the device did not run (only the device's measurement catches it), a ROM that is not the frozen image, firmware signed by the design flow platform, a swapped SBOM, an HBOM listing another runtime.
+- **Firmware:** provenance, manifest and HBOM that all agree on an FMC the device did not run, and a CoRIM re-issued for it (only the device's measurement catches it), a ROM that is not the frozen image, firmware signed by the design flow platform, a swapped SBOM, an HBOM listing another runtime.
+- **The CoRIM:** one signed by a key outside the firmware platform's role, one edited after the build, one whose runtime digest, SVN or runtime entry differs from the provenance, and an HBOM pointing at another CoRIM.
 - **The mask ROM:** a ROM merge that does not consume the ROM, a failed `rom-readback`, a swapped released design, a failed lint, a unit added to the lot.
 
 The verify job also runs slsa-verifier three times expecting failure: Firmware L3 for a unit verified at L2, SLSA Build L3 for the firmware, and one unit's VSA presented for another unit.

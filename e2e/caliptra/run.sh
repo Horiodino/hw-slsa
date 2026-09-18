@@ -32,6 +32,8 @@ if [[ -z "${HSLSA:-}" ]]; then
   (cd "$ROOT" && go build -o "$HSLSA" ./tools/hslsa/cmd/hslsa)
 fi
 hslsa() { "$HSLSA" "$@"; }
+# Veraison's CoRIM command line tool, at a commit on its main branch (it has no release yet).
+COCLI_VERSION=${COCLI_VERSION:-v1.0.0-alpha0.0.20260924140712-c8c31ce6af05}
 pin() { jq -r --arg a "$1" --arg b "$2" '.[$a][$b]' "$E2E/caliptra.lock.json"; }
 
 checkout() {
@@ -224,6 +226,30 @@ refusals() {
   expect_refused "firmware on a unit fused for another vendor key" 0x000b0003 "$tampered/vk" "$DEVICES/$unit/flash.bin" "$tampered/fuses.json"
 }
 
+# The firmware CoRIM on its own: the reference values, each booted unit's
+# alias certificates appraised against them, and the same file decoded and
+# validated by Veraison's cocli, a CoRIM tool this project did not write.
+corim_checks() {
+  local units=$1 boots=$2 unit corim=$BUNDLE/artifacts/caliptra-fw.corim
+  echo "== the firmware CoRIM"
+  hslsa corim show --corim "$corim" --trust-root "$BUNDLE/trust-root.json" --role firmware-platform
+  while read -r unit; do
+    [[ -n $unit ]] || continue
+    hslsa corim appraise --corim "$corim" --trust-root "$BUNDLE/trust-root.json" --role firmware-platform \
+      "$boots/$unit/fmc-alias-ecc384.der" "$boots/$unit/rt-alias-ecc384.der" | sed "s/^/$unit: /"
+  done < "$units"
+  echo "== Veraison cocli reads the CoRIM"
+  local shown=$boots/cocli-corim-display.txt
+  # Outside this module, so go run builds cocli from its own go.mod.
+  (cd "${TMPDIR:-/tmp}" && go run "github.com/veraison/cocli@$COCLI_VERSION" corim display --file "$corim" --show-tags) > "$shown" 2>&1 ||
+    { cat "$shown" >&2; echo "FAIL: cocli $COCLI_VERSION could not decode the CoRIM" >&2; exit 1; }
+  # cocli falls back to an unsigned CoRIM, and skips a CoMID it cannot decode, without failing.
+  if ! grep -q '^Meta:' "$shown" || grep -q 'skipping malformed\|unmatched CBOR tag' "$shown"; then
+    cat "$shown" >&2; echo "FAIL: cocli $COCLI_VERSION did not read a signed CoRIM with one CoMID" >&2; exit 1
+  fi
+  echo "cocli $COCLI_VERSION: decoded the signed CoRIM and its CoMID, $(grep -c '"environment"' "$shown") reference values (${shown#"$ROOT/"})"
+}
+
 buyer_checks() {
   local units=$1 boots=$2 vsa_dir=$3 vkey=$4
   echo "== buyer checks"
@@ -237,6 +263,7 @@ buyer_checks() {
   hslsa pubkey --key "$vkey/verifier.key.pem" --out "$vsa_dir/verifier.pub.pem"
   hslsa caliptra verify --bundle "$BUNDLE" --trust-root "$BUNDLE/trust-root.json" --policy "$BUNDLE/policy.json" \
     --units "$units" --boots "$boots" --vsa-key "$vkey/verifier.key.pem" --vsa-out "$vsa_dir"
+  corim_checks "$units" "$boots"
 
   local sv=${SLSA_VERIFIER:-slsa-verifier} keyid
   keyid=$(hslsa keyid --key "$vsa_dir/verifier.pub.pem")

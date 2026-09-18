@@ -73,6 +73,7 @@ The data type identifier of an HSLSA record is its predicate type. Where several
 | Firmware image build | `https://slsa.dev/provenance/v1` | Named for the builder |
 | Firmware provisioning | `https://github.com/Horiodino/hw-slsa/fw-provisioning/v0.1` | `.../fw-provisioning/step/provision@v1` |
 | Firmware review | The OCP S.A.F.E. short-form report's own CoRIM profile | None |
+| Firmware reference values | The HSLSA CoRIM profile, `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` | None |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | None |
 | Verification summary | `https://slsa.dev/verification_summary/v1` | None |
 
@@ -111,7 +112,7 @@ Three events have no HSLSA step:
 - **Store.** Nothing records a warehouse or a die bank. See [H3](#gaps-in-hslsa).
 - **Employ.** The at-boot check is the closest: a verifier MAY sign a unit verification summary for a booted device. Under this profile that summary is the Employ record.
 
-Some records are not events. The HBOM is pedigree: what the product is made of, pointing at the events. The verification summary is a decision over a chain, which is what IR 8536's principle 1 says the chain is for. The source review, IP release and S.A.F.E. report are supplemental evidence for the steps that consume them.
+Some records are not events. The HBOM is pedigree: what the product is made of, pointing at the events. The verification summary is a decision over a chain, which is what IR 8536's principle 1 says the chain is for. The source review, IP release and S.A.F.E. report are supplemental evidence for the steps that consume them. The firmware reference values are supplemental evidence for Employ: the measurements a firmware build should produce on a device, which the at-boot check compares the device against.
 
 ## Principles
 

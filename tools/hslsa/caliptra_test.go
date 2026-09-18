@@ -83,6 +83,43 @@ func resignFile(path, key string, mutate func(Obj)) error {
 	return err
 }
 
+// resignCoRIM re-issues the firmware CoRIM with role's key in keys, holding
+// mutate's reference values (the current ones when mutate is nil), then
+// re-signs the bundle provenance with the firmware platform's key to name it.
+func resignCoRIM(bundle, keys, role string, mutate func([]RefValue) []RefValue) error {
+	path := filepath.Join(bundle, "artifacts", CoRIMFile)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	c, err := ParseCoRIM(data)
+	if err != nil {
+		return err
+	}
+	refs := c.RefValues
+	if mutate != nil {
+		refs = mutate(refs)
+	}
+	signer, err := LoadSigner(filepath.Join(keys, role+".key.pem"))
+	if err != nil {
+		return err
+	}
+	if err := WriteCoRIM(path, c.ID, "HSLSA firmware build platform", "firmware-platform", refs, signer); err != nil {
+		return err
+	}
+	corimRD, err := fileRD(path, "")
+	if err != nil {
+		return err
+	}
+	return resignFile(filepath.Join(bundle, "att", FWAtt["bundle"]), filepath.Join(keys, "firmware-platform.key.pem"), func(s Obj) {
+		for _, b := range Objs(s, "predicate", "runDetails", "byproducts") {
+			if S(b, "name") == CoRIMFile {
+				b["digest"] = corimRD["digest"]
+			}
+		}
+	})
+}
+
 // calRebuild re-signs the chain downstream of the design steps and firmware provenance with the test keys.
 func calRebuild(bundle string, fromRomMerge bool) error {
 	keys := filepath.Join(filepath.Dir(bundle), "keys")
@@ -151,10 +188,11 @@ func calWork(t *testing.T) string {
 		if err := BuildTrustRoot(pub, filepath.Join(bundle, "trust-root.json")); err != nil {
 			return err
 		}
-		for _, name := range FWAtt {
-			if err := resignFile(filepath.Join(bundle, "att", name), filepath.Join(keys, "firmware-platform.key.pem"), nil); err != nil {
-				return err
-			}
+		if err := resignFile(filepath.Join(bundle, "att", FWAtt["rom"]), filepath.Join(keys, "firmware-platform.key.pem"), nil); err != nil {
+			return err
+		}
+		if err := resignCoRIM(bundle, keys, "firmware-platform", nil); err != nil {
+			return err
 		}
 		for _, step := range []string{"source-freeze", "simulation"} {
 			if err := resignFile(filepath.Join(bundle, "att", AttName(step)), filepath.Join(keys, "flow-platform.key.pem"), nil); err != nil {
@@ -327,6 +365,10 @@ func TestFirmwareProvenanceForAnotherFMC(t *testing.T) {
 			}
 		}
 	})
+	must(t, resignCoRIM(bundle, filepath.Join(work, "keys"), "firmware-platform", func(refs []RefValue) []RefValue {
+		refs[0].Digests[0].Digest = fake
+		return refs
+	}))
 	must(t, calRebuild(bundle, false))
 	calResign(t, work, "hbom.intoto.json", "product-owner", func(s Obj) {
 		for _, f := range Objs(s, "predicate", "firmware") {
@@ -335,8 +377,70 @@ func TestFirmwareProvenanceForAnotherFMC(t *testing.T) {
 			}
 		}
 	})
-	// Every record agrees with every other; only the device's own measurement catches the lie.
-	calRejects(t, work, "device "+calUnit+": FMC measurement matches no FMC image with provenance")
+	// Every record agrees with every other, the CoRIM included; only the device's own measurement catches the lie.
+	calRejects(t, work, "device "+calUnit+": FMC measurement matches no reference value in the firmware CoRIM")
+}
+
+// The firmware CoRIM
+
+func TestCoRIMFromAnotherSigner(t *testing.T) {
+	work := calWork(t)
+	bundle := filepath.Join(work, "bundle")
+	must(t, resignCoRIM(bundle, filepath.Join(work, "keys"), "attacker", nil))
+	must(t, calRebuild(bundle, false))
+	calRejects(t, work, "firmware CoRIM: signature does not verify with any allowed key")
+}
+
+func TestCoRIMEditedAfterTheBuild(t *testing.T) {
+	work := calWork(t)
+	appendFile(t, filepath.Join(work, "bundle", "artifacts", CoRIMFile), "\x00")
+	calRejects(t, work, "firmware bundle: "+CoRIMFile+" does not match its provenance")
+}
+
+func TestCoRIMForAnotherRuntime(t *testing.T) {
+	// The firmware platform signs reference values for a runtime its provenance does not name.
+	work := calWork(t)
+	bundle := filepath.Join(work, "bundle")
+	must(t, resignCoRIM(bundle, filepath.Join(work, "keys"), "firmware-platform", func(refs []RefValue) []RefValue {
+		refs[1].Digests[0].Digest = strings.Repeat("8", 96)
+		return refs
+	}))
+	must(t, calRebuild(bundle, false))
+	calRejects(t, work, "firmware CoRIM: reference values differ from the image provenance")
+}
+
+func TestCoRIMAllowsAnOlderSVN(t *testing.T) {
+	work := calWork(t)
+	bundle := filepath.Join(work, "bundle")
+	must(t, resignCoRIM(bundle, filepath.Join(work, "keys"), "firmware-platform", func(refs []RefValue) []RefValue {
+		old := CaliptraTcbSVN(0)
+		refs[1].SVN = &old
+		return refs
+	}))
+	must(t, calRebuild(bundle, false))
+	calRejects(t, work, "firmware CoRIM: reference values differ from the image provenance")
+}
+
+func TestCoRIMWithoutTheRuntime(t *testing.T) {
+	work := calWork(t)
+	bundle := filepath.Join(work, "bundle")
+	must(t, resignCoRIM(bundle, filepath.Join(work, "keys"), "firmware-platform", func(refs []RefValue) []RefValue {
+		return refs[:1]
+	}))
+	must(t, calRebuild(bundle, false))
+	calRejects(t, work, "firmware CoRIM: reference values differ from the image provenance")
+}
+
+func TestHBOMPointsAtAnotherCoRIM(t *testing.T) {
+	work := calWork(t)
+	calResign(t, work, "hbom.intoto.json", "product-owner", func(s Obj) {
+		for _, f := range Objs(s, "predicate", "firmware") {
+			if S(f, "name") == "caliptra-runtime" {
+				O(f, "referenceValuesRef", "digest")["sha256"] = strings.Repeat("9", 64)
+			}
+		}
+	})
+	calRejects(t, work, "hbom: firmware entry caliptra-runtime does not point at the firmware CoRIM")
 }
 
 func TestROMThatIsNotTheFrozenImage(t *testing.T) {

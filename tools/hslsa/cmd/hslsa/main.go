@@ -3,6 +3,7 @@
 package main
 
 import (
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
@@ -34,6 +35,7 @@ var commands = map[string]command{
 	"lot-digest":    {"compute the lot digest of a unit list", lotDigest},
 	"subject":       {"print the name and sha256 of an envelope's first subject", subject},
 	"validate-hbom": {"validate HBOM statements or envelopes against the schema", validateHBOM},
+	"corim":         {"show a signed CoRIM, or appraise DICE certificates against it", corimCmd},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -563,5 +565,79 @@ func validateHBOM(args []string) error {
 		}
 		fmt.Println(path, "valid")
 	}
+	return nil
+}
+
+func corimCmd(args []string) error {
+	act, rest, err := action(args, "show", "appraise")
+	if err != nil {
+		return err
+	}
+	f := newFlags("corim " + act)
+	file := f.str("corim", "signed CoRIM", true)
+	trust := f.str("trust-root", "trust root holding the signer's key", act == "appraise")
+	role := f.str("role", "trust root role allowed to sign the CoRIM", act == "appraise")
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	var c *hslsa.CoRIM
+	if *trust != "" {
+		if err := need(role, "role", "--trust-root"); err != nil {
+			return err
+		}
+		t, err := hslsa.LoadTrustRoot(*trust)
+		if err != nil {
+			return err
+		}
+		if c, err = hslsa.OpenCoRIM(*file, t.Roles[*role], *file); err != nil {
+			return err
+		}
+	} else {
+		data, err := os.ReadFile(*file)
+		if err != nil {
+			return err
+		}
+		if c, err = hslsa.ParseCoRIM(data); err != nil {
+			return err
+		}
+	}
+	if act == "show" {
+		verified := "signature not checked (pass --trust-root and --role)"
+		if *trust != "" {
+			verified = "signature verified with a " + *role + " key"
+		}
+		fmt.Printf("corim-id: %s\nprofile:  %s\nsigner:   %s, %s\n", c.ID, c.Profile, c.Signer, verified)
+		for _, r := range c.RefValues {
+			fmt.Printf("reference value: %s\n", r)
+		}
+		return nil
+	}
+	if f.NArg() == 0 {
+		return usageError{"appraise needs at least one DER certificate"}
+	}
+	var certs []*x509.Certificate
+	for _, path := range f.Args() {
+		der, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		certs = append(certs, cert)
+	}
+	names := make([]string, len(certs))
+	for i, p := range f.Args() {
+		names[i] = filepath.Base(p)
+	}
+	lines, err := hslsa.AppraiseCerts(c.RefValues, certs, names)
+	for _, l := range lines {
+		fmt.Println(l)
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Printf("appraisal: PASSED against %s\n", c.ID)
 	return nil
 }

@@ -259,7 +259,8 @@
         "role": {"enum": ["boot-rom", "bootloader", "runtime", "microcode", "configuration"]},
         "storage": {"enum": ["mask-rom", "otp", "on-die-flash", "external-flash"]},
         "digest": {"$ref": "#/$defs/digestSet"},
-        "sbomRef": {"$ref": "#/$defs/ref"}
+        "sbomRef": {"$ref": "#/$defs/ref"},
+        "referenceValuesRef": {"$ref": "#/$defs/ref", "description": "Signed CoRIM with the reference values for the measurement a device reports for this image"}
       }
     },
     "part": {

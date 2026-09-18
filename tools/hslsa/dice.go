@@ -96,6 +96,7 @@ type TcbInfo struct {
 	Vendor, Model, Type string
 	SVN                 int64
 	HasSVN              bool
+	Layer, Index        *uint64
 	FWIDs               []FWID
 }
 
@@ -114,6 +115,13 @@ func parseTcbInfo(value []byte) (TcbInfo, error) {
 		case 3:
 			info.SVN = new(big.Int).SetBytes(f.value).Int64()
 			info.HasSVN = true
+		case 4, 5:
+			v := new(big.Int).SetBytes(f.value).Uint64()
+			if f.tag&0x1f == 4 {
+				info.Layer = &v
+			} else {
+				info.Index = &v
+			}
 		case 6:
 			fwids, err := derChildren(f.value)
 			if err != nil {

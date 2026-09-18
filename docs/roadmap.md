@@ -34,7 +34,7 @@ Work that needs no partner. Target: spec v0.2.
 3. **Design L2 example.** A signed, reviewed source freeze (a signed tag plus a review attestation) and signed provenance for one third-party IP block, verified at tapeout.
 4. **Bit-exact GDS.** Pin the dates Magic, KLayout, OpenSTA and RCX embed in the OpenLane 2 flow so two runs match byte for byte, then make the verifier require `gds-bit-exact` by default.
 5. **Independent rebuild.** A second builder under a separate trust root (a different CI account and key) signs the `rebuild` record, so the OpenLane 2 example shows real Design L4 evidence.
-6. **Boot on the RTL.** Boot the Caliptra ROM on the Verilated RTL instead of the emulator, so the booted device is the design itself.
+6. **Boot on the RTL.** Boot the Caliptra ROM on the Verilated RTL instead of the emulator, so the booted device is the design itself. Done: on a self-hosted runner a unit boots to runtime on the Verilated released design in about 2.5 hours and passes the buyer checks ([caliptra-e2e.md](caliptra-e2e.md#booting-on-the-rtl)).
 7. **Licensed tools at L3.** Allow a declared license server as the only permitted network egress for a Design L3 step, with its address and the checked-out features recorded in `hwFlow`.
 8. **Close the blocking open questions.** Decide the board-level root of trust rule for Firmware L2, whether `fw-review` is needed, and one shared step list for `hwFlow.step` and the HBOM's `design.flow[].step`.
 

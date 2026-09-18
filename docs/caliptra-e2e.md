@@ -26,7 +26,7 @@ All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/ca
 **Not run yet:**
 
 - Physical design. Caliptra's SystemVerilog does not go through Yosys, so there is no synthesis, place and route or GDS. The release subject is the RTL with the ROM merged, standing in for the GDS.
-- A full boot on the RTL. The RTL job derives each unit's identity on the RTL, but a boot to runtime has not yet finished inside a hosted runner's six-hour limit; see [Booting on the RTL](#booting-on-the-rtl). Pull requests and pushes boot the emulator.
+- A full boot on the RTL in every run. It takes hours, so it runs on demand on a self-hosted runner, where one unit has booted to runtime; see [Booting on the RTL](#booting-on-the-rtl). Pull requests and pushes boot the emulator.
 - Only the ECC P-384 half of Caliptra's certificate chain is checked. Caliptra 2.x also issues an ML-DSA-87 chain; Go's `crypto/x509`, which the verifier uses, cannot verify ML-DSA certificates.
 
 ## Booting on the RTL
@@ -37,14 +37,16 @@ The emulator is a software model of the RTL, so a chain that ends at it ends at 
 
 The job has two stages, picked with `rtl-stage`:
 
-| Stage | What runs on the RTL | What the buyer checks | Measured on a standard hosted runner |
+| Stage | What runs on the RTL | What the buyer checks | Result |
 | --- | --- | --- | --- |
-| `identity` (default) | The ROM, with the unit's fuses in the manufacturing lifecycle, until it exports the IDevID CSR | The CSR verifies under its own key, and that key is the one in the IDevID certificate the identity CA endorsed from the CSR read at test | Passed ([run 36622030110](https://github.com/Horiodino/hw-slsa/actions/runs/36622030110)): CSR after 3 hours 4 minutes (3.67 million polling steps; the tool then counted steps, each with a bus read, not clock cycles), byte for byte the CSR the emulator exported at test. The whole job, with a 25-minute model build, took about 3.5 hours for one unit |
-| `boot` | The ROM, the firmware upload and verification, then FMC and runtime | The same tapeout, lot, firmware and at-boot checks as Verify, the same VSAs, and slsa-verifier. The LDevID certificate must verify under the endorsed IDevID key | Not finished. The ROM asked for firmware after 5.4 million cycles (91 minutes), then was still verifying it when GitHub stopped the job at six hours. The emulator reaches runtime in about 8.1 million cycles |
+| `identity` (default) | The ROM, with the unit's fuses in the manufacturing lifecycle, until it exports the IDevID CSR | The CSR verifies under its own key, and that key is the one in the IDevID certificate the identity CA endorsed from the CSR read at test | Passed on a hosted runner with Verilator 5.020 ([run 36622030110](https://github.com/Horiodino/hw-slsa/actions/runs/36622030110)): CSR after 3 hours 4 minutes (3.67 million polling steps; the tool then counted steps, each with a bus read, not clock cycles), byte for byte the CSR the emulator exported at test. The whole job, with a 25-minute model build, took about 3.5 hours for one unit |
+| `boot` | The ROM, the firmware upload and verification, then FMC and runtime | The same tapeout, lot, firmware and at-boot checks as Verify, the same VSAs, and slsa-verifier. The LDevID certificate must verify under the endorsed IDevID key | Passed for CLP-00002 on the self-hosted `archlinux` runner with Verilator 5.052 on four threads ([run 36696743021](https://github.com/Horiodino/hw-slsa/actions/runs/36696743021)): the ROM asked for firmware after 5.48 million cycles (17 minutes), accepted it after 21.0 million (73 minutes), and runtime was ready after 35.8 million cycles and 2 hours 24 minutes, about 4,130 cycles a second. The whole job, with an 8-minute model build, took 2 hours 34 minutes. The emulator reaches runtime in 8.1 million cycles; on a hosted runner with Verilator 5.020 the ROM was still verifying firmware at six hours |
 
 The `identity` stage shows that the design itself derives the identity the chain was endorsed with: the key the identity CA certified, and every certificate the buyer later trusts from it, comes from the released RTL and ROM with that unit's fuses, not only from the emulator's model of them.
 
-The `boot` stage needs a runner without the six-hour job limit: set `rtl-runner` to a self-hosted runner's label, and the job then allows up to five days. The first attempt printed nothing while the ROM verified firmware; the device tool now prints the cycle count and Caliptra's boot and error status every minute in every phase, so the next run shows whether verification is slow or stuck.
+The `boot` stage goes further: the released RTL and mask ROM verify the unit's firmware and run FMC and runtime, and the LDevID, FMC alias and RT alias certificates the at-boot check verifies come from that boot. So the booted device at the end of the chain is the design itself, not a model of it.
+
+A boot runs past a hosted runner's six-hour job limit, so it needs a self-hosted runner: set `rtl-runner` to its label, and the job then allows up to five days. [`rtl-runner-setup.sh`](../e2e/caliptra/rtl-runner-setup.sh) prepares an x86_64 runner, installing missing packages with apt or pacman only when sudo needs no password and otherwise printing the one command to run. The device tool prints the cycle count, rate and Caliptra's boot and error status every minute, and the cycle count at each stage.
 
 The secure-boot refusal checks stay on the emulator, since each refused boot would take hours more on the RTL.
 

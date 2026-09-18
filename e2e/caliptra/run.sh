@@ -126,9 +126,8 @@ build_rtl() {
   sed -i 's/memcpy(result->v\.\(cptra_obf_key\|cptra_csr_hmac_key\), /memcpy(result->v.\1.data(), /' \
     "$sw/hw/verilated/caliptra_verilated.cpp"
   # caliptra-sw's harness compiles with -Os on one thread; -O3 with a thread
-  # per core, up to 4, boots faster. More threads barely helped: on four
-  # cores two threads ran 840 cycles a second, four 870. Neither changes the
-  # design.
+  # per core, up to 4, boots faster: on four cores two threads ran 3,450
+  # cycles a second, four 4,570. Neither changes the design.
   local threads=${RTL_THREADS:-$(( $(nproc) < 4 ? $(nproc) : 4 ))}
   { verilator --version; echo "threads: $threads, -O3"; } | tee "$BUILD/verilator-version.txt"
 

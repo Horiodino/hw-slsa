@@ -1,0 +1,14 @@
+{
+  "fields": {
+    "wafer-fab": ["/buildDefinition/externalParameters/maskSetId"],
+    "wafer-sort": ["/buildDefinition/externalParameters/probeProgram", "/hwMfg/yield"],
+    "final-test": ["/buildDefinition/externalParameters/testProgram", "/hwMfg/yield"],
+    "hbom": [
+      "/manufacturing/fab/maskSetId",
+      "/manufacturing/waferLots/0/waferIds",
+      "/manufacturing/test/0/program",
+      "/manufacturing/test/1/program"
+    ]
+  },
+  "saltFiles": ["wafer-maps.json", "genealogy.json", "final-test-results.json"]
+}

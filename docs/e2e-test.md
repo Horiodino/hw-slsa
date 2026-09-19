@@ -7,8 +7,9 @@ The workflow in [`.github/workflows/hslsa-e2e.yml`](../.github/workflows/hslsa-e
 | Job | Plays | Does |
 | --- | --- | --- |
 | Lint and unit tests | | `gofmt`, `go vet` and `go test` (bundle-free tests only), validates the committed HBOM examples against their schema, and checks the example's lot digest can be recomputed from its unit list |
-| Produce | IP vendor, design lead, reviewer, flow platform, tapeout authority, fab, sort house, OSAT, test house, product owner | Signs the IP provenance, the source tag and its review, runs the design flow, signs each step, releases the design, signs F1 to F4 for a lot, builds and signs the HBOM. Uploads the bundle without any private key |
+| Produce | IP vendor, design lead, reviewer, flow platform, tapeout authority, fab, sort house, OSAT, test house, product owner | Signs the IP provenance, the source tag and its review, runs the design flow, signs each step, releases the design, signs F1 to F4 for a lot, builds and signs the HBOM, and signs the lot again with fields withheld for the escrow job. Uploads the bundles without any private key |
 | Verify | Buyer | Receives only the bundle, runs the tapeout check and the lot receipt check, signs two SLSA Verification Summary Attestations, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
+| Escrow | Auditor, then buyer | The auditor receives the same lot re-signed with confidential fields withheld, plus their disclosures, checks it for the buyer's units and signs two VSAs; the buyer checks only those VSAs, with slsa-verifier. Then measures what the records and the VSAs reveal. See [selective-disclosure.md](selective-disclosure.md) |
 
 **Real:** the design is [PicoRV32](https://github.com/YosysHQ/picorv32) at a pinned commit, with every file checked against [`e2e/picorv32/inputs.lock.json`](../e2e/picorv32/inputs.lock.json). Step 1 runs its testbench in Icarus Verilog and step 2 synthesizes it with Yosys; the netlist is byte-for-byte reproducible. Every signature, digest link and check is real, and the verifier uses the in-toto attestation library to validate every statement and to parse every step predicate as SLSA Provenance v1.
 
@@ -39,7 +40,7 @@ Design reaches L2: every step runs on GitHub Actions and is signed by the flow p
 
 ## What the tamper tests prove
 
-[`tools/hslsa/e2e_test.go`](../tools/hslsa/e2e_test.go) breaks the chain in 25 ways, and [`tools/hslsa/source_test.go`](../tools/hslsa/source_test.go) in 15 more for the Design L2 inputs, and each must fail for the stated reason. The fixture re-signs the bundle with test keys so it can also forge records with valid signatures, which is what an insider at one site could do:
+[`tools/hslsa/e2e_test.go`](../tools/hslsa/e2e_test.go) breaks the chain in 25 ways, and [`tools/hslsa/source_test.go`](../tools/hslsa/source_test.go) in 15 more for the Design L2 inputs, and each must fail for the stated reason. [`tools/hslsa/escrow_test.go`](../tools/hslsa/escrow_test.go) and [`tools/hslsa/disclose_test.go`](../tools/hslsa/disclose_test.go) break withheld fields, disclosures and escrow VSAs; see [selective-disclosure.md](selective-disclosure.md#tests). The fixture re-signs the bundle with test keys so it can also forge records with valid signatures, which is what an insider at one site could do:
 
 - files swapped after signing (netlist, source archive, simulation log, wafer maps, genealogy), a unit added to the shipped lot, a received unit that was scrapped at final test
 - a missing step, a payload edited without re-signing, a step signed by an unknown key, a release signed by the flow platform instead of the tapeout authority, a record copied from another site

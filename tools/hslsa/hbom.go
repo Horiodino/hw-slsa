@@ -134,8 +134,18 @@ func manufacturingBlock(bundle string, sc Obj) Obj {
 	}
 }
 
-// signHBOM validates the predicate and signs it over the released design and the shipped lot.
-func signHBOM(bundle string, final Obj, lotID string, shipped []string, predicate Obj, key string) error {
+// signHBOM validates the predicate and signs it over the released design and
+// the shipped lot, withholding the fields w names for the HBOM. Both the full
+// and the withheld predicate must match the schema, so a required field
+// cannot be withheld.
+func signHBOM(bundle string, final Obj, lotID string, shipped []string, predicate Obj, key string, w *Withholding) error {
+	if err := ValidateHBOM(predicate); err != nil {
+		return err
+	}
+	predicate, disclosures, err := withhold(predicate, HBOMType, w.fields("hbom"))
+	if err != nil {
+		return fmt.Errorf("hbom: %w", err)
+	}
 	if err := ValidateHBOM(predicate); err != nil {
 		return err
 	}
@@ -152,12 +162,16 @@ func signHBOM(bundle string, final Obj, lotID string, shipped []string, predicat
 	if err != nil {
 		return err
 	}
-	_, err = Sign(stmt, signer, filepath.Join(bundle, "att", "hbom.intoto.json"))
-	return err
+	path := filepath.Join(bundle, "att", "hbom.intoto.json")
+	if _, err := Sign(stmt, signer, path); err != nil {
+		return err
+	}
+	return writeDisclosures(path, disclosures)
 }
 
-// BuildHBOM builds, validates and signs the PicoRV32 example's HBOM.
-func BuildHBOM(bundle, lockPath, scenarioPath, key string) error {
+// BuildHBOM builds, validates and signs the PicoRV32 example's HBOM,
+// withholding the fields w names.
+func BuildHBOM(bundle, lockPath, scenarioPath, key string, w *Withholding) error {
 	lock, err := ReadObj(lockPath)
 	if err != nil {
 		return err
@@ -201,9 +215,13 @@ func BuildHBOM(bundle, lockPath, scenarioPath, key string) error {
 		},
 		"manufacturing": manufacturingBlock(bundle, sc),
 	}
-	if err := signHBOM(bundle, final, S(sc, "finalTest", "lotId"), shipped, predicate, key); err != nil {
+	if err := signHBOM(bundle, final, S(sc, "finalTest", "lotId"), shipped, predicate, key, w); err != nil {
 		return err
 	}
-	fmt.Printf("hbom: signed, %d flow steps, lot of %d units\n", len(flow), len(shipped))
+	msg := fmt.Sprintf("hbom: signed, %d flow steps, lot of %d units", len(flow), len(shipped))
+	if n := len(w.fields("hbom")); n > 0 {
+		msg += fmt.Sprintf(", %d field(s) withheld", n)
+	}
+	fmt.Println(msg)
 	return nil
 }

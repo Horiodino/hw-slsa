@@ -3,7 +3,10 @@
 # Three jobs play three parties. "produce" is the design house and its
 # suppliers: it runs the real RTL flow and signs every record. "verify" is the
 # buyer: it gets only the public bundle, checks the whole chain, signs VSAs
-# and verifies them with the official slsa-verifier release.
+# and verifies them with the official slsa-verifier release. "escrow" plays an
+# auditor who gets a lot's records with confidential fields withheld plus their
+# disclosures, and a buyer who gets only the auditor's VSAs; see
+# docs/selective-disclosure.md.
 #
 # Private by design: signing uses local ECDSA keys in DSSE envelopes, and no
 # job requests an OIDC token or talks to Sigstore, so nothing about this repo
@@ -69,6 +72,8 @@ jobs:
         run: e2e/run.sh produce
       - name: Build the board on the shipped chips and sign shipments, A1 and the board HBOM
         run: e2e/board/run.sh produce
+      - name: Re-sign the lot with confidential fields withheld, for the escrow job
+        run: e2e/escrow.sh produce
       - name: Remove private keys before upload
         run: rm -rf out/keys out/board-keys
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -81,6 +86,12 @@ jobs:
         with:
           name: hslsa-board-bundle
           path: out/board
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hslsa-escrow-auditor
+          path: out/escrow/bundle
           if-no-files-found: error
           retention-days: 14
 
@@ -137,5 +148,53 @@ jobs:
         with:
           name: hslsa-vsa
           path: out/vsa
+          if-no-files-found: error
+          retention-days: 14
+
+  escrow:
+    name: Escrow (auditor, then buyer)
+    needs: produce
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hslsa-escrow-auditor
+          path: out/escrow/bundle
+      - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
+            "https://github.com/slsa-framework/slsa-verifier/releases/download/${SLSA_VERIFIER_VERSION}/slsa-verifier-linux-amd64"
+          echo "${SLSA_VERIFIER_SHA256}  $RUNNER_TEMP/slsa-verifier" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/slsa-verifier"
+          echo "SLSA_VERIFIER=$RUNNER_TEMP/slsa-verifier" >> "$GITHUB_ENV"
+      - name: Auditor checks the full records with their disclosures and signs VSAs
+        run: e2e/escrow.sh audit | tee escrow.log
+      - name: Buyer checks the auditor's VSAs, holding nothing else
+        run: e2e/escrow.sh buyer | tee -a escrow.log
+      - name: Measure what the records and the VSAs reveal
+        run: e2e/escrow.sh leaks > /dev/null
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## HSLSA verifier escrow"
+            echo '```'
+            cat escrow.log 2>/dev/null || true
+            echo '```'
+            cat out/leaks/leaks.md 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hslsa-escrow-buyer
+          path: |
+            out/buyer/vsa
+            out/buyer/auditor.pub.pem
+            out/leaks
           if-no-files-found: error
           retention-days: 14

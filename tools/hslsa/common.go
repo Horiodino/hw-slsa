@@ -415,7 +415,9 @@ func BuildTrustRoot(pubDir, outPath string) error {
 	return WriteJSON(outPath, Obj{"roles": roles})
 }
 
-// Open verifies that the envelope at path was signed by role and returns its statement.
+// Open verifies that the envelope at path was signed by role and returns its
+// statement, with any withheld fields put back from the bundle's disclosures.
+// A record that withholds a field nobody disclosed fails to open.
 func (t *TrustRoot) Open(path, role, predicateType string) (Obj, error) {
 	name := filepath.Base(path)
 	if _, err := os.Stat(path); err != nil {
@@ -465,5 +467,5 @@ func (t *TrustRoot) Open(path, role, predicateType string) (Obj, error) {
 	if predicateType != "" && S(stmt, "predicateType") != predicateType {
 		return nil, failf("%s: predicate type %s, want %s", name, S(stmt, "predicateType"), predicateType)
 	}
-	return stmt, nil
+	return reveal(path, stmt)
 }

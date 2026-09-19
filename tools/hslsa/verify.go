@@ -288,10 +288,11 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 			good[dieKey(d["wafer"], d["x"], d["y"])] = true
 		}
 	}
-	genealogy, err := ReadObj(filepath.Join(art, "genealogy.json"))
+	genealogyFile, err := ReadObj(filepath.Join(art, "genealogy.json"))
 	if err != nil {
 		return nil, failf("packaging: genealogy: %v", err)
 	}
+	genealogy := O(genealogyFile, "units")
 	used := map[string]bool{}
 	for _, unit := range sortedKeys(genealogy) {
 		g := O(genealogy, unit)

@@ -139,7 +139,7 @@ func calRebuild(bundle string, fromRomMerge bool) error {
 	if err := CaliptraRelease(bundle, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), calPolicy); err != nil {
 		return err
 	}
-	if err := Mfg(bundle, calScenario, keys); err != nil {
+	if err := Mfg(bundle, calScenario, keys, nil); err != nil {
 		return err
 	}
 	if err := SignProvisioning(bundle, filepath.Join(keys, "test-site.key.pem")); err != nil {

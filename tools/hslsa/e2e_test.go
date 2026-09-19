@@ -55,10 +55,10 @@ func rebuildDownstream(bundle string) error {
 	if err := DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy); err != nil {
 		return err
 	}
-	if err := Mfg(bundle, e2eScenario, keys); err != nil {
+	if err := Mfg(bundle, e2eScenario, keys, nil); err != nil {
 		return err
 	}
-	return BuildHBOM(bundle, e2eLock, e2eScenario, filepath.Join(keys, "product-owner.key.pem"))
+	return BuildHBOM(bundle, e2eLock, e2eScenario, filepath.Join(keys, "product-owner.key.pem"), nil)
 }
 
 // chipBundle is a fresh copy of the re-signed chip bundle.

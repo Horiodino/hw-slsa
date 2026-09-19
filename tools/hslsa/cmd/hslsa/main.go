@@ -29,6 +29,8 @@ var commands = map[string]command{
 	"mfg":           {"emit signed F1 to F4 records for the scenario lot", mfg},
 	"hbom":          {"build, validate and sign the HBOM", hbomCmd},
 	"verify":        {"tapeout and lot receipt checks, then VSAs", verify},
+	"escrow":        {"verifier escrow: the auditor's full check and VSAs, or the buyer's check of them", escrow},
+	"leaks":         {"measure what the signed records and the escrow VSAs reveal", leaks},
 	"openlane":      {"OpenLane 2 flow with a signed record per step", openlane},
 	"caliptra":      {"the Caliptra example (e2e/caliptra)", caliptra},
 	"board":         {"board-level example: shipments, A1 and board HBOM, or the buyer's board check", board},
@@ -267,10 +269,15 @@ func mfg(args []string) error {
 	bundle := f.str("bundle", "", true)
 	scenario := f.str("scenario", "", true)
 	keys := f.str("keys", "directory of <role>.key.pem", true)
+	hold := f.str("withhold", "fields and files to withhold (JSON); disclosures go to the bundle's disclosures directory", false)
 	if err := f.parse(args); err != nil {
 		return err
 	}
-	return hslsa.Mfg(*bundle, *scenario, *keys)
+	w, err := hslsa.LoadWithholding(*hold)
+	if err != nil {
+		return err
+	}
+	return hslsa.Mfg(*bundle, *scenario, *keys, w)
 }
 
 func hbomCmd(args []string) error {
@@ -279,10 +286,15 @@ func hbomCmd(args []string) error {
 	lock := f.str("lock", "", true)
 	scenario := f.str("scenario", "", true)
 	key := f.str("key", "", true)
+	hold := f.str("withhold", "fields to withhold (JSON); disclosures go to the bundle's disclosures directory", false)
 	if err := f.parse(args); err != nil {
 		return err
 	}
-	return hslsa.BuildHBOM(*bundle, *lock, *scenario, *key)
+	w, err := hslsa.LoadWithholding(*hold)
+	if err != nil {
+		return err
+	}
+	return hslsa.BuildHBOM(*bundle, *lock, *scenario, *key, w)
 }
 
 func verify(args []string) error {
@@ -302,6 +314,73 @@ func verify(args []string) error {
 	}
 	_, _, err = hslsa.Verify(*bundle, tr, *policy, *units, *vsaKey, *vsaOut)
 	return err
+}
+
+func escrow(args []string) error {
+	act, rest, err := action(args, "audit", "check")
+	if err != nil {
+		return err
+	}
+	f := newFlags("escrow " + act)
+	trust := f.str("trust-root", "audit: the sites' trust root; check: the buyer's, listing the auditor's key", true)
+	policy := f.str("policy", "the buyer's policy", true)
+	units := f.str("units", "file with the serials of the units the buyer received", true)
+	bundle := f.str("bundle", "audit: the full bundle, with its disclosures", false)
+	key := f.str("key", "audit: the auditor's signing key", false)
+	vsaOut := f.str("vsa-out", "audit: directory for the VSAs the buyer receives", false)
+	manifest := f.str("manifest", "audit: where the auditor keeps the escrow manifest", false)
+	vsaDir := f.str("vsa-dir", "check: the VSAs the buyer received", false)
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	tr, err := hslsa.LoadTrustRoot(*trust)
+	if err != nil {
+		return err
+	}
+	if act == "check" {
+		if err := need(vsaDir, "vsa-dir", "check"); err != nil {
+			return err
+		}
+		return hslsa.EscrowCheck(*vsaDir, tr, *policy, *units)
+	}
+	for name, v := range map[string]*string{"bundle": bundle, "key": key, "vsa-out": vsaOut, "manifest": manifest} {
+		if err := need(v, name, "audit"); err != nil {
+			return err
+		}
+	}
+	return hslsa.EscrowAudit(*bundle, tr, *policy, *units, *key, *vsaOut, *manifest)
+}
+
+func leaks(args []string) error {
+	f := newFlags("leaks")
+	bundle := f.str("bundle", "the producer's full bundle, with its disclosures", true)
+	units := f.str("units", "the unit ids the viewer holds, such as a buyer's received units", true)
+	vsaDir := f.str("vsa-dir", "the escrow VSAs the buyer receives", false)
+	out := f.str("out", "directory for leaks.json and leaks.md", false)
+	maxUnits := f.Int("max-units", hslsa.DefaultLeakLimits.MaxUnits, "largest lot to try when recovering a lot from its digest")
+	maxMissing := f.Int("max-missing", hslsa.DefaultLeakLimits.MaxMissing, "most scrapped units to try per lot")
+	if err := f.parse(args); err != nil {
+		return err
+	}
+	known, err := hslsa.ReadUnits(*units)
+	if err != nil {
+		return err
+	}
+	rep, err := hslsa.Leaks(*bundle, known, *vsaDir, hslsa.LeakLimits{MaxUnits: *maxUnits, MaxMissing: *maxMissing})
+	if err != nil {
+		return err
+	}
+	md := hslsa.LeaksMarkdown(rep)
+	if *out != "" {
+		if err := hslsa.WriteJSON(filepath.Join(*out, "leaks.json"), rep); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(*out, "leaks.md"), []byte(md), 0o644); err != nil {
+			return err
+		}
+	}
+	fmt.Print(md)
+	return nil
 }
 
 func openlane(args []string) error {

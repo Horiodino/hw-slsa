@@ -286,9 +286,10 @@
       "type": "object",
       "required": ["path", "saltedDigest"],
       "additionalProperties": false,
+      "description": "A field removed before signing; see the spec's Selective disclosure section",
       "properties": {
-        "path": {"type": "string", "description": "JSON Pointer to the withheld field"},
-        "saltedDigest": {"$ref": "#/$defs/digestSet"}
+        "path": {"type": "string", "description": "JSON Pointer to the withheld field, relative to the predicate"},
+        "saltedDigest": {"$ref": "#/$defs/digestSet", "description": "sha256 of the disclosure: base64url of the JSON array [salt, path, value]"}
       }
     }
   }

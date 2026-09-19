@@ -35,7 +35,7 @@ A set of records conforms to this profile when it meets HSLSA at the levels it c
 | Traceability link | A `resolvedDependencies` entry, `hwMfg.designRef`, or an HBOM `*Ref`, each by digest |
 | Traceback | The buyer's checks, which walk links backward from a device, lot or board |
 | Cyber-physical linkage | Physical subject names (`urn:hslsa:`), the [lot digest](hslsa-v0.1.md#lot-digest), and device identity at L3 |
-| Selective disclosure | Salted digests listed in `hwMfg.confidential[]` and the HBOM's `redactions[]`, and the verifier escrow mode planned in phase 1 |
+| Selective disclosure | [Withheld fields](hslsa-v0.1.md#withheld-fields) listed with salted digests in `hwMfg.confidential[]` and the HBOM's `redactions[]`, and [verifier escrow](hslsa-v0.1.md#verifier-escrow), where an auditor checks the full records and the buyer receives only its VSAs |
 | Acquirer | Buyer, OEM, EMS or system integrator |
 | Manufacturer, supplier | Site: design house, IP vendor, foundry, sort house, OSAT, test house, distributor, EMS |
 | Alternative evidence | Certificates the records point at: site accreditation, OCP S.A.F.E. reports, certificates of conformance, signed waivers |
@@ -185,7 +185,7 @@ Each gap is something IR 8536 expects and HSLSA does not yet do, with a proposal
 | H7 | Organization identifiers optional | Principle 7 | P1 above; the HBOM schema now accepts `uei:` and `gln:` and checks the prefix |
 | H8 | References are digests with bundle-relative URIs; no way to fetch a record from its owner | Federated repositories, traceback links (section 4.3.2) and link-based querying (section 4.4.3) | References carry a URI into the owner's repository, which may require access; a private RFC 9162 or SCITT log can index records by subject digest (phase 1, item 4) |
 | H9 | Nothing maps to GS1 EPCIS, a widely used event format for shipping, receiving and storage | Principle 9 | Accept an EPCIS event as supplemental evidence for Ship, Receive and Store from distributors that already emit it; do not replace the distribution record |
-| H10 | No retention period or access rule for records | Controlled access and data retention (section 4.4.2) | State a minimum retention (the product's support life) and that access to full records is granted per buyer or auditor; the verifier escrow mode in phase 1 defines who sees what |
+| H10 | No retention period or access rule for records | Controlled access and data retention (section 4.4.2) | State a minimum retention (the product's support life) and that access to full records is granted per buyer or auditor; [verifier escrow](hslsa-v0.1.md#verifier-escrow) defines who sees what |
 
 The Semiconductor Industry Association's [comments on the second draft](https://www.semiconductors.org/wp-content/uploads/2025/10/SIA-Final-Comments-on-NIST-IR-8536-2pd_10.03.pdf) asked that a traceability system link to data its owner controls rather than collect it, and stay out of each company's internal systems. H8 and H10 follow that: records stay with their owners, and the internal design steps are disclosed only as the design house chooses.
 

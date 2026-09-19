@@ -149,7 +149,7 @@
           "digest": {"sha256": "3f524cdc07a11d7c6220bdb049fe8dd41b27483c96cc59b581e022d547290d69"}
         }
       },
-      "waferLots": [{"lotId": "LOT-EXAMPLE-A", "waferIds": ["REDACTED"], "startDate": "2026-03-02"}],
+      "waferLots": [{"lotId": "LOT-EXAMPLE-A", "startDate": "2026-03-02"}],
       "assembly": {
         "osat": {"name": "Example OSAT", "country": "US"},
         "packageType": "QFN-64 7x7 mm",

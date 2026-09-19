@@ -120,7 +120,7 @@ Every record in HSLSA is an [in-toto Statement v1](https://github.com/in-toto/at
 | Firmware review | None of its own: the OCP S.A.F.E. short-form report, used as published (see [Firmware review](#firmware-review)) | none | Review provider | Image digest, inside the report |
 | Firmware reference values | Not an in-toto predicate: a signed CoRIM with profile `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` (see [Firmware reference values](#firmware-reference-values)) | none | Firmware build platform | Each measured image's digest, as the reference value for the device layer that measures it |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | none | Product owner | Design (final GDS or board design) and lot (shipped lot or board lot) |
-| Verification summary | `https://slsa.dev/verification_summary/v1` | none | Vendor or buyer verifier | Any subject above |
+| Verification summary | `https://slsa.dev/verification_summary/v1` | none | Vendor or buyer verifier, or an [escrow auditor](#verifier-escrow) | Any subject above, or the units a buyer received |
 
 Step types are named `https://github.com/Horiodino/hw-slsa/design-flow/step/<step>@v1` and `https://github.com/Horiodino/hw-slsa/mfg/step/<step>@v1`. A flow platform MAY instead name the tool that ran the step, as in `.../design-flow/step/openlane2@v1`, when it also states the spec step in `hwFlow.step` (see [Per-tool design steps](#per-tool-design-steps)). A verification summary reports levels as `HSLSA_<TRACK>_LEVEL_<n>` (for example `HSLSA_WAFER_LEVEL_3`); SLSA allows custom `verifiedLevels` values that do not start with `SLSA_`.
 
@@ -157,6 +157,7 @@ Files are named by sha256 (sha384 where a device reports SHA-384 measurements, a
 | Shipment | The packing list file | File digest |
 | Board lot | `urn:hslsa:lot:<board-lot-id>` | The lot digest (below), over the serials of the boards that passed test |
 | Board | `urn:hslsa:board:<manufacturer>:<serial>` | The DER identity certificate once the board has one; until then the serial itself, as UTF-8 bytes with no trailing newline |
+| Receipt | `urn:hslsa:receipt:<lot-id>` | The lot digest formula over the units one buyer received from the shipped lot `<lot-id>`, used by a receipt VSA under [verifier escrow](#verifier-escrow) |
 
 `<manufacturer>` in a board URN is the manufacturer's name in lowercase with spaces replaced by hyphens.
 
@@ -194,6 +195,7 @@ Platforms and sites sign step records; people sign only decisions.
 | Firmware build platform | Image provenance and SBOM | As for the design flow platform |
 | Programming station | `fw-provisioning` records | The site key of the site it sits in |
 | Independent lab (L4) | Inspection records | Lab's own key under a trust root separate from the producer's |
+| Escrow auditor | Design and receipt VSAs for the buyers it checks for ([Verifier escrow](#verifier-escrow)) | Its own key, listed in each buyer's trust root as `auditor` |
 
 None of these key models requires a public transparency log. The reference tool signs every record as a DSSE envelope with a local ECDSA P-256 key, publishes nothing, and hands the buyer a trust root of public keys by role; that meets every requirement up to L2, and L3 logs may be private (see the rules under [Core requirements](#core-requirements)).
 
@@ -202,7 +204,7 @@ None of these key models requires a public transparency log. The reference tool 
 1. **Decisions are inputs.** Waivers, process deviations, rework orders and bin-limit waivers are `externalParameters` with their own digest and signer.
 2. **Edits and rework are steps.** An ECO, manual layout fix, reworked wafer or re-marked package gets its own attestation; anything that re-enters the chain without one breaks it on purpose.
 3. **Nothing disappears silently.** Scrap is recorded in the yield block, so a lot cannot gain or swap units unnoticed.
-4. **Confidential values are digests.** A field a supplier will not disclose (recipe, yield, fab site, wafer IDs, third-party IP) is replaced by a salted digest and listed by JSON Pointer (`hwMfg.confidential[]` in step records, `redactions[]` in the HBOM). An auditor given the salt can confirm the value.
+4. **Confidential values are withheld.** A field a supplier will not disclose (recipe, yield, test program, mask set, wafer IDs) is removed before signing and listed by JSON Pointer with a salted digest (`hwMfg.confidential[]` in step records, `redactions[]` in the HBOM), and a data file it will not disclose carries a salt. An auditor given the disclosure can confirm the value. See [Selective disclosure](#selective-disclosure), which also covers verifier escrow.
 5. **Third-party inputs are dependencies.** Hard IP, cell libraries, PDKs and vendor firmware are pinned by digest in `resolvedDependencies`, with the vendor's own attestation linked when one exists.
 
 ### Record shapes
@@ -439,7 +441,7 @@ The programming station is the firmware's last builder. For every part it writes
 5. Every required gate passed and every deviation or rework is signed.
 6. For an L4 claim, an inspection record from an allowed lab covers the lot, with an acceptable sampling plan and no failed sample.
 
-Board assembly runs this same check on each part before placement, then adds A1, so a system integrator verifies the board and, through it, every part.
+Board assembly runs this same check on each part before placement, then adds A1, so a system integrator verifies the board and, through it, every part. Under [verifier escrow](#verifier-escrow) an auditor runs this check for the buyer, with the buyer's policy and received units, and the buyer receives only a receipt VSA.
 
 **At board receipt**, by the system integrator or board buyer:
 
@@ -507,6 +509,64 @@ The JSON Schema and the worked examples are in this repository at [`hbom/hbom-pr
 
 **Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L2: the flow platform signs every step, the source freeze is an SSH-signed git tag with a source review by someone other than the author, and PicoRV32 arrives with IP provenance signed by a key standing in for its vendor. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1.
 
+## Selective disclosure
+
+Suppliers will not show every buyer everything their records hold. Yields, test programs, mask set ids and wafer maps are trade secrets, and a foundry or OSAT that has to reveal them to each customer will not sign records at all. HSLSA offers two mechanisms, both built on the same signed records and local keys: withheld fields hide values inside a record, and verifier escrow hides the records themselves from the buyer. The [PicoRV32 example](../docs/selective-disclosure.md) uses both and measures what each leaves visible.
+
+### Withheld fields
+
+A producer withholds a field by removing it from the predicate before signing and listing it in the record: in `hwMfg.confidential[]` for a manufacturing step record, and in `redactions[]` for the HBOM. Each entry holds:
+
+| Field | Holds |
+| --- | --- |
+| `path` | The JSON Pointer ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) of the removed member, relative to the predicate. It names a member of an object; array indices may appear on the way to it |
+| `saltedDigest` | `{"sha256": "<hex>"}`: the sha256 of the disclosure below, taken over its ASCII characters |
+
+The disclosure is the base64url encoding, without padding, of the compact JSON array `[salt, path, value]`. `salt` is at least 128 random bits, base64url-encoded and fresh for every field; `path` is the entry's `path`; `value` is the removed member. This is the construction [SD-JWT (RFC 9901)](https://www.rfc-editor.org/rfc/rfc9901) uses for JSON claims. The producer gives each disclosure only to whoever may see the value. The reference tool keeps them next to the bundle's envelopes, in `disclosures/<record>.disclosures.json`.
+
+1. **The chain stays checkable.** The fields that link records and report gates cannot be withheld: in step records `buildDefinition.buildType`, `buildDefinition.resolvedDependencies`, `runDetails.builder`, `hwMfg.step`, `hwMfg.designRef` and `hwMfg.checks`, nor any block that contains one of them, and `buildDefinition.externalParameters` only member by member; in the HBOM, `hbomVersion`, `product` and every field the schema requires. Anyone holding the records can therefore check every signature, link, design release and gate result without a disclosure.
+2. **One record for every audience.** The site signs once. A party without a disclosure sees only the salted digest; a party with it checks the digest and puts the value back. Because the digest is signed, nobody can later disclose a different value.
+3. **The full check needs every disclosure.** A verifier restores each withheld field before it reads the record, and fails when a disclosure is missing, matches no listed digest, has a salt shorter than 128 bits, names another path, or would overwrite a value the record still shows. It also refuses a record that lists a protected field as withheld.
+4. **Withheld files are salted.** A data file that a record names by digest and that the producer does not hand out (wafer maps, genealogy, test results) carries its own random salt of at least 128 bits, as a top-level `salt` member in JSON, because anyone who can guess a predictable file's content can confirm the guess from its digest. Unit lists cannot take a salt, since their digest is the [lot digest](#lot-digest); what that leaves open is measured below.
+
+### Verifier escrow
+
+Withheld fields hide values, but the records around them still show how many records there are, which sites signed them, lot ids and timing, and at Package/Test L2 the lot digests themselves can be inverted. Verifier escrow hides the records as well: an auditor the buyer trusts sees everything, and the buyer sees only the auditor's results.
+
+1. The supplier gives the auditor the full bundle: every envelope, data file and disclosure. The buyer gives the auditor its policy and the identifiers of the units it received.
+2. The auditor runs the tapeout and lot receipt checks under the buyer's policy, for those units, with every withheld field restored.
+3. The auditor signs two VSAs with its own key and gives the buyer nothing else:
+   - a **design VSA** for the released design, as the buyer's own verifier would sign it;
+   - a **receipt VSA**, whose subject is `urn:hslsa:receipt:<lot-id>` with the lot digest formula applied to the received units only, and whose `resourceUri` is the shipped lot's URN. The buyer recomputes the digest from its own list, so the receipt covers exactly its units and says nothing about the rest of the lot.
+4. Both VSAs name the buyer's policy by digest and list one input attestation, the **escrow manifest**: every envelope, data file and disclosure the auditor checked, by digest. The auditor keeps the manifest. It lets a later dispute establish exactly what was checked, without telling the buyer how many records there were.
+5. The buyer accepts the two VSAs when both are signed by a key its trust root lists for the `auditor` role, passed, name the buyer's policy, state every level the policy claims and name the same manifest, and when the receipt's subject is the digest of the units it received. `slsa-verifier verify-vsa` checks the signature, subject digest, resource URI and levels.
+
+The auditor takes over the buyer's check, and with it the buyer's trust root: the auditor holds the site keys, and the buyer holds only the auditor's key. The at-boot check reads each unit's provisioning record and firmware provenance, so under escrow either the auditor runs it too, as a RATS verifier for the buyer, or the supplier discloses those records to the buyer. No example runs the at-boot check under escrow yet.
+
+### What each view reveals
+
+The reference tool's `leaks` command measures this on a bundle, and a producer can run it before handing anything out. On the PicoRV32 example, whose lot has 40 packaged and 37 shipped units named by serial (Package/Test L2), the records withhold both yields, the probe and test programs, the mask set id and the wafer ids, and salt the wafer maps, genealogy and test results. The buyer holds three of the 37 units.
+
+| What | Holding the signed records, fields withheld | Holding only the escrow VSAs |
+| --- | --- | --- |
+| Withheld values: yields, programs, mask set, wafer ids | Hidden | Hidden |
+| Data files: wafer maps, genealogy, test results | Hidden (salted) | Hidden |
+| Records | 11 envelopes, by predicate type | One manifest digest |
+| Parties | 9 signing key ids, the same across lots and buyers; builder ids name each site | The auditor |
+| Site, fab and lot ids | In builder ids and subject URNs, such as `urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A` | The shipped lot's id |
+| Timing | `finishedOn` on every step record | When the auditor checked |
+| Lot sizes | Recovered from the lot digests by guessing: the packaged lot of 40 at the first guess, the shipped lot of 37 at guess 3,802, in milliseconds | Hidden: the receipt covers only the buyer's units |
+| Yield | Derived from the two recovered lots: 37 of 40 shipped, and which 3 serials were scrapped, although the yield fields are withheld | Hidden |
+| Design and levels | Every record | The design digest and the levels the auditor verified |
+
+Three findings follow.
+
+1. **At Package/Test L2, withheld fields do not hide volumes.** The lot digest is taken over serials, and a buyer who holds a few units can read the serial format and guess the rest, so it recovers the packaged and shipped lots, and the yield between them, with every yield field withheld. At Package/Test L3 the lot is taken over certificate digests, which cannot be guessed. A supplier that must hide volumes at L2 uses escrow, or serials that are not sequential.
+2. **Names and times stay visible.** Builder ids, subject URNs and signing keys must stay in a record for the chain to be checked, so a site that must hide its name or its fab uses opaque identifiers there. Every step record says when it was made. The `leaks` command also reports a withheld value that another record still shows, such as a mask set id withheld from F1 but written in the HBOM, or a withheld site name that a builder id spells out.
+3. **Escrow leaves the buyer the result and little else:** the design digest, the lot id, the levels, the auditor's identity and when it checked.
+
+Escrow does not change three things. The auditor sees everything, so the supplier trusts it with the data, as it would any auditor under NDA. An auditor that signs a false VSA is accountable through the manifest, but the buyer cannot rerun the check. And a supplier can still show different records to different auditors ([equivocation](#what-the-verifier-trusts)); a log shared by the auditors closes that among them.
+
 ## Threat model
 
 This section says what a buyer can rely on at each level, and what no level gives them. Read it before writing a level into a purchasing policy.
@@ -542,6 +602,7 @@ Some threats are outside HSLSA altogether: changes made after the buyer's checks
 3. **Hardware roots of trust.** A unit's identity key stays inside it, and the ROM that measures its firmware does what its design says. Fault injection, side channels or invasive extraction that recover a device key let a clone answer the identity challenge.
 4. **The cryptography.** SHA-256, SHA-384 and ECDSA.
 5. **The verifier and its policy.** The policy decides which sites, checks and levels are acceptable.
+6. **The escrow auditor**, when the buyer uses [verifier escrow](#verifier-escrow). The buyer cannot rerun the check and trusts the auditor's key and its check the way it would trust its own verifier; the auditor holds the site keys in the buyer's place.
 
 HSLSA does not require a public transparency log (see [Signing and keys](#signing-and-keys)). Private records keep supplier data private but leave two gaps a shared log would close:
 
@@ -636,6 +697,7 @@ HSLSA reuses an existing standard wherever one fits and adds only the glue: per-
 | Sigstore, Rekor | Keyless signing for design and firmware platforms; public or private logs | Sigstore, [IETF SCITT (RFC 9943)](https://www.rfc-editor.org/rfc/rfc9943), RFC 9162 |
 | Verification before use | Tapeout, lot receipt and boot checks | [IETF RATS (RFC 9334)](https://www.rfc-editor.org/rfc/rfc9334), [TCG Platform Certificate](https://trustedcomputinggroup.org/resource/tcg-platform-certificate-profile/), [CoRIM](https://datatracker.ietf.org/doc/draft-ietf-rats-corim/) (still an Internet-Draft) for [firmware reference values](#firmware-reference-values) |
 | Independent review | Firmware L3 review, using the S.A.F.E. short-form report as is | [OCP S.A.F.E.](https://github.com/opencomputeproject/OCP-Security-SAFE/blob/main/Documentation/framework.md) |
+| Selective disclosure | Withheld fields with salted digests; verifier escrow VSAs | The disclosure construction of [SD-JWT (RFC 9901)](https://www.rfc-editor.org/rfc/rfc9901), applied to in-toto predicates; SLSA VSAs |
 | Build records | Wafer, Package/Test and Assembly step records | [IPC-1782](https://standards.globalspec.com/std/14358527/ipc-1782) traceability, SEMI E142 wafer maps, STDF test results |
 | Supplier assessment | L3 accredited sites | [DMEA Trusted Supplier](https://www.acq.osd.mil/asds/dmea/tapo/trusted-supplier-programs.html), [O-TTPS (ISO/IEC 20243)](https://www.opengroup.org/open-trusted-technology-provider%E2%84%A2-standard-o-ttps-approved-isoiec-international-standard), SEMI E187 for equipment |
 | Dependency integrity | Signed IP provenance; encrypted IP flag | [IEEE 1735-2023](https://standards.ieee.org/standard/1735-2014.html), [Accellera SA-EDI](https://www.accellera.org/news/press-releases/373-accelleras-security-annotation-for-electronic-design-integration-standard-1-0-moves-toward-ieee-standardization) |
@@ -650,12 +712,12 @@ Four examples run in this repository's GitHub Actions and exercise the spec end 
 
 | Example | Exercises | Levels verified | Docs |
 | --- | --- | --- | --- |
-| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md) |
+| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]`, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
 | Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, firmware reference values as a signed CoRIM, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
-The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, and signs VSAs. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
+The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, and signs VSAs. It also withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
 What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key is simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
 
@@ -688,7 +750,9 @@ The source drafts were not edited; this spec settles each difference as follows.
 - [ ] Should HBOM `firmware[]` entries also carry a provenance reference? Revision 5 answered the rest of this question: reference values are published as a signed CoRIM, and `referenceValuesRef` points at it.
 - [ ] Who endorses IDevID certificates when the OSAT, not the chip vendor, holds the provisioning station?
 - [ ] Should the foundry verify provenance at GDS intake, or only the design house before release? (Wafer L3 already asks the fab to verify the release.)
-- [ ] How much of `hwFlow.metrics` and `hwMfg` data is safe to disclose to the next party, and are salted digests enough for encrypted IP and NDA-bound PDKs, or is verifier escrow needed?
+- [x] Are salted digests enough to keep manufacturing data from the next party, or is verifier escrow needed? Answered in [Selective disclosure](#selective-disclosure): withheld fields hide values, but at Package/Test L2 the lot digests give away lot sizes and yield, and names and timing stay visible; escrow hides all of them.
+- [ ] Which design data should design records be able to withhold (`hwFlow.metrics`, encrypted IP, NDA-bound PDK paths)? Only manufacturing records and the HBOM have a list of withheld fields today.
+- [ ] Who accredits escrow auditors? And should a buyer be able to check its units against a lot without one, for example through a per-unit commitment in F4 with an inclusion proof that ships with each unit?
 - [ ] Can an MES emit these records natively, or does it need a signing sidecar?
 - [ ] Which neutral home should own the spec long term (OpenSSF, CHIPS Alliance, OCP or a joint group), beyond the owner's repository?
 - [ ] Track SPDX 3.1 from release candidate to final, and CoRIM from Internet-Draft to RFC.
@@ -719,6 +783,9 @@ Starts phase 1 of the [roadmap](../docs/roadmap.md).
 
 - **NIST IR 8536 profile.** Added [nist-ir-8536-profile.md](nist-ir-8536-profile.md), which presents HSLSA as the semiconductor profile of the final NIST IR 8536. It maps every step to an IR 8536 event (Make, Assemble, Ship; receipt, storage and transfers between fab and OSAT have no record yet) and every record type to a data type identifier, and it requires a standard organization identifier, an event time and links by record digest. The HBOM schema's `org.id` now accepts `uei:` and `gln:` as well as `lei:`, `duns:` and `cage:`, and rejects any other form. The rebuild record now carries `finishedOn`.
 - **Firmware reference values as CoRIM.** The firmware build platform publishes the measurements a device reports at boot as a signed CoRIM with the HSLSA profile, listed as a byproduct of the images' provenance; each DICE TcbInfo field maps to one CoMID field ([Firmware reference values](#firmware-reference-values)). Step 3 of the at-boot check appraises the alias certificates against it, so a RATS verifier can run that step. The HBOM's `firmware[]` entries gain `referenceValuesRef`, which answers most of the open question on expected boot measurements. The Caliptra example signs one for its FMC and runtime, the at-boot check uses it, the reference tool gains `hslsa corim show` and `hslsa corim appraise`, and Veraison's `cocli` decodes the file in CI.
+- **Selective disclosure.** Added [Selective disclosure](#selective-disclosure). A producer withholds a field by removing it before signing and listing a salted digest of a `[salt, path, value]` disclosure, as SD-JWT does; the fields that link records and report gates cannot be withheld, and withheld data files carry a salt. A verifier restores every withheld field from its disclosure before the full check, and fails on a missing or forged one. Rule 4 under [Rules every step follows](#rules-every-step-follows) now points here.
+- **Verifier escrow.** An auditor the buyer trusts runs the tapeout and lot receipt checks for the buyer's received units under the buyer's policy, and signs a design VSA and a receipt VSA (new subject `urn:hslsa:receipt:<lot-id>`) that name one escrow manifest the auditor keeps. The buyer receives only the two VSAs and checks them with slsa-verifier. Added the escrow auditor to the signers, and to what the verifier trusts in the threat model.
+- **What each view reveals.** Measured on the PicoRV32 example: with every yield withheld, a party holding the records still recovers the packaged and shipped lots from their digests at Package/Test L2, and so the yield and the scrapped serials, and still sees site names, lot ids and timing. Escrow hides all of these from the buyer.
 
 ### Revision 4 (2026-09-18)
 

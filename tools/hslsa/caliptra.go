@@ -1380,7 +1380,7 @@ func CaliptraHBOM(bundle, lockPath, scenarioPath, key string) error {
 		"manufacturing": manufacturingBlock(bundle, sc),
 		"firmware":      firmware,
 	}
-	if err := signHBOM(bundle, final, S(sc, "finalTest", "lotId"), shipped, predicate, key); err != nil {
+	if err := signHBOM(bundle, final, S(sc, "finalTest", "lotId"), shipped, predicate, key, nil); err != nil {
 		return err
 	}
 	fmt.Printf("hbom: signed, %d flow steps, %d firmware images, %d units\n", len(flow), len(firmware), len(shipped))

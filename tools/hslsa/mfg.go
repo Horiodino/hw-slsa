@@ -32,7 +32,7 @@ var MfgSigner = map[string]string{
 
 func slug(name string) string { return strings.ReplaceAll(strings.ToLower(name), " ", "-") }
 
-func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw Obj, keys string) (Obj, error) {
+func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw Obj, keys string, w *Withholding) (Obj, error) {
 	hwMfg := Obj{"step": step, "confidential": []any{}}
 	for k, v := range hw {
 		hwMfg[k] = v
@@ -49,6 +49,10 @@ func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw
 		},
 		"hwMfg": hwMfg,
 	}
+	pred, disclosures, err := withhold(pred, MfgStep, w.fields(step))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", step, err)
+	}
 	signer, err := LoadSigner(filepath.Join(keys, MfgSigner[step]+".key.pem"))
 	if err != nil {
 		return nil, err
@@ -57,12 +61,33 @@ func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw
 	if err != nil {
 		return nil, err
 	}
-	env, err := Sign(stmt, signer, filepath.Join(bundle, "att", MfgAtt[step]))
+	path := filepath.Join(bundle, "att", MfgAtt[step])
+	env, err := Sign(stmt, signer, path)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("%s: signed by %s\n", step, MfgSigner[step])
+	if err := writeDisclosures(path, disclosures); err != nil {
+		return nil, err
+	}
+	msg := fmt.Sprintf("%s: signed by %s", step, MfgSigner[step])
+	if len(disclosures) > 0 {
+		msg += fmt.Sprintf(", %d field(s) withheld", len(disclosures))
+	}
+	fmt.Println(msg)
 	return rd("att/"+MfgAtt[step], S(env, "digest", "sha256")), nil
+}
+
+// writeData writes a data file a record names, with a random salt when the
+// producer withholds it, so its digest cannot be confirmed by guessing.
+func writeData(path string, v Obj, w *Withholding) error {
+	if w.salts(filepath.Base(path)) {
+		salt, err := newSalt()
+		if err != nil {
+			return err
+		}
+		v["salt"] = salt
+	}
+	return WriteJSON(path, v)
 }
 
 func passed(names ...string) []Obj {
@@ -75,8 +100,10 @@ func passed(names ...string) []Obj {
 
 func dieKey(wafer, x, y any) string { return fmt.Sprintf("%v\x00%v\x00%v", num(wafer), num(x), num(y)) }
 
-// Mfg emits signed F1 to F4 records for the scenario lot.
-func Mfg(bundle, scenarioPath, keys string) error {
+// Mfg emits signed F1 to F4 records for the scenario lot. With w, each site
+// withholds the fields w names and writes their disclosures to the bundle's
+// disclosures directory.
+func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 	art := filepath.Join(bundle, "artifacts")
 	sc, err := ReadObj(scenarioPath)
 	if err != nil {
@@ -110,7 +137,7 @@ func Mfg(bundle, scenarioPath, keys string) error {
 		Obj{"lotId": S(lot, "lotId"), "maskSetId": S(fab, "maskSetId"), "processNode": S(fab, "processNode")},
 		[]Obj{releaseRD},
 		Obj{"site": O(fab, "site"), "designRef": designRef, "checks": passed("mask-vs-gds-xor", "inline-parametrics")},
-		keys)
+		keys, w)
 	if err != nil {
 		return err
 	}
@@ -146,7 +173,7 @@ func Mfg(bundle, scenarioPath, keys string) error {
 			}
 		}
 	}
-	if err := WriteJSON(filepath.Join(art, "wafer-maps.json"), Obj{"waferLot": S(waferLot, "name"), "dies": nonNil(dies)}); err != nil {
+	if err := writeData(filepath.Join(art, "wafer-maps.json"), Obj{"waferLot": S(waferLot, "name"), "dies": nonNil(dies)}, w); err != nil {
 		return err
 	}
 	mapsRD, err := fileRD(filepath.Join(art, "wafer-maps.json"), "")
@@ -162,7 +189,7 @@ func Mfg(bundle, scenarioPath, keys string) error {
 			"yield":     Obj{"in": len(dies), "passed": len(good), "failed": len(dies) - len(good)},
 			"checks":    passed("probe"),
 		},
-		keys)
+		keys, w)
 	if err != nil {
 		return err
 	}
@@ -180,7 +207,7 @@ func Mfg(bundle, scenarioPath, keys string) error {
 		genealogy[serial] = Obj{"waferLot": S(waferLot, "name"), "wafer": d["wafer"], "x": d["x"], "y": d["y"]}
 		packagedUnits = append(packagedUnits, serial)
 	}
-	if err := WriteJSON(filepath.Join(art, "genealogy.json"), genealogy); err != nil {
+	if err := writeData(filepath.Join(art, "genealogy.json"), Obj{"units": genealogy}, w); err != nil {
 		return err
 	}
 	if err := writeUnits(filepath.Join(art, "packaged-lot.txt"), packagedUnits); err != nil {
@@ -203,7 +230,7 @@ func Mfg(bundle, scenarioPath, keys string) error {
 			"designRef": designRef,
 			"checks":    passed("die-attach", "wire-bond", "x-ray-sample", "marking"),
 		},
-		keys)
+		keys, w)
 	if err != nil {
 		return err
 	}
@@ -222,7 +249,7 @@ func Mfg(bundle, scenarioPath, keys string) error {
 			results[u] = "fail"
 		}
 	}
-	if err := WriteJSON(filepath.Join(art, "final-test-results.json"), results); err != nil {
+	if err := writeData(filepath.Join(art, "final-test-results.json"), Obj{"units": results}, w); err != nil {
 		return err
 	}
 	shippedDigest, err := LotDigest(shipped)
@@ -243,7 +270,7 @@ func Mfg(bundle, scenarioPath, keys string) error {
 			"yield":     Obj{"in": len(packagedUnits), "passed": len(shipped), "failed": anyStrings(sortedCopy(failedUnits))},
 			"checks":    passed("final-test-per-unit", "yield-within-limits"),
 		},
-		keys)
+		keys, w)
 	if err != nil {
 		return err
 	}

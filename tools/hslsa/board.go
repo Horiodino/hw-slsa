@@ -379,6 +379,12 @@ func BoardProduce(bundle, chipBundle, scenarioPath, designPath, policyPath, keys
 	if err != nil {
 		return err
 	}
+	if err := addRenderings(stmt, filepath.Join(bundle, "att"), "file:att/"); err != nil {
+		return err
+	}
+	if err := ValidateHBOM(predicate); err != nil {
+		return err
+	}
 	owner, err := LoadSigner(filepath.Join(keys, boardOwnerRole+".key.pem"))
 	if err != nil {
 		return err
@@ -748,6 +754,9 @@ func BoardVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, vsaKey
 		msg += fmt.Sprintf(", %d received boards found in the lot", len(received))
 	}
 	fmt.Println(msg)
+	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", BoardHBOM), "board hbom"); err != nil {
+		return nil, err
+	}
 	if vsaKey != "" {
 		pol, err := ReadObj(policyPath)
 		if err != nil {

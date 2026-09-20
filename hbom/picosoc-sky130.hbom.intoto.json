@@ -25,8 +25,13 @@
     "renderings": [
       {
         "format": "CycloneDX-1.6",
-        "uri": "https://example.org/hbom/picosoc-sky130-A0.cdx.json",
-        "digest": {"sha256": "76e34c4548e2a2975f9305a557607abb7f3865a9bd592a7e7624a55a77d2f24b"}
+        "uri": "https://raw.githubusercontent.com/Horiodino/hw-slsa/main/hbom/picosoc-sky130.cdx.json",
+        "digest": {"sha256": "c506d382c47cdf2f48443850d4b5e1648690b73ec7f510907b8613a861dbcc4e"}
+      },
+      {
+        "format": "SPDX-3.1-RC1",
+        "uri": "https://raw.githubusercontent.com/Horiodino/hw-slsa/main/hbom/picosoc-sky130.spdx.json",
+        "digest": {"sha256": "9dc22f8438125779f8dd5eb8c416be69038dd9e81ce56eb15712b566ee450a82"}
       }
     ],
     "design": {

@@ -530,7 +530,7 @@ Policy can be written in existing in-toto tooling (layouts, witness policies or 
 
 The HBOM is the one document a buyer starts from: it lists what the product is made of and who made each part, and points by digest at every attestation in the chain rather than copying them. It is required from Design L1.
 
-**Format.** The HBOM is a CycloneDX 1.6 document at its core, with every extension also mapped to SPDX 3.1 so either can be emitted. SPDX 3.0 has no hardware profile; the mapping targets the SPDX 3.1 release candidate (Hardware classes `PhysicalHardware`, `BulkHardware`, `VirtualHardware`; SupplyChain classes `ManufactureProcess`, `AssemblyProcess`, `TestProcess`, `ResponsibilityChangeProcess`) and will be rechecked when 3.1 is final. New fields live in one `hbom:` namespace; in CycloneDX they travel as properties prefixed `hbom:`.
+**Format.** The signed HBOM is the in-toto predicate defined here. It is rendered as a CycloneDX 1.6 BOM and as an SPDX 3.1 document, so standard SBOM tooling can read it; see [Renderings](#renderings). SPDX 3.0 has no hardware profile, and SPDX 3.1 was still a release candidate on 2026-09-20, so the SPDX rendering targets 3.1 release candidate 1 and will move to 3.1 when it is final. HBOM fields that neither format has live in one `hbom:` namespace: in CycloneDX they travel as properties prefixed `hbom:`, in SPDX as `hbom:` entries in `additionalInformation` or in a `CdxPropertiesExtension`.
 
 **Envelope and subjects.** The HBOM ships as the predicate of an in-toto Statement with predicate type `https://github.com/Horiodino/hw-slsa/hbom/v0.1` and two subjects:
 
@@ -548,7 +548,7 @@ The HBOM is the one document a buyer starts from: it lists what the product is m
 | Block | Holds | Points at |
 | --- | --- | --- |
 | `product` | Name, hierarchy level (die, package, module, board, system), part number, revision, manufacturer, purl, device identity scheme | Nothing |
-| `renderings[]` | Full CycloneDX or SPDX documents for the same product | Each by digest |
+| `renderings[]` | CycloneDX and SPDX renderings of this HBOM (format `CycloneDX-1.6`, `SPDX-3.1-RC1`, or `SPDX-3.1` once final) | Each by digest |
 | `design` | IP blocks (kind, supplier, license, IEEE 1735 flag), RTL sources by commit, PDK, flow steps and tools, final layout | Each flow step's `design-flow` attestation via `provenanceRef` |
 | `manufacturing` | Foundry, process node, mask set, shuttle, wafer lots, OSAT and package, test stages and programs; for boards, the EMS and board lot in `boardAssembly` | F1 via `fab.attestationRef`, F3 via `assembly.attestationRef`, F2 and F4 results via `test[].resultsRef`, A1 via `boardAssembly.attestationRef` |
 | `firmware[]` | Each image's name, role, storage (mask-rom, otp, on-die-flash, external-flash) and digest | Its SBOM via `sbomRef`; for an image the device measures, the [firmware reference values](#firmware-reference-values) via `referenceValuesRef` |
@@ -564,10 +564,37 @@ The HBOM is the one document a buyer starts from: it lists what the product is m
 5. `manufacturing.fab` is required only for dies and packages; boards, modules and systems require `manufacturing.boardAssembly` and `parts[]` instead.
 6. New `manufacturing.boardAssembly` block: `ems`, `boardLot`, and `attestationRef` to A1.
 7. New `parts[].distributionRef`: the signed distribution record for that part's lot.
+8. `renderings[].format` adds `SPDX-3.1-RC1`, and each rendering is derived from the HBOM as defined in [Renderings](#renderings).
 
-The JSON Schema and the worked examples are in this repository at [`hbom/hbom-predicate-v0.1.schema.json`](../hbom/hbom-predicate-v0.1.schema.json), [`hbom/picosoc-sky130.hbom.intoto.json`](../hbom/picosoc-sky130.hbom.intoto.json) and [`hbom/picosoc-devboard.hbom.intoto.json`](../hbom/picosoc-devboard.hbom.intoto.json), all current with these changes. [`hbom/picosoc-sky130.shipped-lot.txt`](../hbom/picosoc-sky130.shipped-lot.txt) and [`hbom/picosoc-devboard.board-lot.txt`](../hbom/picosoc-devboard.board-lot.txt) are their canonical unit and board lists, so both lot digests can be recomputed.
+The JSON Schema and the worked examples are in this repository at [`hbom/hbom-predicate-v0.1.schema.json`](../hbom/hbom-predicate-v0.1.schema.json), [`hbom/picosoc-sky130.hbom.intoto.json`](../hbom/picosoc-sky130.hbom.intoto.json) and [`hbom/picosoc-devboard.hbom.intoto.json`](../hbom/picosoc-devboard.hbom.intoto.json), all current with these changes. [`hbom/picosoc-sky130.shipped-lot.txt`](../hbom/picosoc-sky130.shipped-lot.txt) and [`hbom/picosoc-devboard.board-lot.txt`](../hbom/picosoc-devboard.board-lot.txt) are their canonical unit and board lists, so both lot digests can be recomputed. Each example's CycloneDX and SPDX renderings sit next to it (`hbom/picosoc-sky130.cdx.json`, `hbom/picosoc-sky130.spdx.json`, `hbom/picosoc-devboard.cdx.json`, `hbom/picosoc-devboard.spdx.json`), listed in its `renderings[]`.
 
 **Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L2: the flow platform signs every step, the source freeze is an SSH-signed git tag with a source review by someone other than the author, and PicoRV32 arrives with IP provenance signed by a key standing in for its vendor. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1.
+
+### Renderings
+
+A rendering is the HBOM written as a CycloneDX or SPDX document for tools that read those formats. It carries no signature of its own; it is trusted because it is exactly what the signed HBOM renders to.
+
+1. **Derived, complete.** A rendering is made from the signed statement with any withheld fields still withheld, and carries every field of the predicate and both subjects. It leaves out `renderings[]` itself, so the HBOM can list its renderings without a cycle.
+2. **Deterministic.** The same statement and creation time give the same bytes. Both renderings take one UUID from the statement's sha256 (a name-based UUIDv5): it is the CycloneDX `serialNumber` and the namespace of every SPDX element ID, so the two documents of one HBOM can be matched.
+3. **Bound by the HBOM.** The product owner renders before signing and lists each rendering in `renderings[]` with its digest. A rendering not listed there is still checkable by re-rendering, but nobody signed for it.
+4. **Checked by re-rendering.** A verifier re-renders the signed HBOM at the rendering's creation time, requires the same bytes, and requires the digest `renderings[]` lists for that format. The reference tool does this for every rendering in the bundle once the rest of the buyer's check has passed, since a rendering is derived data and a broken record should be reported as itself. A reader who takes a rendering from anyone else without this check trusts that party, not the chain.
+5. **Schema-valid.** Every rendering passes the format's official JSON Schema, kept unchanged in [`hbom/formats/`](../hbom/formats). The SPDX JSON Schema checks structure only; the SPDX SHACL shapes are not run yet.
+
+How the HBOM maps onto each format:
+
+| HBOM | CycloneDX 1.6 | SPDX 3.1-RC1 |
+| --- | --- | --- |
+| Subjects, `hbomVersion`, product level, part number, device identity, `redactions[]` | `hbom:` properties of `metadata` | `hbom:` entries in the product's `hardware_additionalInformation` |
+| `product` | `metadata.component` of type `device`, with `manufacturer`, `purl`, `cpe`; the lot as `hbom:lot` | `hardware_PhysicalHardware`: `hardware_productAgent` is the manufacturer, `hardware_category` the hierarchy level, `hardware_batchNumber` the lot |
+| `design.ipBlocks[]` | Components of type `library`, with supplier and license expression; the source as a `vcs` reference | `software_Package` (purpose `source` for soft and firm IP, else `library`), `suppliedBy`, a `git+<uri>@<commit>` download location, `hasDeclaredLicense` |
+| `design.rtlSources[]`, `design.pdk` | Components of type `file` and `platform` | `software_Package` (purpose `source`, `library`) |
+| `design.finalLayout` | Component of type `file` | `software_File` |
+| `design.flow[]` | Tasks of the `design-flow` formulation workflow, with their tools as formulation components and the step record as an `attestation` output | One `build_Build` per step (`build_buildType` is the `design-flow` predicate type), `usesTool`, `hasOutput`, the step record by `hasEvidence`, steps linked by `follows`; the first step `hasInput` the IP, RTL and PDK |
+| `manufacturing` (fab, wafer lots, assembly, test stages, board assembly) | Tasks of the `manufacturing` formulation workflow, with site and lot data as `hbom:` properties and each record as an `attestation` output | `supplychain_ManufactureAction`, `supplychain_AssemblyAction` and `supplychain_TestAction`, `performedBy` the site's organization at its `PhysicalLocation`, each record by `hasEvidence`, in order by `follows` |
+| `firmware[]` | Components of type `firmware`; the SBOM as a `bom` reference, the CoRIM as an `attestation` reference | `software_Package` of purpose `firmware`, `hasMetadata` its SBOM and CoRIM files |
+| `parts[]` | Components of type `device` with manufacturer, distributor as supplier, the part's HBOM as a `bom` reference and the shipment as an `attestation` reference | `hardware_PhysicalHardware` with lot as batch number, the part's HBOM by `hasMetadata`, and the shipment as a custody `supplychain_ResponsibilityChangeAction` from the distributor to the EMS with the record as evidence |
+| Organization IDs (`lei:`, `duns:`, `gln:`, `cage:`, `uei:`) | `hbom:` properties | `externalIdentifier` (`lei`, `duns`, `gln`; CAGE and UEI as `other` with their issuing authority) |
+| Digests | `hashes` (SHA-256, SHA-384, SHA-512, SHA3-256); a git commit in a comment or `hbom:gitCommit` | `verifiedUsing` hashes; a git commit in the download location or `hbom:gitCommit` |
 
 ## Selective disclosure
 
@@ -776,12 +803,12 @@ Four examples run in this repository's GitHub Actions and exercise the spec end 
 
 | Example | Exercises | Levels verified | Docs |
 | --- | --- | --- | --- |
-| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md) |
-| Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]`, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
+| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM with its CycloneDX and SPDX renderings, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md) |
+| Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]` and its renderings, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
 | Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, firmware reference values as a signed CoRIM, the firmware review check on simulated S.A.F.E. reports, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
-The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
+The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, renders them as CycloneDX 1.6 and SPDX 3.1-RC1 (`hslsa render`, which also checks a rendering against a signed HBOM), runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
 What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key and the firmware review provider are simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
 
@@ -819,7 +846,7 @@ The source drafts were not edited; this spec settles each difference as follows.
 - [ ] Who accredits escrow auditors? And should a buyer be able to check its units against a lot without one, for example through a per-unit commitment in F4 with an inclusion proof that ships with each unit?
 - [ ] Can an MES emit these records natively, or does it need a signing sidecar?
 - [ ] Which neutral home should own the spec long term (OpenSSF, CHIPS Alliance, OCP or a joint group), beyond the owner's repository?
-- [ ] Track SPDX 3.1 from release candidate to final, and CoRIM from Internet-Draft to RFC.
+- [ ] Track SPDX 3.1 from release candidate to final, then move the SPDX rendering to the final schema and format `SPDX-3.1`; track CoRIM from Internet-Draft to RFC.
 - [ ] Should Design L4 accept `gds-equal-ignoring-timestamps` by default, or only `gds-bit-exact`? This spec requires bit-exact unless the policy says otherwise.
 - [ ] How should a verifier treat post-quantum identity chains (Caliptra 2.x also issues ML-DSA-87 certificates) until common X.509 libraries can verify them?
 - [ ] What identity should a board carry once it has one: a platform certificate, a board-level DICE identity, or the identity of its root of trust?
@@ -845,6 +872,7 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 ### Revision 7 (2026-09-20)
 
 - **Firmware review checks.** The [Firmware review](#firmware-review) section says which report forms a verifier accepts (the JWS-signed JSON report and the S.A.F.E. CoRIM profile), what counts as the image digest, that a report must state its scope, and what the policy lists. The reference tool now runs the three checks, the Caliptra example checks a simulated review of its ROM, FMC and runtime, and the tool refuses a Firmware L3 claim until it also checks SLSA Build L3 and transparency log inclusion. Reports that review providers published for Caliptra in 2023 and 2024 verify under their providers' keys, but neither can count here: the 2023 FMC report predates scope numbers and names an image of an older release, and the 2024 report names commits rather than an image.
+- **HBOM renderings.** The HBOM is rendered as a CycloneDX 1.6 BOM and an SPDX 3.1-RC1 document, with a mapping for every field ([Renderings](#renderings)). A rendering is derived from the signed HBOM, deterministic, listed in `renderings[]` by digest, and checked by re-rendering; the buyer's chip, board and Caliptra checks do this for the renderings in the bundle, last. Both formats pass their official JSON Schemas, and the PicoRV32 and board CycloneDX renderings also pass the CycloneDX project's own validator in CI. `renderings[].format` adds `SPDX-3.1-RC1`, since SPDX 3.1 is not final yet. The PicoRV32, board and Caliptra examples now sign their renderings with the HBOM, and both committed examples have theirs.
 
 ### Revision 6 (2026-09-20)
 

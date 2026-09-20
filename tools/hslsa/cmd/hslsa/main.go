@@ -10,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Horiodino/hw-slsa/tools/hslsa"
 )
@@ -37,6 +39,7 @@ var commands = map[string]command{
 	"lot-digest":    {"compute the lot digest of a unit list", lotDigest},
 	"subject":       {"print the name and sha256 of an envelope's first subject", subject},
 	"validate-hbom": {"validate HBOM statements or envelopes against the schema", validateHBOM},
+	"render":        {"render an HBOM as CycloneDX 1.6 or SPDX 3.1-RC1, or check a rendering", render},
 	"corim":         {"show a signed CoRIM, or appraise DICE certificates against it", corimCmd},
 	"safe":          {"sign, show or check an OCP S.A.F.E. short-form report", safeCmd},
 }
@@ -632,19 +635,27 @@ func subject(args []string) error {
 	return nil
 }
 
+// readStatement reads an in-toto statement, or the statement in an envelope
+// without checking its signature.
+func readStatement(path string) (map[string]any, error) {
+	stmt, err := hslsa.ReadObj(path)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := stmt["payload"]; ok {
+		return hslsa.DecodeEnvelope(path)
+	}
+	return stmt, nil
+}
+
 func validateHBOM(args []string) error {
 	if len(args) == 0 {
 		return usageError{"usage: hslsa validate-hbom <statement or envelope>..."}
 	}
 	for _, path := range args {
-		stmt, err := hslsa.ReadObj(path)
+		stmt, err := readStatement(path)
 		if err != nil {
 			return err
-		}
-		if _, ok := stmt["payload"]; ok {
-			if stmt, err = hslsa.DecodeEnvelope(path); err != nil {
-				return err
-			}
 		}
 		if err := hslsa.ValidateHBOM(stmt["predicate"]); err != nil {
 			return fmt.Errorf("%s: %w", path, err)
@@ -652,6 +663,58 @@ func validateHBOM(args []string) error {
 		fmt.Println(path, "valid")
 	}
 	return nil
+}
+
+func render(args []string) error {
+	f := newFlags("render")
+	in := f.str("hbom", "HBOM statement or envelope; an envelope's signature is not checked, so verify the HBOM first", true)
+	format := f.str("format", "cyclonedx or spdx (to render)", false)
+	out := f.str("out", "file to write (default: standard output)", false)
+	created := f.str("created", "creation time YYYY-MM-DDTHH:MM:SSZ (default: SOURCE_DATE_EPOCH if set, else now)", false)
+	check := f.str("check", "instead of rendering, check that this file is exactly what the HBOM renders to", false)
+	if err := f.parse(args); err != nil {
+		return err
+	}
+	stmt, err := readStatement(*in)
+	if err != nil {
+		return err
+	}
+	if *check != "" {
+		got, err := hslsa.CheckRendering(stmt, *check, "rendering")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s: %s rendering of %s\n", *check, got, *in)
+		return nil
+	}
+	if err := need(format, "format", "rendering"); err != nil {
+		return err
+	}
+	formats := map[string]string{"cyclonedx": hslsa.FormatCycloneDX, "spdx": hslsa.FormatSPDX}
+	name, ok := formats[strings.ToLower(*format)]
+	if !ok {
+		return usageError{fmt.Sprintf("invalid --format %q (choose from cyclonedx, spdx)", *format)}
+	}
+	when := *created
+	if when == "" {
+		when = hslsa.Now()
+		if sde := os.Getenv("SOURCE_DATE_EPOCH"); sde != "" {
+			n, err := strconv.ParseInt(sde, 10, 64)
+			if err != nil {
+				return usageError{"SOURCE_DATE_EPOCH is not an integer"}
+			}
+			when = time.Unix(n, 0).UTC().Format("2006-01-02T15:04:05Z")
+		}
+	}
+	data, err := hslsa.RenderHBOM(stmt, name, when)
+	if err != nil {
+		return err
+	}
+	if *out == "" {
+		_, err = os.Stdout.Write(data)
+		return err
+	}
+	return os.WriteFile(*out, data, 0o644)
 }
 
 func corimCmd(args []string) error {

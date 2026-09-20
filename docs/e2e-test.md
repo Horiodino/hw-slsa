@@ -6,9 +6,9 @@ The workflow in [`.github/workflows/hslsa-e2e.yml`](../.github/workflows/hslsa-e
 
 | Job | Plays | Does |
 | --- | --- | --- |
-| Lint and unit tests | | `gofmt`, `go vet` and `go test` (bundle-free tests only), validates the committed HBOM examples against their schema, and checks the example's lot digest can be recomputed from its unit list |
-| Produce | IP vendor, design lead, reviewer, flow platform, tapeout authority, fab, sort house, OSAT, test house, product owner | Signs the IP provenance, the source tag and its review, runs the design flow, signs each step, releases the design, signs F1 to F4 for a lot and the three transfers between the four sites, builds and signs the HBOM, and signs the lot again with fields withheld for the escrow job. Uploads the bundles without any private key |
-| Verify | Buyer | Receives only the bundle, runs the tapeout check and the lot receipt check, signs two SLSA Verification Summary Attestations, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
+| Lint and unit tests | | `gofmt`, `go vet` and `go test` (bundle-free tests only), validates the committed HBOM examples against their schema, checks their committed CycloneDX and SPDX renderings, and checks the example's lot digest can be recomputed from its unit list |
+| Produce | IP vendor, design lead, reviewer, flow platform, tapeout authority, fab, sort house, OSAT, test house, product owner | Signs the IP provenance, the source tag and its review, runs the design flow, signs each step, releases the design, signs F1 to F4 for a lot and the three transfers between the four sites, builds the HBOM, renders it as CycloneDX 1.6 and SPDX 3.1-RC1 and signs it with both renderings listed by digest, and signs the lot again with fields withheld for the escrow job. Uploads the bundles without any private key |
+| Verify | Buyer | Receives only the bundle, runs the tapeout check and the lot receipt check, then re-renders the HBOM and requires its two renderings byte for byte, signs two SLSA Verification Summary Attestations, verifies them with slsa-verifier v2.7.1, validates the chip and board CycloneDX renderings with the CycloneDX project's `cyclonedx` CLI, then runs the tamper tests |
 | Escrow | Auditor, then buyer | The auditor receives the same lot re-signed with confidential fields withheld, plus their disclosures, checks it for the buyer's units and signs two VSAs; the buyer checks only those VSAs, with slsa-verifier. Then measures what the records and the VSAs reveal. See [selective-disclosure.md](selective-disclosure.md) |
 
 **Real:** the design is [PicoRV32](https://github.com/YosysHQ/picorv32) at a pinned commit, with every file checked against [`e2e/picorv32/inputs.lock.json`](../e2e/picorv32/inputs.lock.json). Step 1 runs its testbench in Icarus Verilog and step 2 synthesizes it with Yosys; the netlist is byte-for-byte reproducible. Every signature, digest link and check is real, and the verifier uses the in-toto attestation library to validate every statement and to parse every step predicate as SLSA Provenance v1.
@@ -47,8 +47,23 @@ Design reaches L2: every step runs on GitHub Actions and is signed by the flow p
 - the Design L2 inputs: a tag signed by an unknown key or edited after signing, a validly signed tag that points at another commit, a source archive that is not the tagged tree (re-signed by the flow platform), a review signed by an unknown key, of another commit, not approving, or by the commit's author, a source freeze that does not consume the review, IP provenance that is missing, signed by the design house instead of the vendor, or for other file contents, and a policy that claims Design L2 without the source or IP rules
 - the transfers: one missing, several records missing at once (the check names all of them with their tracks), a transfer signed by the receiving site, one shipped to a site that did not sign the next step, a packing list that swaps a unit, and a step that links past its transfer to the step before
 - validly signed lies: a failed gate, a record whose `hwFlow.step` is not the step it claims to be, an unapproved tool, a step that does not consume the frozen source, a release of an artifact the flow did not build, a packaging record that names another design, a yield record that hides a failed unit, an HBOM that names another lot or does not match its schema
+- the HBOM renderings: one edited after signing, one missing, one listed outside the bundle, and a CycloneDX rendering put where the SPDX one should be ([`tools/hslsa/render_test.go`](../tools/hslsa/render_test.go), which also checks that every HBOM field reaches both formats and that the official schemas reject bad renderings)
 
 The verify job also runs slsa-verifier four times expecting failure: a level above the claim, an SLSA build level above the claim (L3), another subject's digest, and another verifier's key.
+
+## HBOM renderings
+
+The HBOM is also written as a CycloneDX 1.6 BOM (`att/hbom.cdx.json`) and an SPDX 3.1-RC1 document (`att/hbom.spdx.json`), so SBOM tools can read it; the spec's [Renderings](../spec/hslsa-v0.1.md#renderings) section has the rules and the field mapping. The product owner renders the HBOM before signing it and lists both files in `renderings[]` by digest. The renderings are of the HBOM as signed: in the escrow bundle they leave out the withheld fields too. After the tapeout and lot receipt checks pass, the buyer's check re-renders the signed HBOM and requires both files byte for byte; it comes last because the renderings are derived from the HBOM, so a broken record is reported as itself.
+
+`hslsa render` does the same for any HBOM statement or envelope. It does not check the envelope's signature, so verify the HBOM first:
+
+```sh
+hslsa render --hbom out/bundle/att/hbom.intoto.json --format cyclonedx --out hbom.cdx.json
+hslsa render --hbom out/bundle/att/hbom.intoto.json --format spdx --out hbom.spdx.json
+hslsa render --hbom out/bundle/att/hbom.intoto.json --check out/bundle/att/hbom.spdx.json
+```
+
+The creation time is `--created`, else `SOURCE_DATE_EPOCH`, else now; `--check` reads it from the file it checks. Every rendering passes the format's official JSON Schema before it is written ([`hbom/formats/`](../hbom/formats/README.md)).
 
 ## Keys and privacy
 

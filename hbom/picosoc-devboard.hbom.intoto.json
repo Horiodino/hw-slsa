@@ -243,6 +243,22 @@
           "R2"
         ]
       }
+    ],
+    "renderings": [
+      {
+        "digest": {
+          "sha256": "b9109df27f6f5c36738d0889c01d69e7f01739cc27ef32c71ff2a22d23700e45"
+        },
+        "format": "CycloneDX-1.6",
+        "uri": "https://raw.githubusercontent.com/Horiodino/hw-slsa/main/hbom/picosoc-devboard.cdx.json"
+      },
+      {
+        "digest": {
+          "sha256": "1e1c52b569e2fc634eef79ec75c1c124824c76c1fd02e54e674316352fe9b7ef"
+        },
+        "format": "SPDX-3.1-RC1",
+        "uri": "https://raw.githubusercontent.com/Horiodino/hw-slsa/main/hbom/picosoc-devboard.spdx.json"
+      }
     ]
   }
 }

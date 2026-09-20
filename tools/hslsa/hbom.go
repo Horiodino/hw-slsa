@@ -137,7 +137,8 @@ func manufacturingBlock(bundle string, sc Obj) Obj {
 // signHBOM validates the predicate and signs it over the released design and
 // the shipped lot, withholding the fields w names for the HBOM. Both the full
 // and the withheld predicate must match the schema, so a required field
-// cannot be withheld.
+// cannot be withheld. The CycloneDX and SPDX renderings go next to the HBOM
+// in att/ and are listed in its renderings[] by digest.
 func signHBOM(bundle string, final Obj, lotID string, shipped []string, predicate Obj, key string, w *Withholding) error {
 	if err := ValidateHBOM(predicate); err != nil {
 		return err
@@ -156,6 +157,13 @@ func signHBOM(bundle string, final Obj, lotID string, shipped []string, predicat
 	subjects := []Obj{rd(S(final, "name"), S(final, "digest", "sha256")), rd("urn:hslsa:lot:"+lotID, lot)}
 	stmt, err := statement(subjects, HBOMType, predicate)
 	if err != nil {
+		return err
+	}
+	// The renderings are of the HBOM as signed, with any fields withheld.
+	if err := addRenderings(stmt, filepath.Join(bundle, "att"), "file:att/"); err != nil {
+		return err
+	}
+	if err := ValidateHBOM(predicate); err != nil {
 		return err
 	}
 	signer, err := LoadSigner(key)

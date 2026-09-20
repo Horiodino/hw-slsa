@@ -1852,6 +1852,9 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 		devices = append(devices, dev)
 	}
 	fmt.Printf("at-boot check: PASSED for %d booted units (%s)\n", len(devices), strings.Join(units, ", "))
+	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", "hbom.intoto.json"), "hbom"); err != nil {
+		return err
+	}
 	if vsaKey == "" {
 		return nil
 	}

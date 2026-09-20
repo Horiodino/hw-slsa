@@ -1,0 +1,1644 @@
+{
+  "@context": "https://spdx.github.io/spdx-spec/v3.1-RC1/rdf/spdx-context.jsonld",
+  "@graph": [
+    {
+      "@id": "_:creationinfo",
+      "created": "2026-10-01T00:00:00Z",
+      "createdBy": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#agent-1"
+      ],
+      "specVersion": "3.1.0-rc1",
+      "type": "CreationInfo"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "element": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#bom",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#agent-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#spec-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#product",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rtl-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#pdk-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-8",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-9",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-10",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-11",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-12",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-13",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-14",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-15",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-16",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-17",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-18",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-19",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-20",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-21",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-22",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-8",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-8",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-23",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-24",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-25",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-26",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-27",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-8",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-28",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-29",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-30",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-9",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-31",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-32",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-33",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-9",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-34",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-10",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-35",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-36",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-37",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-38",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-11",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-39",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-40",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-41",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-42",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-10",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-43",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-12",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-44",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-45",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-46"
+      ],
+      "name": "HBOM of picosoc-sky130 (HSLSA)",
+      "profileConformance": [
+        "core",
+        "hardware",
+        "supplyChain",
+        "software",
+        "build",
+        "simpleLicensing",
+        "extension"
+      ],
+      "rootElement": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#bom"
+      ],
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#document",
+      "type": "SpdxDocument"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "element": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#agent-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#spec-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#product",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rtl-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#pdk-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-8",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-9",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-10",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-11",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-12",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-13",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-14",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-15",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-16",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-17",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-18",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-19",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-20",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-21",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-22",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-8",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-8",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-23",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-24",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-25",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-26",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-27",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-8",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-28",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-29",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-30",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-9",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-31",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-32",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-33",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-9",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-34",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-10",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-35",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-36",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-37",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-38",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-11",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-39",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-40",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-7",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-41",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-42",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-10",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-43",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-12",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-44",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-45",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-46"
+      ],
+      "name": "HBOM of picosoc-sky130",
+      "profileConformance": [
+        "core",
+        "hardware",
+        "supplyChain",
+        "software",
+        "build",
+        "simpleLicensing",
+        "extension"
+      ],
+      "rootElement": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#product"
+      ],
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#bom",
+      "type": "Bom"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "hslsa 0.1",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#agent-1",
+      "type": "SoftwareAgent"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "externalRef": [
+        {
+          "externalRefType": "documentation",
+          "locator": [
+            "https://github.com/Horiodino/hw-slsa/hbom/v0.1"
+          ],
+          "type": "ExternalRef"
+        }
+      ],
+      "name": "HSLSA HBOM predicate v0.1",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#spec-1",
+      "specType": "spdx:Core/SpecificationType/specification",
+      "type": "Specification"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:country",
+              "extension_cdxPropValue": "US",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "Example Open Silicon Group",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-1",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "externalIdentifier": [
+        {
+          "externalIdentifierType": "packageUrl",
+          "identifier": "pkg:generic/picosoc-sky130@A0",
+          "type": "ExternalIdentifier"
+        }
+      ],
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:predicateType",
+          "type": "DictionaryEntry",
+          "value": "https://github.com/Horiodino/hw-slsa/hbom/v0.1"
+        },
+        {
+          "key": "hbom:hbomVersion",
+          "type": "DictionaryEntry",
+          "value": "0.1"
+        },
+        {
+          "key": "hbom:subject",
+          "type": "DictionaryEntry",
+          "value": "caravel_psoc130.gds sha256:8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071"
+        },
+        {
+          "key": "hbom:subject.2",
+          "type": "DictionaryEntry",
+          "value": "urn:hslsa:lot:ASM-EXAMPLE-17 sha256:4876860b247bffbd0ceedf5bb53d278f9a25251619cd68dee4d740a4c73cbaf1"
+        },
+        {
+          "key": "hbom:level",
+          "type": "DictionaryEntry",
+          "value": "package"
+        },
+        {
+          "key": "hbom:partNumber",
+          "type": "DictionaryEntry",
+          "value": "PSOC130-QFN64"
+        },
+        {
+          "key": "hbom:manufacturer.name",
+          "type": "DictionaryEntry",
+          "value": "Example Open Silicon Group"
+        },
+        {
+          "key": "hbom:manufacturer.country",
+          "type": "DictionaryEntry",
+          "value": "US"
+        },
+        {
+          "key": "hbom:deviceIdentity.scheme",
+          "type": "DictionaryEntry",
+          "value": "serial"
+        },
+        {
+          "key": "hbom:deviceIdentity.serial",
+          "type": "DictionaryEntry",
+          "value": "per unit; the shipped lot lists every serial"
+        },
+        {
+          "key": "hbom:redaction",
+          "type": "DictionaryEntry",
+          "value": "/manufacturing/waferLots/0/waferIds sha256:99eba9d39625f84a40323984610d7dd279e2f775fa4a833534e3a0e7ddf53331"
+        }
+      ],
+      "hardware_batchNumber": "ASM-EXAMPLE-17",
+      "hardware_category": [
+        {
+          "definitionSource": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#spec-1",
+          "type": "DefinedType",
+          "typeFromSource": "package"
+        }
+      ],
+      "hardware_hardwareVersion": "A0",
+      "hardware_partNumber": "PSOC130-QFN64",
+      "hardware_productAgent": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-1",
+      "name": "picosoc-sky130",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#product",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "YosysHQ",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-2",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:ipKind",
+              "extension_cdxPropValue": "soft",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "picorv32",
+      "software_downloadLocation": "git+https://github.com/YosysHQ/picorv32@01afdda1b0e3ca89e503fda08c983a3a66340c5a",
+      "software_packageVersion": "v1.0",
+      "software_primaryPurpose": "source",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-1",
+      "suppliedBy": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-2",
+      "type": "software_Package"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "simplelicensing_licenseExpression": "ISC",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-1",
+      "type": "simplelicensing_LicenseExpression"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-1",
+      "relationshipType": "hasDeclaredLicense",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-1",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-1"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Efabless",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-3",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:ipKind",
+              "extension_cdxPropValue": "hard",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "caravel harness",
+      "software_downloadLocation": "git+https://github.com/efabless/caravel@6240b3bd7435262681632af08c9b6b3bfbf6baad",
+      "software_primaryPurpose": "library",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-2",
+      "suppliedBy": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-3",
+      "type": "software_Package"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "simplelicensing_licenseExpression": "Apache-2.0",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-2",
+      "type": "simplelicensing_LicenseExpression"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-2",
+      "relationshipType": "hasDeclaredLicense",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-2",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "SkyWater Technology",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-4",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:ipKind",
+              "extension_cdxPropValue": "std-cell-library",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "sky130_fd_sc_hd",
+      "software_primaryPurpose": "library",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-3",
+      "suppliedBy": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-4",
+      "type": "software_Package"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-3",
+      "relationshipType": "hasDeclaredLicense",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-3",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:ipKind",
+              "extension_cdxPropValue": "io-library",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "sky130_fd_io",
+      "software_primaryPurpose": "library",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-4",
+      "suppliedBy": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-4",
+      "type": "software_Package"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-4",
+      "relationshipType": "hasDeclaredLicense",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-4",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#license-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:language",
+              "extension_cdxPropValue": "Verilog",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "rtl/",
+      "software_downloadLocation": "git+https://github.com/example/picosoc-sky130@e06410c3136960fd33c56d41274fecfe11841906",
+      "software_primaryPurpose": "source",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rtl-1",
+      "type": "software_Package"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:pdk",
+              "extension_cdxPropValue": "true",
+              "type": "extension_CdxPropertyEntry"
+            },
+            {
+              "extension_cdxPropName": "hbom:gitCommit",
+              "extension_cdxPropValue": "a496cc6dcfea4d9f87c7431adbe08339419a3fbd",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "sky130A (open_pdks)",
+      "software_packageVersion": "<open_pdks commit>",
+      "software_primaryPurpose": "library",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#pdk-1",
+      "suppliedBy": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-4",
+      "type": "software_Package"
+    },
+    {
+      "contentType": "application/vnd.gdsii",
+      "creationInfo": "_:creationinfo",
+      "name": "file:gds/caravel_psoc130.gds",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "data",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-1",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "build_buildId": "1-simulation",
+      "build_buildType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+      "creationInfo": "_:creationinfo",
+      "name": "simulation",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-1",
+      "type": "build_Build"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-1",
+      "relationshipType": "hasInput",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-5",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rtl-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#pdk-1"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "externalIdentifier": [
+        {
+          "externalIdentifierType": "packageUrl",
+          "identifier": "pkg:github/steveicarus/iverilog@v12_0",
+          "type": "ExternalIdentifier"
+        }
+      ],
+      "name": "Icarus Verilog 12.0",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-1",
+      "type": "Tool"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-1",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-6",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-1"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "build_buildId": "2-synthesis",
+      "build_buildType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+      "creationInfo": "_:creationinfo",
+      "name": "synthesis",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-2",
+      "type": "build_Build"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "externalIdentifier": [
+        {
+          "externalIdentifierType": "packageUrl",
+          "identifier": "pkg:github/YosysHQ/yosys@v0.46",
+          "type": "ExternalIdentifier"
+        }
+      ],
+      "name": "Yosys 0.46",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-2",
+      "type": "Tool"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "file:runs/final/nl/user_project_wrapper.nl.v",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "data",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-2",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "fc026475b8786a706f6831d13838bb256ab0e1be5ae65e2ded1ae39a99420900",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-2",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-7",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-2",
+      "relationshipType": "hasOutput",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-8",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/att/synth.intoto.jsonl",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-3",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "8048f7c30b224754081e0043e4d80c698c9b353ad086a11b2dcc000951c30af5",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-2",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-9",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-3"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-1",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-10",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "build_buildId": "3-floorplan",
+      "build_buildType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+      "creationInfo": "_:creationinfo",
+      "name": "floorplan",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-3",
+      "type": "build_Build"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "OpenLane 2.x",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-3",
+      "type": "Tool"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "OpenROAD <commit>",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-4",
+      "type": "Tool"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-3",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-11",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-2",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-12",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-3"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "build_buildId": "4-place-cts",
+      "build_buildType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+      "creationInfo": "_:creationinfo",
+      "name": "place-cts",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-4",
+      "type": "build_Build"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-4",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-13",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-3",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-14",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "build_buildId": "5-routing",
+      "build_buildType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+      "creationInfo": "_:creationinfo",
+      "name": "routing",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-5",
+      "type": "build_Build"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "file:runs/final/def/user_project_wrapper.def",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "data",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-4",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "cb8379ac2098aa165029e3938a51da0bcecfc008fd6795f401178647f96c5b34",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-5",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-15",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-5",
+      "relationshipType": "hasOutput",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-16",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/att/pnr.intoto.jsonl",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-5",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "90b91f6b17c02f4377e84fb4114a8f751fd87d047a9208ed8d6c75a70b8b115f",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-5",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-17",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-5"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-4",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-18",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-5"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "build_buildId": "6-signoff",
+      "build_buildType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+      "creationInfo": "_:creationinfo",
+      "name": "signoff",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-6",
+      "type": "build_Build"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Magic 8.3",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-5",
+      "type": "Tool"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "KLayout 0.29",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-6",
+      "type": "Tool"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Netgen 1.5",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-7",
+      "type": "Tool"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-6",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-19",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-5",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-6",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-7"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-5",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-20",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-6"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "build_buildId": "7-gds-stream-out",
+      "build_buildType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+      "creationInfo": "_:creationinfo",
+      "name": "gds-stream-out",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-7",
+      "type": "build_Build"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-7",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-21",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-5"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-6",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-22",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-7"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "build_buildId": "8-release",
+      "build_buildType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+      "creationInfo": "_:creationinfo",
+      "name": "release",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-8",
+      "type": "build_Build"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "externalIdentifier": [
+        {
+          "externalIdentifierType": "packageUrl",
+          "identifier": "pkg:github/sigstore/cosign@v2.4.1",
+          "type": "ExternalIdentifier"
+        }
+      ],
+      "name": "cosign 2.4.1",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-8",
+      "type": "Tool"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-8",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-23",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-8"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-8",
+      "relationshipType": "hasOutput",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-24",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-1"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/att/release.intoto.jsonl",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-6",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "49ecf35a64234b21ed0c646172f578480fc475e880aa13bd16d0add59dd56f10",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-8",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-25",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-6"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-7",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-26",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#build-8"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:role",
+              "extension_cdxPropValue": "bootloader",
+              "type": "extension_CdxPropertyEntry"
+            },
+            {
+              "extension_cdxPropName": "hbom:storage",
+              "extension_cdxPropValue": "external-flash",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "caravel management firmware",
+      "software_packageVersion": "<tag>",
+      "software_primaryPurpose": "firmware",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-1",
+      "type": "software_Package",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "d6e5d4d4d36d3a6f6bd89fc1f50364e0221fffa496a7625d973b14ef2e88ab95",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/sbom/mgmt-fw.spdx.json",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "bom",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-7",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "cdbb608b62f133717bcc4e17284389a4d1c5a650c1c14a11f914d3ddeb112095",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-1",
+      "relationshipType": "hasMetadata",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-27",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-7"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:role",
+              "extension_cdxPropValue": "runtime",
+              "type": "extension_CdxPropertyEntry"
+            },
+            {
+              "extension_cdxPropName": "hbom:storage",
+              "extension_cdxPropValue": "external-flash",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "picosoc firmware",
+      "software_packageVersion": "0.3.0",
+      "software_primaryPurpose": "firmware",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-2",
+      "type": "software_Package",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "69ccc925cfaab3d874d8a4ecd1d4cc76f278fcda7869d50f0f539cccf78d2ad2",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/sbom/picosoc-fw.cdx.json",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "bom",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-8",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "5d04007a2eb998faa9a2e27f176ae4316c2903b26f0771379e78616e72ced1f6",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-2",
+      "relationshipType": "hasMetadata",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-28",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-8"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "country": "USA",
+      "creationInfo": "_:creationinfo",
+      "name": "SkyWater Technology, Bloomington, MN",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-1",
+      "type": "PhysicalLocation"
+    },
+    {
+      "actionLocation": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-1"
+      ],
+      "additionalInformation": [
+        {
+          "key": "hbom:foundry.name",
+          "type": "DictionaryEntry",
+          "value": "SkyWater Technology"
+        },
+        {
+          "key": "hbom:foundry.country",
+          "type": "DictionaryEntry",
+          "value": "US"
+        },
+        {
+          "key": "hbom:foundry.site",
+          "type": "DictionaryEntry",
+          "value": "Bloomington, MN"
+        },
+        {
+          "key": "hbom:processNode",
+          "type": "DictionaryEntry",
+          "value": "SKY130 (130 nm CMOS)"
+        },
+        {
+          "key": "hbom:maskSetId",
+          "type": "DictionaryEntry",
+          "value": "MS-EXAMPLE-0001"
+        },
+        {
+          "key": "hbom:shuttle",
+          "type": "DictionaryEntry",
+          "value": "MPW-EXAMPLE-01"
+        },
+        {
+          "key": "hbom:waferLots.0.lotId",
+          "type": "DictionaryEntry",
+          "value": "LOT-EXAMPLE-A"
+        },
+        {
+          "key": "hbom:waferLots.0.startDate",
+          "type": "DictionaryEntry",
+          "value": "2026-03-02"
+        }
+      ],
+      "creationInfo": "_:creationinfo",
+      "name": "wafer fabrication",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-1",
+      "type": "supplychain_ManufactureAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:country",
+              "extension_cdxPropValue": "US",
+              "type": "extension_CdxPropertyEntry"
+            },
+            {
+              "extension_cdxPropName": "hbom:site",
+              "extension_cdxPropValue": "Bloomington, MN",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "SkyWater Technology",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-5",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-1",
+      "relationshipType": "performedBy",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-29",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-5"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-1",
+      "relationshipType": "hasInput",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-30",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-1"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/att/f1-wafer-fab.intoto.jsonl",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-9",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "3f524cdc07a11d7c6220bdb049fe8dd41b27483c96cc59b581e022d547290d69",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-1",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-31",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-9"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "actionLocation": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-1"
+      ],
+      "additionalInformation": [
+        {
+          "key": "hbom:site.name",
+          "type": "DictionaryEntry",
+          "value": "SkyWater Technology"
+        },
+        {
+          "key": "hbom:site.country",
+          "type": "DictionaryEntry",
+          "value": "US"
+        },
+        {
+          "key": "hbom:site.site",
+          "type": "DictionaryEntry",
+          "value": "Bloomington, MN"
+        },
+        {
+          "key": "hbom:stage",
+          "type": "DictionaryEntry",
+          "value": "wafer-sort"
+        }
+      ],
+      "creationInfo": "_:creationinfo",
+      "name": "wafer-sort",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2",
+      "type": "supplychain_TestAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2",
+      "relationshipType": "performedBy",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-32",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-5"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2",
+      "relationshipType": "hasInput",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-33",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#product"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "psoc130-probe 1.0.0",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-9",
+      "type": "Tool",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "ba9c736f19e7f60b7f6764adb0b7908c0a2b394e09b6c09863528c7f2bc86095",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-34",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-9"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/att/f2-wafer-sort.intoto.jsonl",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-10",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "e4ab4e3b1493d5a997b4e51cdefbaa10570ef3ea9432bd72e7b6a89654ceb7f6",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-35",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-10"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-1",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-36",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "country": "USA",
+      "creationInfo": "_:creationinfo",
+      "name": "Example OSAT",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-2",
+      "type": "PhysicalLocation"
+    },
+    {
+      "actionLocation": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-2"
+      ],
+      "additionalInformation": [
+        {
+          "key": "hbom:osat.name",
+          "type": "DictionaryEntry",
+          "value": "Example OSAT"
+        },
+        {
+          "key": "hbom:osat.country",
+          "type": "DictionaryEntry",
+          "value": "US"
+        },
+        {
+          "key": "hbom:packageType",
+          "type": "DictionaryEntry",
+          "value": "QFN-64 7x7 mm"
+        },
+        {
+          "key": "hbom:assemblyLot",
+          "type": "DictionaryEntry",
+          "value": "ASM-EXAMPLE-17"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "2622"
+        }
+      ],
+      "creationInfo": "_:creationinfo",
+      "name": "packaging",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-3",
+      "type": "supplychain_AssemblyAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:country",
+              "extension_cdxPropValue": "US",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "Example OSAT",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-6",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-3",
+      "relationshipType": "performedBy",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-37",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-6"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-3",
+      "relationshipType": "hasOutput",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-38",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#product"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/att/f3-packaging.intoto.jsonl",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-11",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "625e0f649de27800fc3bcf4c118ef79f69dcb762c2e73fbb1cfce0e7a86f6b80",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-3",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-39",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-11"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-2",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-40",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-3"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "country": "USA",
+      "creationInfo": "_:creationinfo",
+      "name": "Example Test House",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-3",
+      "type": "PhysicalLocation"
+    },
+    {
+      "actionLocation": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#location-3"
+      ],
+      "additionalInformation": [
+        {
+          "key": "hbom:site.name",
+          "type": "DictionaryEntry",
+          "value": "Example Test House"
+        },
+        {
+          "key": "hbom:site.country",
+          "type": "DictionaryEntry",
+          "value": "US"
+        },
+        {
+          "key": "hbom:stage",
+          "type": "DictionaryEntry",
+          "value": "final-test"
+        }
+      ],
+      "creationInfo": "_:creationinfo",
+      "name": "final-test",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-4",
+      "type": "supplychain_TestAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:country",
+              "extension_cdxPropValue": "US",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "Example Test House",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-7",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-4",
+      "relationshipType": "performedBy",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-41",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#org-7"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-4",
+      "relationshipType": "hasInput",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-42",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#product"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "psoc130-ft 1.2.0",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-10",
+      "type": "Tool",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "9adf009b9ea42792e73e5dc86e9c9024489d74ad894c0a3acbc03095158eaabc",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-4",
+      "relationshipType": "usesTool",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-43",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#tool-10"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "https://example.org/att/f4-final-test.intoto.jsonl",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-12",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "608cdb524384f5ee06edc2830d6b13a92047229398768ff88e28ad68d02569e8",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-4",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-44",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#file-12"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-3",
+      "relationshipType": "follows",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-45",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#action-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#product",
+      "relationshipType": "contains",
+      "spdxId": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#rel-46",
+      "to": [
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-2",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-3",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#ip-4",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-1",
+        "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e#firmware-2"
+      ],
+      "type": "Relationship"
+    }
+  ]
+}

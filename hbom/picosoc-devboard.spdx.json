@@ -1,0 +1,978 @@
+{
+  "@context": "https://spdx.github.io/spdx-spec/v3.1-RC1/rdf/spdx-context.jsonld",
+  "@graph": [
+    {
+      "@id": "_:creationinfo",
+      "created": "2026-10-01T00:00:00Z",
+      "createdBy": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#agent-1"
+      ],
+      "specVersion": "3.1.0-rc1",
+      "type": "CreationInfo"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "element": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#bom",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#agent-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#spec-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#product",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-8",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-9",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-10",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-8",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-11",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-8",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-8",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-9",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#location-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#action-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-10",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-11",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-12",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-13",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-14",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-15"
+      ],
+      "name": "HBOM of picosoc-devboard (HSLSA)",
+      "profileConformance": [
+        "core",
+        "hardware",
+        "supplyChain",
+        "software",
+        "build",
+        "simpleLicensing",
+        "extension"
+      ],
+      "rootElement": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#bom"
+      ],
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#document",
+      "type": "SpdxDocument"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "element": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#agent-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#spec-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#product",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-8",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-9",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-10",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-8",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-11",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-8",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-8",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-9",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#location-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#action-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-10",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-11",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-12",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-13",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-14",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-15"
+      ],
+      "name": "HBOM of picosoc-devboard",
+      "profileConformance": [
+        "core",
+        "hardware",
+        "supplyChain",
+        "software",
+        "build",
+        "simpleLicensing",
+        "extension"
+      ],
+      "rootElement": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#product"
+      ],
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#bom",
+      "type": "Bom"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "hslsa 0.1",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#agent-1",
+      "type": "SoftwareAgent"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "externalRef": [
+        {
+          "externalRefType": "documentation",
+          "locator": [
+            "https://github.com/Horiodino/hw-slsa/hbom/v0.1"
+          ],
+          "type": "ExternalRef"
+        }
+      ],
+      "name": "HSLSA HBOM predicate v0.1",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#spec-1",
+      "specType": "spdx:Core/SpecificationType/specification",
+      "type": "Specification"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:country",
+              "extension_cdxPropValue": "US",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "Example Open Silicon Group",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-1",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:predicateType",
+          "type": "DictionaryEntry",
+          "value": "https://github.com/Horiodino/hw-slsa/hbom/v0.1"
+        },
+        {
+          "key": "hbom:hbomVersion",
+          "type": "DictionaryEntry",
+          "value": "0.1"
+        },
+        {
+          "key": "hbom:subject",
+          "type": "DictionaryEntry",
+          "value": "board-design.json sha256:1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+        },
+        {
+          "key": "hbom:subject.2",
+          "type": "DictionaryEntry",
+          "value": "urn:hslsa:lot:BRD-EXAMPLE-01 sha256:d0c032429682df39bdf9a3d23021639f0987ce5695367cdd6c83283053657462"
+        },
+        {
+          "key": "hbom:level",
+          "type": "DictionaryEntry",
+          "value": "board"
+        },
+        {
+          "key": "hbom:partNumber",
+          "type": "DictionaryEntry",
+          "value": "PSOC-DEVB-01"
+        },
+        {
+          "key": "hbom:manufacturer.name",
+          "type": "DictionaryEntry",
+          "value": "Example Open Silicon Group"
+        },
+        {
+          "key": "hbom:manufacturer.country",
+          "type": "DictionaryEntry",
+          "value": "US"
+        },
+        {
+          "key": "hbom:deviceIdentity.scheme",
+          "type": "DictionaryEntry",
+          "value": "serial"
+        },
+        {
+          "key": "hbom:deviceIdentity.serial",
+          "type": "DictionaryEntry",
+          "value": "per board; the board lot lists every serial"
+        }
+      ],
+      "hardware_batchNumber": "BRD-EXAMPLE-01",
+      "hardware_category": [
+        {
+          "definitionSource": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#spec-1",
+          "type": "DefinedType",
+          "typeFromSource": "board"
+        }
+      ],
+      "hardware_hardwareVersion": "A",
+      "hardware_partNumber": "PSOC-DEVB-01",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-1",
+      "name": "picosoc-devboard",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#product",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "file:artifacts/board-design.json",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "data",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-1",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:country",
+              "extension_cdxPropValue": "US",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "Example EMS",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Example PCB Fab",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-3",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:country",
+              "extension_cdxPropValue": "US",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "Example PCB Fab",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-4",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:refDes",
+          "type": "DictionaryEntry",
+          "value": "PCB1"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "EXAMPLE-2637"
+        },
+        {
+          "key": "hbom:authorized",
+          "type": "DictionaryEntry",
+          "value": "true"
+        }
+      ],
+      "hardware_batchNumber": "EXAMPLE-PCB-LOT-01",
+      "hardware_partNumber": "PSOC-DEVB-01-PCB",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-3",
+      "name": "PSOC-DEVB-01-PCB",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-1",
+      "suppliedBy": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-4",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "file:att/mfg-distribution-EXAMPLE-SHIP-0002.intoto.json",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-2",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "9d75db87b328fee1aedaa1f56ec156d4974c6f0cfd97bb819b29b170975e8f97",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "distribution of PSOC-DEVB-01-PCB",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-1",
+      "supplychain_current": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "supplychain_previous": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-4",
+      "supplychain_responsibilityCategory": "custody",
+      "supplychain_responsibilityChangedOn": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-1"
+      ],
+      "type": "supplychain_ResponsibilityChangeAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-1",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-1",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Example Open Silicon Group",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-5",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "extension": [
+        {
+          "extension_cdxProperty": [
+            {
+              "extension_cdxPropName": "hbom:country",
+              "extension_cdxPropValue": "US",
+              "type": "extension_CdxPropertyEntry"
+            }
+          ],
+          "type": "extension_CdxPropertiesExtension"
+        }
+      ],
+      "name": "Example Franchised Distributor",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:refDes",
+          "type": "DictionaryEntry",
+          "value": "U1"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "EXAMPLE-2636"
+        },
+        {
+          "key": "hbom:authorized",
+          "type": "DictionaryEntry",
+          "value": "true"
+        }
+      ],
+      "hardware_batchNumber": "ASM-EXAMPLE-17",
+      "hardware_partNumber": "PSOC130-QFN64",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-5",
+      "name": "PSOC130-QFN64",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-2",
+      "suppliedBy": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "file:parts/picosoc/att/hbom.intoto.json",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "bom",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-3",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "60aefdafe82fd9b79c194c8e3ca459cf3646c2a588c414b4c3344df426427482",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-2",
+      "relationshipType": "hasMetadata",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-2",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-3"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "distribution of PSOC130-QFN64",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-2",
+      "supplychain_current": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "supplychain_previous": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "supplychain_responsibilityCategory": "custody",
+      "supplychain_responsibilityChangedOn": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-2"
+      ],
+      "type": "supplychain_ResponsibilityChangeAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-2",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-3",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Winbond Electronics",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-7",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:refDes",
+          "type": "DictionaryEntry",
+          "value": "U2"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "EXAMPLE-2621"
+        },
+        {
+          "key": "hbom:authorized",
+          "type": "DictionaryEntry",
+          "value": "true"
+        }
+      ],
+      "hardware_batchNumber": "EXAMPLE-WB-LOT-0001",
+      "hardware_partNumber": "W25Q128JVSIQ",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-7",
+      "name": "W25Q128JVSIQ",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-3",
+      "suppliedBy": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "distribution of W25Q128JVSIQ",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-3",
+      "supplychain_current": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "supplychain_previous": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "supplychain_responsibilityCategory": "custody",
+      "supplychain_responsibilityChangedOn": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-3"
+      ],
+      "type": "supplychain_ResponsibilityChangeAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-3",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-4",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Texas Instruments",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-8",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:refDes",
+          "type": "DictionaryEntry",
+          "value": "U3"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "EXAMPLE-2618"
+        },
+        {
+          "key": "hbom:authorized",
+          "type": "DictionaryEntry",
+          "value": "true"
+        }
+      ],
+      "hardware_batchNumber": "EXAMPLE-TI-LOT-0001",
+      "hardware_partNumber": "TLV75518PDBVR",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-8",
+      "name": "TLV75518PDBVR",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-4",
+      "suppliedBy": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "distribution of TLV75518PDBVR",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-4",
+      "supplychain_current": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "supplychain_previous": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "supplychain_responsibilityCategory": "custody",
+      "supplychain_responsibilityChangedOn": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-4"
+      ],
+      "type": "supplychain_ResponsibilityChangeAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-4",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-5",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:refDes",
+          "type": "DictionaryEntry",
+          "value": "U4"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "EXAMPLE-2619"
+        },
+        {
+          "key": "hbom:authorized",
+          "type": "DictionaryEntry",
+          "value": "true"
+        }
+      ],
+      "hardware_batchNumber": "EXAMPLE-TI-LOT-0002",
+      "hardware_partNumber": "TLV75533PDBVR",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-8",
+      "name": "TLV75533PDBVR",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-5",
+      "suppliedBy": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "distribution of TLV75533PDBVR",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-5",
+      "supplychain_current": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "supplychain_previous": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "supplychain_responsibilityCategory": "custody",
+      "supplychain_responsibilityChangedOn": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-5"
+      ],
+      "type": "supplychain_ResponsibilityChangeAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-5",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-6",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Abracon",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-9",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:refDes",
+          "type": "DictionaryEntry",
+          "value": "Y1"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "EXAMPLE-2611"
+        },
+        {
+          "key": "hbom:authorized",
+          "type": "DictionaryEntry",
+          "value": "true"
+        }
+      ],
+      "hardware_batchNumber": "EXAMPLE-AB-LOT-0001",
+      "hardware_partNumber": "ASE-12.000MHZ-LC-T",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-9",
+      "name": "ASE-12.000MHZ-LC-T",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-6",
+      "suppliedBy": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "distribution of ASE-12.000MHZ-LC-T",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-6",
+      "supplychain_current": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "supplychain_previous": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "supplychain_responsibilityCategory": "custody",
+      "supplychain_responsibilityChangedOn": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-6"
+      ],
+      "type": "supplychain_ResponsibilityChangeAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-6",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-7",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "Murata Electronics",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-10",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:refDes",
+          "type": "DictionaryEntry",
+          "value": "C1"
+        },
+        {
+          "key": "hbom:refDes.2",
+          "type": "DictionaryEntry",
+          "value": "C2"
+        },
+        {
+          "key": "hbom:refDes.3",
+          "type": "DictionaryEntry",
+          "value": "C3"
+        },
+        {
+          "key": "hbom:refDes.4",
+          "type": "DictionaryEntry",
+          "value": "C4"
+        },
+        {
+          "key": "hbom:refDes.5",
+          "type": "DictionaryEntry",
+          "value": "C5"
+        },
+        {
+          "key": "hbom:refDes.6",
+          "type": "DictionaryEntry",
+          "value": "C6"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "EXAMPLE-2602"
+        },
+        {
+          "key": "hbom:authorized",
+          "type": "DictionaryEntry",
+          "value": "true"
+        }
+      ],
+      "hardware_batchNumber": "EXAMPLE-MU-LOT-0001",
+      "hardware_partNumber": "GRM188R61A106KE69D",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-10",
+      "name": "GRM188R61A106KE69D",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-7",
+      "suppliedBy": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "distribution of GRM188R61A106KE69D",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-7",
+      "supplychain_current": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "supplychain_previous": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "supplychain_responsibilityCategory": "custody",
+      "supplychain_responsibilityChangedOn": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-7"
+      ],
+      "type": "supplychain_ResponsibilityChangeAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-7",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-8",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "YAGEO",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-11",
+      "type": "Organization"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "hardware_additionalInformation": [
+        {
+          "key": "hbom:refDes",
+          "type": "DictionaryEntry",
+          "value": "R1"
+        },
+        {
+          "key": "hbom:refDes.2",
+          "type": "DictionaryEntry",
+          "value": "R2"
+        },
+        {
+          "key": "hbom:dateCode",
+          "type": "DictionaryEntry",
+          "value": "EXAMPLE-2605"
+        },
+        {
+          "key": "hbom:authorized",
+          "type": "DictionaryEntry",
+          "value": "true"
+        }
+      ],
+      "hardware_batchNumber": "EXAMPLE-YG-LOT-0001",
+      "hardware_partNumber": "RC0402FR-0710KL",
+      "hardware_productAgent": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-11",
+      "name": "RC0402FR-0710KL",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-8",
+      "suppliedBy": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "type": "hardware_PhysicalHardware"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "distribution of RC0402FR-0710KL",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-8",
+      "supplychain_current": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2",
+      "supplychain_previous": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-6",
+      "supplychain_responsibilityCategory": "custody",
+      "supplychain_responsibilityChangedOn": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-8"
+      ],
+      "type": "supplychain_ResponsibilityChangeAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#transfer-8",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-9",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-4"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "country": "USA",
+      "creationInfo": "_:creationinfo",
+      "name": "Example EMS",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#location-1",
+      "type": "PhysicalLocation"
+    },
+    {
+      "actionLocation": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#location-1"
+      ],
+      "additionalInformation": [
+        {
+          "key": "hbom:ems.name",
+          "type": "DictionaryEntry",
+          "value": "Example EMS"
+        },
+        {
+          "key": "hbom:ems.country",
+          "type": "DictionaryEntry",
+          "value": "US"
+        },
+        {
+          "key": "hbom:boardLot",
+          "type": "DictionaryEntry",
+          "value": "BRD-EXAMPLE-01"
+        }
+      ],
+      "creationInfo": "_:creationinfo",
+      "name": "board assembly",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#action-1",
+      "type": "supplychain_AssemblyAction"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#action-1",
+      "relationshipType": "performedBy",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-10",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#org-2"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#action-1",
+      "relationshipType": "hasInput",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-11",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-8"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#action-1",
+      "relationshipType": "hasInput",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-12",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-1"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#action-1",
+      "relationshipType": "hasOutput",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-13",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#product"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "name": "file:att/mfg-a1-board-assembly.intoto.json",
+      "software_fileKind": "file",
+      "software_primaryPurpose": "evidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-5",
+      "type": "software_File",
+      "verifiedUsing": [
+        {
+          "algorithm": "sha256",
+          "hashValue": "b35e5a01848ffa65b7da76812c0c6e624cfcf6307babe83cdb9c9f28e31d654b",
+          "type": "Hash"
+        }
+      ]
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#action-1",
+      "relationshipType": "hasEvidence",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-14",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#file-5"
+      ],
+      "type": "Relationship"
+    },
+    {
+      "creationInfo": "_:creationinfo",
+      "from": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#product",
+      "relationshipType": "contains",
+      "spdxId": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#rel-15",
+      "to": [
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-1",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-2",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-3",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-4",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-5",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-6",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-7",
+        "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda#part-8"
+      ],
+      "type": "Relationship"
+    }
+  ]
+}

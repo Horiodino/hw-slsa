@@ -34,6 +34,9 @@ env:
   SLSA_VERIFIER_VERSION: v2.7.1
   # sha256 of slsa-verifier-linux-amd64 v2.7.1, from SHA256SUM.md in slsa-framework/slsa-verifier
   SLSA_VERIFIER_SHA256: 946dbec729094195e88ef78e1734324a27869f03e2c6bd2f61cbc06bd5350339
+  CYCLONEDX_CLI_VERSION: v0.32.0
+  # sha256 of cyclonedx-linux-x64 v0.32.0, as listed on the CycloneDX/cyclonedx-cli release page
+  CYCLONEDX_CLI_SHA256: 454879e6a4a405c8a13bff49b8982adcb0596f3019b26b0811c66e4d7f0783e1
 
 jobs:
   lint:
@@ -129,6 +132,16 @@ jobs:
         env:
           HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
         run: e2e/board/run.sh verify | tee -a verify.log
+      - name: Validate the CycloneDX renderings with the CycloneDX CLI ${{ env.CYCLONEDX_CLI_VERSION }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/cyclonedx" \
+            "https://github.com/CycloneDX/cyclonedx-cli/releases/download/${CYCLONEDX_CLI_VERSION}/cyclonedx-linux-x64"
+          echo "${CYCLONEDX_CLI_SHA256}  $RUNNER_TEMP/cyclonedx" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/cyclonedx"
+          for bom in out/bundle/att/hbom.cdx.json out/board/att/hbom.cdx.json hbom/*.cdx.json; do
+            echo "== $bom"
+            "$RUNNER_TEMP/cyclonedx" validate --input-file "$bom" --input-format json --input-version v1_6 --fail-on-errors
+          done
       - name: Tamper tests
         run: go test -v -count=1 ./tools/hslsa/ | tee tamper.log
       - name: Summary

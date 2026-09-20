@@ -459,6 +459,9 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 	if len(lot.NotRecorded) > 0 {
 		fmt.Printf("not recorded, and not required by the policy: %s\n", strings.Join(lot.NotRecorded, "; "))
 	}
+	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", "hbom.intoto.json"), "hbom"); err != nil {
+		return nil, nil, err
+	}
 	if vsaKey != "" {
 		claims := O(policy, "claims")
 		if err := signVSA(design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"],

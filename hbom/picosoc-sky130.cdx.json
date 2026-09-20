@@ -1,0 +1,900 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "ip-1",
+      "externalReferences": [
+        {
+          "comment": "git commit 01afdda1b0e3ca89e503fda08c983a3a66340c5a",
+          "type": "vcs",
+          "url": "https://github.com/YosysHQ/picorv32"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "ISC"
+        }
+      ],
+      "name": "picorv32",
+      "properties": [
+        {
+          "name": "hbom:ipKind",
+          "value": "soft"
+        }
+      ],
+      "supplier": {
+        "name": "YosysHQ"
+      },
+      "type": "library",
+      "version": "v1.0"
+    },
+    {
+      "bom-ref": "ip-2",
+      "externalReferences": [
+        {
+          "comment": "git commit 6240b3bd7435262681632af08c9b6b3bfbf6baad",
+          "type": "vcs",
+          "url": "https://github.com/efabless/caravel"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "caravel harness",
+      "properties": [
+        {
+          "name": "hbom:ipKind",
+          "value": "hard"
+        }
+      ],
+      "supplier": {
+        "name": "Efabless"
+      },
+      "type": "library"
+    },
+    {
+      "bom-ref": "ip-3",
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "sky130_fd_sc_hd",
+      "properties": [
+        {
+          "name": "hbom:ipKind",
+          "value": "std-cell-library"
+        }
+      ],
+      "supplier": {
+        "name": "SkyWater Technology"
+      },
+      "type": "library"
+    },
+    {
+      "bom-ref": "ip-4",
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "name": "sky130_fd_io",
+      "properties": [
+        {
+          "name": "hbom:ipKind",
+          "value": "io-library"
+        }
+      ],
+      "supplier": {
+        "name": "SkyWater Technology"
+      },
+      "type": "library"
+    },
+    {
+      "bom-ref": "rtl-1",
+      "externalReferences": [
+        {
+          "comment": "git commit e06410c3136960fd33c56d41274fecfe11841906",
+          "type": "vcs",
+          "url": "https://github.com/example/picosoc-sky130"
+        }
+      ],
+      "name": "rtl/",
+      "properties": [
+        {
+          "name": "hbom:rtlSource",
+          "value": "true"
+        },
+        {
+          "name": "hbom:language",
+          "value": "Verilog"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "pdk",
+      "name": "sky130A (open_pdks)",
+      "properties": [
+        {
+          "name": "hbom:pdk",
+          "value": "true"
+        },
+        {
+          "name": "hbom:gitCommit",
+          "value": "a496cc6dcfea4d9f87c7431adbe08339419a3fbd"
+        }
+      ],
+      "supplier": {
+        "name": "SkyWater Technology"
+      },
+      "type": "platform",
+      "version": "<open_pdks commit>"
+    },
+    {
+      "bom-ref": "final-layout",
+      "externalReferences": [
+        {
+          "comment": "final layout; media type application/vnd.gdsii",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071"
+            }
+          ],
+          "type": "distribution",
+          "url": "file:gds/caravel_psoc130.gds"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071"
+        }
+      ],
+      "mime-type": "application/vnd.gdsii",
+      "name": "caravel_psoc130.gds",
+      "properties": [
+        {
+          "name": "hbom:finalLayout",
+          "value": "true"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "fw-1",
+      "externalReferences": [
+        {
+          "comment": "firmware SBOM",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "cdbb608b62f133717bcc4e17284389a4d1c5a650c1c14a11f914d3ddeb112095"
+            }
+          ],
+          "type": "bom",
+          "url": "https://example.org/sbom/mgmt-fw.spdx.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d6e5d4d4d36d3a6f6bd89fc1f50364e0221fffa496a7625d973b14ef2e88ab95"
+        }
+      ],
+      "name": "caravel management firmware",
+      "properties": [
+        {
+          "name": "hbom:role",
+          "value": "bootloader"
+        },
+        {
+          "name": "hbom:storage",
+          "value": "external-flash"
+        }
+      ],
+      "type": "firmware",
+      "version": "<tag>"
+    },
+    {
+      "bom-ref": "fw-2",
+      "externalReferences": [
+        {
+          "comment": "firmware SBOM",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "5d04007a2eb998faa9a2e27f176ae4316c2903b26f0771379e78616e72ced1f6"
+            }
+          ],
+          "type": "bom",
+          "url": "https://example.org/sbom/picosoc-fw.cdx.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "69ccc925cfaab3d874d8a4ecd1d4cc76f278fcda7869d50f0f539cccf78d2ad2"
+        }
+      ],
+      "name": "picosoc firmware",
+      "properties": [
+        {
+          "name": "hbom:role",
+          "value": "runtime"
+        },
+        {
+          "name": "hbom:storage",
+          "value": "external-flash"
+        }
+      ],
+      "type": "firmware",
+      "version": "0.3.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "ip-1",
+        "ip-2",
+        "ip-3",
+        "ip-4",
+        "rtl-1",
+        "pdk",
+        "final-layout",
+        "fw-1",
+        "fw-2"
+      ],
+      "ref": "product"
+    },
+    {
+      "ref": "ip-1"
+    },
+    {
+      "ref": "ip-2"
+    },
+    {
+      "ref": "ip-3"
+    },
+    {
+      "ref": "ip-4"
+    },
+    {
+      "ref": "rtl-1"
+    },
+    {
+      "ref": "pdk"
+    },
+    {
+      "ref": "final-layout"
+    },
+    {
+      "ref": "fw-1"
+    },
+    {
+      "ref": "fw-2"
+    }
+  ],
+  "formulation": [
+    {
+      "bom-ref": "formulation",
+      "components": [
+        {
+          "bom-ref": "tool-1",
+          "name": "Icarus Verilog",
+          "purl": "pkg:github/steveicarus/iverilog@v12_0",
+          "type": "application",
+          "version": "12.0"
+        },
+        {
+          "bom-ref": "tool-2",
+          "name": "Yosys",
+          "purl": "pkg:github/YosysHQ/yosys@v0.46",
+          "type": "application",
+          "version": "0.46"
+        },
+        {
+          "bom-ref": "tool-3",
+          "name": "OpenLane",
+          "type": "application",
+          "version": "2.x"
+        },
+        {
+          "bom-ref": "tool-4",
+          "name": "OpenROAD",
+          "type": "application",
+          "version": "<commit>"
+        },
+        {
+          "bom-ref": "tool-5",
+          "name": "Magic",
+          "type": "application",
+          "version": "8.3"
+        },
+        {
+          "bom-ref": "tool-6",
+          "name": "KLayout",
+          "type": "application",
+          "version": "0.29"
+        },
+        {
+          "bom-ref": "tool-7",
+          "name": "Netgen",
+          "type": "application",
+          "version": "1.5"
+        },
+        {
+          "bom-ref": "tool-8",
+          "name": "cosign",
+          "purl": "pkg:github/sigstore/cosign@v2.4.1",
+          "type": "application",
+          "version": "2.4.1"
+        },
+        {
+          "bom-ref": "tool-9",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "ba9c736f19e7f60b7f6764adb0b7908c0a2b394e09b6c09863528c7f2bc86095"
+            }
+          ],
+          "name": "psoc130-probe",
+          "type": "application",
+          "version": "1.0.0"
+        },
+        {
+          "bom-ref": "tool-10",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "9adf009b9ea42792e73e5dc86e9c9024489d74ad894c0a3acbc03095158eaabc"
+            }
+          ],
+          "name": "psoc130-ft",
+          "type": "application",
+          "version": "1.2.0"
+        }
+      ],
+      "workflows": [
+        {
+          "bom-ref": "design-flow",
+          "name": "design flow",
+          "taskTypes": [
+            "build"
+          ],
+          "tasks": [
+            {
+              "bom-ref": "design-1",
+              "name": "simulation",
+              "resourceReferences": [
+                {
+                  "ref": "tool-1"
+                }
+              ],
+              "taskTypes": [
+                "test"
+              ],
+              "uid": "design-1-simulation"
+            },
+            {
+              "bom-ref": "design-2",
+              "name": "synthesis",
+              "outputs": [
+                {
+                  "resource": {
+                    "externalReference": {
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "fc026475b8786a706f6831d13838bb256ab0e1be5ae65e2ded1ae39a99420900"
+                        }
+                      ],
+                      "type": "distribution",
+                      "url": "file:runs/final/nl/user_project_wrapper.nl.v"
+                    }
+                  },
+                  "type": "artifact"
+                },
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "design-flow record for this step",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "8048f7c30b224754081e0043e4d80c698c9b353ad086a11b2dcc000951c30af5"
+                        }
+                      ],
+                      "type": "attestation",
+                      "url": "https://example.org/att/synth.intoto.jsonl"
+                    }
+                  },
+                  "type": "attestation"
+                }
+              ],
+              "resourceReferences": [
+                {
+                  "ref": "tool-2"
+                }
+              ],
+              "taskTypes": [
+                "build"
+              ],
+              "uid": "design-2-synthesis"
+            },
+            {
+              "bom-ref": "design-3",
+              "name": "floorplan",
+              "resourceReferences": [
+                {
+                  "ref": "tool-3"
+                },
+                {
+                  "ref": "tool-4"
+                }
+              ],
+              "taskTypes": [
+                "build"
+              ],
+              "uid": "design-3-floorplan"
+            },
+            {
+              "bom-ref": "design-4",
+              "name": "place-cts",
+              "resourceReferences": [
+                {
+                  "ref": "tool-3"
+                },
+                {
+                  "ref": "tool-4"
+                }
+              ],
+              "taskTypes": [
+                "build"
+              ],
+              "uid": "design-4-place-cts"
+            },
+            {
+              "bom-ref": "design-5",
+              "name": "routing",
+              "outputs": [
+                {
+                  "resource": {
+                    "externalReference": {
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "cb8379ac2098aa165029e3938a51da0bcecfc008fd6795f401178647f96c5b34"
+                        }
+                      ],
+                      "type": "distribution",
+                      "url": "file:runs/final/def/user_project_wrapper.def"
+                    }
+                  },
+                  "type": "artifact"
+                },
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "design-flow record for this step",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "90b91f6b17c02f4377e84fb4114a8f751fd87d047a9208ed8d6c75a70b8b115f"
+                        }
+                      ],
+                      "type": "attestation",
+                      "url": "https://example.org/att/pnr.intoto.jsonl"
+                    }
+                  },
+                  "type": "attestation"
+                }
+              ],
+              "resourceReferences": [
+                {
+                  "ref": "tool-3"
+                },
+                {
+                  "ref": "tool-4"
+                }
+              ],
+              "taskTypes": [
+                "build"
+              ],
+              "uid": "design-5-routing"
+            },
+            {
+              "bom-ref": "design-6",
+              "name": "signoff",
+              "resourceReferences": [
+                {
+                  "ref": "tool-5"
+                },
+                {
+                  "ref": "tool-6"
+                },
+                {
+                  "ref": "tool-7"
+                }
+              ],
+              "taskTypes": [
+                "test"
+              ],
+              "uid": "design-6-signoff"
+            },
+            {
+              "bom-ref": "design-7",
+              "name": "gds-stream-out",
+              "resourceReferences": [
+                {
+                  "ref": "tool-5"
+                }
+              ],
+              "taskTypes": [
+                "build"
+              ],
+              "uid": "design-7-gds-stream-out"
+            },
+            {
+              "bom-ref": "design-8",
+              "name": "release",
+              "outputs": [
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "media type application/vnd.gdsii",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071"
+                        }
+                      ],
+                      "type": "distribution",
+                      "url": "file:gds/caravel_psoc130.gds"
+                    }
+                  },
+                  "type": "artifact"
+                },
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "design-flow record for this step",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "49ecf35a64234b21ed0c646172f578480fc475e880aa13bd16d0add59dd56f10"
+                        }
+                      ],
+                      "type": "attestation",
+                      "url": "https://example.org/att/release.intoto.jsonl"
+                    }
+                  },
+                  "type": "attestation"
+                }
+              ],
+              "resourceReferences": [
+                {
+                  "ref": "tool-8"
+                }
+              ],
+              "taskTypes": [
+                "release"
+              ],
+              "uid": "design-8-release"
+            }
+          ],
+          "uid": "design-flow"
+        },
+        {
+          "bom-ref": "manufacturing",
+          "name": "manufacturing",
+          "taskTypes": [
+            "build",
+            "test"
+          ],
+          "tasks": [
+            {
+              "bom-ref": "mfg-1",
+              "name": "wafer fabrication",
+              "outputs": [
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "manufacturing-step record",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "3f524cdc07a11d7c6220bdb049fe8dd41b27483c96cc59b581e022d547290d69"
+                        }
+                      ],
+                      "type": "attestation",
+                      "url": "https://example.org/att/f1-wafer-fab.intoto.jsonl"
+                    }
+                  },
+                  "type": "attestation"
+                }
+              ],
+              "properties": [
+                {
+                  "name": "hbom:foundry.name",
+                  "value": "SkyWater Technology"
+                },
+                {
+                  "name": "hbom:foundry.country",
+                  "value": "US"
+                },
+                {
+                  "name": "hbom:foundry.site",
+                  "value": "Bloomington, MN"
+                },
+                {
+                  "name": "hbom:processNode",
+                  "value": "SKY130 (130 nm CMOS)"
+                },
+                {
+                  "name": "hbom:maskSetId",
+                  "value": "MS-EXAMPLE-0001"
+                },
+                {
+                  "name": "hbom:shuttle",
+                  "value": "MPW-EXAMPLE-01"
+                },
+                {
+                  "name": "hbom:waferLots.0.lotId",
+                  "value": "LOT-EXAMPLE-A"
+                },
+                {
+                  "name": "hbom:waferLots.0.startDate",
+                  "value": "2026-03-02"
+                }
+              ],
+              "taskTypes": [
+                "build"
+              ],
+              "uid": "mfg-1-wafer-fabrication"
+            },
+            {
+              "bom-ref": "mfg-2",
+              "name": "wafer-sort",
+              "outputs": [
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "manufacturing-step record",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "e4ab4e3b1493d5a997b4e51cdefbaa10570ef3ea9432bd72e7b6a89654ceb7f6"
+                        }
+                      ],
+                      "type": "attestation",
+                      "url": "https://example.org/att/f2-wafer-sort.intoto.jsonl"
+                    }
+                  },
+                  "type": "attestation"
+                }
+              ],
+              "properties": [
+                {
+                  "name": "hbom:site.name",
+                  "value": "SkyWater Technology"
+                },
+                {
+                  "name": "hbom:site.country",
+                  "value": "US"
+                },
+                {
+                  "name": "hbom:site.site",
+                  "value": "Bloomington, MN"
+                },
+                {
+                  "name": "hbom:stage",
+                  "value": "wafer-sort"
+                }
+              ],
+              "resourceReferences": [
+                {
+                  "ref": "tool-9"
+                }
+              ],
+              "taskTypes": [
+                "test"
+              ],
+              "uid": "mfg-2-wafer-sort"
+            },
+            {
+              "bom-ref": "mfg-3",
+              "name": "packaging",
+              "outputs": [
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "manufacturing-step record",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "625e0f649de27800fc3bcf4c118ef79f69dcb762c2e73fbb1cfce0e7a86f6b80"
+                        }
+                      ],
+                      "type": "attestation",
+                      "url": "https://example.org/att/f3-packaging.intoto.jsonl"
+                    }
+                  },
+                  "type": "attestation"
+                }
+              ],
+              "properties": [
+                {
+                  "name": "hbom:osat.name",
+                  "value": "Example OSAT"
+                },
+                {
+                  "name": "hbom:osat.country",
+                  "value": "US"
+                },
+                {
+                  "name": "hbom:packageType",
+                  "value": "QFN-64 7x7 mm"
+                },
+                {
+                  "name": "hbom:assemblyLot",
+                  "value": "ASM-EXAMPLE-17"
+                },
+                {
+                  "name": "hbom:dateCode",
+                  "value": "2622"
+                }
+              ],
+              "taskTypes": [
+                "build"
+              ],
+              "uid": "mfg-3-packaging"
+            },
+            {
+              "bom-ref": "mfg-4",
+              "name": "final-test",
+              "outputs": [
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "manufacturing-step record",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "608cdb524384f5ee06edc2830d6b13a92047229398768ff88e28ad68d02569e8"
+                        }
+                      ],
+                      "type": "attestation",
+                      "url": "https://example.org/att/f4-final-test.intoto.jsonl"
+                    }
+                  },
+                  "type": "attestation"
+                }
+              ],
+              "properties": [
+                {
+                  "name": "hbom:site.name",
+                  "value": "Example Test House"
+                },
+                {
+                  "name": "hbom:site.country",
+                  "value": "US"
+                },
+                {
+                  "name": "hbom:stage",
+                  "value": "final-test"
+                }
+              ],
+              "resourceReferences": [
+                {
+                  "ref": "tool-10"
+                }
+              ],
+              "taskTypes": [
+                "test"
+              ],
+              "uid": "mfg-4-final-test"
+            }
+          ],
+          "uid": "manufacturing"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "product",
+      "manufacturer": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Open Silicon Group"
+      },
+      "name": "picosoc-sky130",
+      "properties": [
+        {
+          "name": "hbom:lot",
+          "value": "ASM-EXAMPLE-17"
+        }
+      ],
+      "purl": "pkg:generic/picosoc-sky130@A0",
+      "type": "device",
+      "version": "A0"
+    },
+    "manufacturer": {
+      "address": {
+        "country": "US"
+      },
+      "name": "Example Open Silicon Group"
+    },
+    "properties": [
+      {
+        "name": "hbom:predicateType",
+        "value": "https://github.com/Horiodino/hw-slsa/hbom/v0.1"
+      },
+      {
+        "name": "hbom:hbomVersion",
+        "value": "0.1"
+      },
+      {
+        "name": "hbom:subject",
+        "value": "caravel_psoc130.gds sha256:8261e1a4f86abe76f7a1e8a66ae713e37dc9e651408b95b7db70ea062d5fc071"
+      },
+      {
+        "name": "hbom:subject",
+        "value": "urn:hslsa:lot:ASM-EXAMPLE-17 sha256:4876860b247bffbd0ceedf5bb53d278f9a25251619cd68dee4d740a4c73cbaf1"
+      },
+      {
+        "name": "hbom:level",
+        "value": "package"
+      },
+      {
+        "name": "hbom:partNumber",
+        "value": "PSOC130-QFN64"
+      },
+      {
+        "name": "hbom:manufacturer.name",
+        "value": "Example Open Silicon Group"
+      },
+      {
+        "name": "hbom:manufacturer.country",
+        "value": "US"
+      },
+      {
+        "name": "hbom:deviceIdentity.scheme",
+        "value": "serial"
+      },
+      {
+        "name": "hbom:deviceIdentity.serial",
+        "value": "per unit; the shipped lot lists every serial"
+      },
+      {
+        "name": "hbom:redaction",
+        "value": "/manufacturing/waferLots/0/waferIds sha256:99eba9d39625f84a40323984610d7dd279e2f775fa4a833534e3a0e7ddf53331"
+      }
+    ],
+    "timestamp": "2026-10-01T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "externalReferences": [
+            {
+              "type": "vcs",
+              "url": "https://github.com/Horiodino/hw-slsa"
+            }
+          ],
+          "name": "hslsa",
+          "type": "application",
+          "version": "0.1"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:83e2bb26-53d0-5669-8c74-bf3fedb2d68e",
+  "specVersion": "1.6",
+  "version": 1
+}

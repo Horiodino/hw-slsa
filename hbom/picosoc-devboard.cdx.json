@@ -1,0 +1,683 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "final-layout",
+      "externalReferences": [
+        {
+          "comment": "final layout",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+            }
+          ],
+          "type": "distribution",
+          "url": "file:artifacts/board-design.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+        }
+      ],
+      "name": "board-design.json",
+      "properties": [
+        {
+          "name": "hbom:finalLayout",
+          "value": "true"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "part-1",
+      "externalReferences": [
+        {
+          "comment": "signed distribution record for this lot",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "9d75db87b328fee1aedaa1f56ec156d4974c6f0cfd97bb819b29b170975e8f97"
+            }
+          ],
+          "type": "attestation",
+          "url": "file:att/mfg-distribution-EXAMPLE-SHIP-0002.intoto.json"
+        }
+      ],
+      "manufacturer": {
+        "name": "Example PCB Fab"
+      },
+      "name": "PSOC-DEVB-01-PCB",
+      "properties": [
+        {
+          "name": "hbom:mpn",
+          "value": "PSOC-DEVB-01-PCB"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "PCB1"
+        },
+        {
+          "name": "hbom:dateCode",
+          "value": "EXAMPLE-2637"
+        },
+        {
+          "name": "hbom:lot",
+          "value": "EXAMPLE-PCB-LOT-01"
+        },
+        {
+          "name": "hbom:authorized",
+          "value": "true"
+        },
+        {
+          "name": "hbom:distributor.country",
+          "value": "US"
+        }
+      ],
+      "supplier": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example PCB Fab"
+      },
+      "type": "device"
+    },
+    {
+      "bom-ref": "part-2",
+      "externalReferences": [
+        {
+          "comment": "the part's signed HBOM",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "60aefdafe82fd9b79c194c8e3ca459cf3646c2a588c414b4c3344df426427482"
+            }
+          ],
+          "type": "bom",
+          "url": "file:parts/picosoc/att/hbom.intoto.json"
+        },
+        {
+          "comment": "signed distribution record for this lot",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+            }
+          ],
+          "type": "attestation",
+          "url": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        }
+      ],
+      "manufacturer": {
+        "name": "Example Open Silicon Group"
+      },
+      "name": "PSOC130-QFN64",
+      "properties": [
+        {
+          "name": "hbom:mpn",
+          "value": "PSOC130-QFN64"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "U1"
+        },
+        {
+          "name": "hbom:dateCode",
+          "value": "EXAMPLE-2636"
+        },
+        {
+          "name": "hbom:lot",
+          "value": "ASM-EXAMPLE-17"
+        },
+        {
+          "name": "hbom:authorized",
+          "value": "true"
+        },
+        {
+          "name": "hbom:distributor.country",
+          "value": "US"
+        }
+      ],
+      "supplier": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Franchised Distributor"
+      },
+      "type": "device"
+    },
+    {
+      "bom-ref": "part-3",
+      "externalReferences": [
+        {
+          "comment": "signed distribution record for this lot",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+            }
+          ],
+          "type": "attestation",
+          "url": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        }
+      ],
+      "manufacturer": {
+        "name": "Winbond Electronics"
+      },
+      "name": "W25Q128JVSIQ",
+      "properties": [
+        {
+          "name": "hbom:mpn",
+          "value": "W25Q128JVSIQ"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "U2"
+        },
+        {
+          "name": "hbom:dateCode",
+          "value": "EXAMPLE-2621"
+        },
+        {
+          "name": "hbom:lot",
+          "value": "EXAMPLE-WB-LOT-0001"
+        },
+        {
+          "name": "hbom:authorized",
+          "value": "true"
+        },
+        {
+          "name": "hbom:distributor.country",
+          "value": "US"
+        }
+      ],
+      "supplier": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Franchised Distributor"
+      },
+      "type": "device"
+    },
+    {
+      "bom-ref": "part-4",
+      "externalReferences": [
+        {
+          "comment": "signed distribution record for this lot",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+            }
+          ],
+          "type": "attestation",
+          "url": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        }
+      ],
+      "manufacturer": {
+        "name": "Texas Instruments"
+      },
+      "name": "TLV75518PDBVR",
+      "properties": [
+        {
+          "name": "hbom:mpn",
+          "value": "TLV75518PDBVR"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "U3"
+        },
+        {
+          "name": "hbom:dateCode",
+          "value": "EXAMPLE-2618"
+        },
+        {
+          "name": "hbom:lot",
+          "value": "EXAMPLE-TI-LOT-0001"
+        },
+        {
+          "name": "hbom:authorized",
+          "value": "true"
+        },
+        {
+          "name": "hbom:distributor.country",
+          "value": "US"
+        }
+      ],
+      "supplier": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Franchised Distributor"
+      },
+      "type": "device"
+    },
+    {
+      "bom-ref": "part-5",
+      "externalReferences": [
+        {
+          "comment": "signed distribution record for this lot",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+            }
+          ],
+          "type": "attestation",
+          "url": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        }
+      ],
+      "manufacturer": {
+        "name": "Texas Instruments"
+      },
+      "name": "TLV75533PDBVR",
+      "properties": [
+        {
+          "name": "hbom:mpn",
+          "value": "TLV75533PDBVR"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "U4"
+        },
+        {
+          "name": "hbom:dateCode",
+          "value": "EXAMPLE-2619"
+        },
+        {
+          "name": "hbom:lot",
+          "value": "EXAMPLE-TI-LOT-0002"
+        },
+        {
+          "name": "hbom:authorized",
+          "value": "true"
+        },
+        {
+          "name": "hbom:distributor.country",
+          "value": "US"
+        }
+      ],
+      "supplier": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Franchised Distributor"
+      },
+      "type": "device"
+    },
+    {
+      "bom-ref": "part-6",
+      "externalReferences": [
+        {
+          "comment": "signed distribution record for this lot",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+            }
+          ],
+          "type": "attestation",
+          "url": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        }
+      ],
+      "manufacturer": {
+        "name": "Abracon"
+      },
+      "name": "ASE-12.000MHZ-LC-T",
+      "properties": [
+        {
+          "name": "hbom:mpn",
+          "value": "ASE-12.000MHZ-LC-T"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "Y1"
+        },
+        {
+          "name": "hbom:dateCode",
+          "value": "EXAMPLE-2611"
+        },
+        {
+          "name": "hbom:lot",
+          "value": "EXAMPLE-AB-LOT-0001"
+        },
+        {
+          "name": "hbom:authorized",
+          "value": "true"
+        },
+        {
+          "name": "hbom:distributor.country",
+          "value": "US"
+        }
+      ],
+      "supplier": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Franchised Distributor"
+      },
+      "type": "device"
+    },
+    {
+      "bom-ref": "part-7",
+      "externalReferences": [
+        {
+          "comment": "signed distribution record for this lot",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+            }
+          ],
+          "type": "attestation",
+          "url": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        }
+      ],
+      "manufacturer": {
+        "name": "Murata Electronics"
+      },
+      "name": "GRM188R61A106KE69D",
+      "properties": [
+        {
+          "name": "hbom:mpn",
+          "value": "GRM188R61A106KE69D"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "C1"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "C2"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "C3"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "C4"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "C5"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "C6"
+        },
+        {
+          "name": "hbom:dateCode",
+          "value": "EXAMPLE-2602"
+        },
+        {
+          "name": "hbom:lot",
+          "value": "EXAMPLE-MU-LOT-0001"
+        },
+        {
+          "name": "hbom:authorized",
+          "value": "true"
+        },
+        {
+          "name": "hbom:distributor.country",
+          "value": "US"
+        }
+      ],
+      "supplier": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Franchised Distributor"
+      },
+      "type": "device"
+    },
+    {
+      "bom-ref": "part-8",
+      "externalReferences": [
+        {
+          "comment": "signed distribution record for this lot",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "f292dadf3af9f5ea203e8e4c73b0a69cada844ecd0b3f0c4a0eb562cee42e048"
+            }
+          ],
+          "type": "attestation",
+          "url": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        }
+      ],
+      "manufacturer": {
+        "name": "YAGEO"
+      },
+      "name": "RC0402FR-0710KL",
+      "properties": [
+        {
+          "name": "hbom:mpn",
+          "value": "RC0402FR-0710KL"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "R1"
+        },
+        {
+          "name": "hbom:refDes",
+          "value": "R2"
+        },
+        {
+          "name": "hbom:dateCode",
+          "value": "EXAMPLE-2605"
+        },
+        {
+          "name": "hbom:lot",
+          "value": "EXAMPLE-YG-LOT-0001"
+        },
+        {
+          "name": "hbom:authorized",
+          "value": "true"
+        },
+        {
+          "name": "hbom:distributor.country",
+          "value": "US"
+        }
+      ],
+      "supplier": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Franchised Distributor"
+      },
+      "type": "device"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "final-layout",
+        "part-1",
+        "part-2",
+        "part-3",
+        "part-4",
+        "part-5",
+        "part-6",
+        "part-7",
+        "part-8"
+      ],
+      "ref": "product"
+    },
+    {
+      "ref": "final-layout"
+    },
+    {
+      "ref": "part-1"
+    },
+    {
+      "ref": "part-2"
+    },
+    {
+      "ref": "part-3"
+    },
+    {
+      "ref": "part-4"
+    },
+    {
+      "ref": "part-5"
+    },
+    {
+      "ref": "part-6"
+    },
+    {
+      "ref": "part-7"
+    },
+    {
+      "ref": "part-8"
+    }
+  ],
+  "formulation": [
+    {
+      "bom-ref": "formulation",
+      "workflows": [
+        {
+          "bom-ref": "manufacturing",
+          "name": "manufacturing",
+          "taskTypes": [
+            "build",
+            "test"
+          ],
+          "tasks": [
+            {
+              "bom-ref": "mfg-1",
+              "name": "board assembly",
+              "outputs": [
+                {
+                  "resource": {
+                    "externalReference": {
+                      "comment": "manufacturing-step record",
+                      "hashes": [
+                        {
+                          "alg": "SHA-256",
+                          "content": "b35e5a01848ffa65b7da76812c0c6e624cfcf6307babe83cdb9c9f28e31d654b"
+                        }
+                      ],
+                      "type": "attestation",
+                      "url": "file:att/mfg-a1-board-assembly.intoto.json"
+                    }
+                  },
+                  "type": "attestation"
+                }
+              ],
+              "properties": [
+                {
+                  "name": "hbom:ems.name",
+                  "value": "Example EMS"
+                },
+                {
+                  "name": "hbom:ems.country",
+                  "value": "US"
+                },
+                {
+                  "name": "hbom:boardLot",
+                  "value": "BRD-EXAMPLE-01"
+                }
+              ],
+              "taskTypes": [
+                "build"
+              ],
+              "uid": "mfg-1-board-assembly"
+            }
+          ],
+          "uid": "manufacturing"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "product",
+      "manufacturer": {
+        "address": {
+          "country": "US"
+        },
+        "name": "Example Open Silicon Group"
+      },
+      "name": "picosoc-devboard",
+      "properties": [
+        {
+          "name": "hbom:lot",
+          "value": "BRD-EXAMPLE-01"
+        }
+      ],
+      "type": "device",
+      "version": "A"
+    },
+    "manufacturer": {
+      "address": {
+        "country": "US"
+      },
+      "name": "Example Open Silicon Group"
+    },
+    "properties": [
+      {
+        "name": "hbom:predicateType",
+        "value": "https://github.com/Horiodino/hw-slsa/hbom/v0.1"
+      },
+      {
+        "name": "hbom:hbomVersion",
+        "value": "0.1"
+      },
+      {
+        "name": "hbom:subject",
+        "value": "board-design.json sha256:1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+      },
+      {
+        "name": "hbom:subject",
+        "value": "urn:hslsa:lot:BRD-EXAMPLE-01 sha256:d0c032429682df39bdf9a3d23021639f0987ce5695367cdd6c83283053657462"
+      },
+      {
+        "name": "hbom:level",
+        "value": "board"
+      },
+      {
+        "name": "hbom:partNumber",
+        "value": "PSOC-DEVB-01"
+      },
+      {
+        "name": "hbom:manufacturer.name",
+        "value": "Example Open Silicon Group"
+      },
+      {
+        "name": "hbom:manufacturer.country",
+        "value": "US"
+      },
+      {
+        "name": "hbom:deviceIdentity.scheme",
+        "value": "serial"
+      },
+      {
+        "name": "hbom:deviceIdentity.serial",
+        "value": "per board; the board lot lists every serial"
+      }
+    ],
+    "timestamp": "2026-10-01T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "externalReferences": [
+            {
+              "type": "vcs",
+              "url": "https://github.com/Horiodino/hw-slsa"
+            }
+          ],
+          "name": "hslsa",
+          "type": "application",
+          "version": "0.1"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:d1e59252-1070-5bcc-b4de-79a649457eda",
+  "specVersion": "1.6",
+  "version": 1
+}

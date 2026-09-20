@@ -97,59 +97,70 @@ func chipGaps(bundle string, policy Obj) (gaps, notRecorded []string) {
 // naming the same design release, from the site that signed that record to
 // the site that signed receiver, and shipping exactly the lot it names. It
 // returns the transfer's envelope for the receiving step to link to, or nil
-// when there is no transfer.
-func transferCheck(bundle string, trust *TrustRoot, design *DesignResult, from string, stmts map[string]Obj, receiver, prev Obj) (Obj, error) {
+// when there is no transfer. A shipper that signs nothing may have its
+// transfer proxy-signed by the site that received the shipment; the check
+// then also returns a line saying so.
+func transferCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult, from string, stmts map[string]Obj, receiver, prev Obj) (Obj, string, error) {
 	path := filepath.Join(bundle, "att", TransferAtt(from))
 	if _, err := os.Stat(path); err != nil {
-		return nil, nil
+		return nil, "", nil
 	}
 	label := "transfer from " + from
-	t, err := trust.Open(path, MfgSigner[from], MfgStep)
+	t, by, err := openRecord(trust, path, MfgSigner[from], ProxySigner[from])
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if buildType(t) != mfgStepType("distribution") {
-		return nil, failf("%s: wrong buildType", label)
+		return nil, "", failf("%s: wrong buildType", label)
+	}
+	note := ""
+	if by != "" {
+		if note, err = onBehalfCheck(bundle, policy, t, label, "transfer-"+from, by); err != nil {
+			return nil, "", err
+		}
+		if !jsonEqual(get(t, "predicate", "hwMfg", "proxy", "signer"), get(t, "predicate", "hwMfg", "receiver")) {
+			return nil, "", failf("%s: signed on the shipper's behalf by %s, which did not receive the shipment", label, S(t, "predicate", "hwMfg", "proxy", "signer", "name"))
+		}
 	}
 	if err := asSLSAProvenance(t, label); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if err := requireGates(t, label, "hwMfg"); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if err := requireFiles(bundle, t, label); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if err := requireLink(t, label, []Obj{prev}, "shipping step"); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	hw := O(t, "predicate", "hwMfg")
 	if !jsonEqual(get(hw, "designRef", "digest"), get(design.Final, "digest")) ||
 		!jsonEqual(get(hw, "designRef", "release", "digest"), get(design.Release, "digest")) {
-		return nil, failf("%s: designRef names a different design release", label)
+		return nil, "", failf("%s: designRef names a different design release", label)
 	}
 	sender := O(stmts[from], "predicate", "hwMfg", "site")
 	to := O(receiver, "predicate", "hwMfg", "site")
 	if !jsonEqual(get(hw, "site"), sender) {
-		return nil, failf("%s: shipped by %s, not by %s, which signed %s", label, S(hw, "site", "name"), S(sender, "name"), from)
+		return nil, "", failf("%s: shipped by %s, not by %s, which signed %s", label, S(hw, "site", "name"), S(sender, "name"), from)
 	}
 	if !jsonEqual(get(hw, "receiver"), to) {
-		return nil, failf("%s: shipped to %s, but %s signed the next step", label, S(hw, "receiver", "name"), S(to, "name"))
+		return nil, "", failf("%s: shipped to %s, but %s signed the next step", label, S(hw, "receiver", "name"), S(to, "name"))
 	}
 	list, err := ReadObj(filepath.Join(bundle, "artifacts", S(firstSubject(t), "name")))
 	if err != nil {
-		return nil, failf("%s: packing list: %v", label, err)
+		return nil, "", failf("%s: packing list: %v", label, err)
 	}
 	if !jsonEqual(get(list, "from"), sender) || !jsonEqual(get(list, "to"), to) {
-		return nil, failf("%s: packing list names other sites than the record", label)
+		return nil, "", failf("%s: packing list names other sites than the record", label)
 	}
 	lot := firstSubject(stmts[transferLot[from]])
 	items := Strs(list, "items")
 	quantity, _ := Int(list, "quantity")
 	if d, err := LotDigest(items); S(list, "lot") != S(lot, "name") || err != nil || d != S(lot, "digest", "sha256") || quantity != int64(len(items)) {
-		return nil, failf("%s: packing list does not ship exactly %s", label, S(lot, "name"))
+		return nil, "", failf("%s: packing list does not ship exactly %s", label, S(lot, "name"))
 	}
-	return envRD(bundle, TransferAtt(from)), nil
+	return envRD(bundle, TransferAtt(from)), note, nil
 }
 
 // boardGaps scans a board bundle for the board receipt check: the board

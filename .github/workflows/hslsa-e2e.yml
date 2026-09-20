@@ -73,6 +73,8 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends yosys iverilog
       - name: Run the flow and sign every step
         run: e2e/run.sh produce
+      - name: The same lot with suppliers that sign nothing, proxy-signed and checked
+        run: e2e/run.sh proxy
       - name: Build the board on the shipped chips and sign shipments, A1 and the board HBOM
         run: e2e/board/run.sh produce
       - name: Re-sign the lot with confidential fields withheld, for the escrow job

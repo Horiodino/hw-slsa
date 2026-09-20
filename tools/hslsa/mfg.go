@@ -12,7 +12,6 @@ package hslsa
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -60,11 +59,37 @@ func mfgNames(step string) (att, role, buildType, hwStep string) {
 
 func slug(name string) string { return strings.ReplaceAll(strings.ToLower(name), " ", "-") }
 
-func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw Obj, keys string, w *Withholding) (Obj, error) {
+// mfgRecord signs one manufacturing record with the site's own key, or,
+// when by is set (see onBehalf), with the key of the party signing on the
+// supplier's behalf.
+func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw Obj, keys string, w *Withholding, by Obj) (Obj, error) {
 	att, role, bt, hwStep := mfgNames(step)
+	builderID := "urn:hslsa:site:" + slug(S(hw, "site", "name"))
 	hwMfg := Obj{"step": hwStep, "confidential": []any{}}
 	for k, v := range hw {
 		hwMfg[k] = v
+	}
+	if by == nil || S(by, "kind") == ByEvidence {
+		if err := removeStale(filepath.Join(bundle, "artifacts", ExportName(step))); err != nil {
+			return nil, err
+		}
+	}
+	if by != nil {
+		if len(w.fields(step)) > 0 {
+			return nil, fmt.Errorf("%s: a record signed on a supplier's behalf cannot withhold fields yet", step)
+		}
+		role, builderID = S(by, "role"), proxyBuilder(O(by, "signer"))
+		proxy := Obj{"signer": O(by, "signer"), "reason": "supplier-does-not-sign"}
+		if S(by, "kind") == ByEvidence {
+			bt, hwMfg["step"] = mfgStepType("evidence"), "evidence"
+		} else {
+			export, err := writeExport(bundle, step, subjects, external, hw)
+			if err != nil {
+				return nil, err
+			}
+			proxy["source"] = []Obj{export}
+		}
+		hwMfg["proxy"] = proxy
 	}
 	pred := Obj{
 		"buildDefinition": Obj{
@@ -73,7 +98,7 @@ func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw
 			"resolvedDependencies": nonNil(deps),
 		},
 		"runDetails": Obj{
-			"builder":  Obj{"id": "urn:hslsa:site:" + slug(S(hw, "site", "name"))},
+			"builder":  Obj{"id": builderID},
 			"metadata": Obj{"invocationId": step + ":" + S(external, "lotId"), "finishedOn": Now()},
 		},
 		"hwMfg": hwMfg,
@@ -99,6 +124,9 @@ func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw
 		return nil, err
 	}
 	msg := fmt.Sprintf("%s: signed by %s", step, role)
+	if by != nil {
+		msg = fmt.Sprintf("%s: signed by %s on behalf of %s (%s)", step, role, S(hw, "site", "name"), S(by, "kind"))
+	}
 	if len(disclosures) > 0 {
 		msg += fmt.Sprintf(", %d field(s) withheld", len(disclosures))
 	}
@@ -111,15 +139,10 @@ func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw
 // the transfer, or prev itself when there is none. The packing list names
 // what was shipped (wafer ids or unit serials), the lot they belong to and
 // the receiving site.
-func transfer(bundle, from string, enabled bool, prev, lot Obj, items []string, fromSite, toSite, designRef Obj, keys string, w *Withholding) (Obj, error) {
+func transfer(bundle, from string, enabled bool, prev, lot Obj, items []string, fromSite, toSite, designRef Obj, keys string, w *Withholding, by Obj) (Obj, error) {
 	if !enabled {
-		for _, stale := range []string{filepath.Join(bundle, "att", TransferAtt(from)), filepath.Join(bundle, "artifacts", TransferList(from)),
-			disclosurePath(filepath.Join(bundle, "att", TransferAtt(from)))} {
-			if err := os.Remove(stale); err != nil && !os.IsNotExist(err) {
-				return nil, err
-			}
-		}
-		return prev, nil
+		return prev, removeStale(filepath.Join(bundle, "att", TransferAtt(from)), filepath.Join(bundle, "artifacts", TransferList(from)),
+			disclosurePath(filepath.Join(bundle, "att", TransferAtt(from))), filepath.Join(bundle, "artifacts", ExportName("transfer-"+from)))
 	}
 	path := filepath.Join(bundle, "artifacts", TransferList(from))
 	id := from + ":" + S(lot, "name")
@@ -135,7 +158,7 @@ func transfer(bundle, from string, enabled bool, prev, lot Obj, items []string, 
 		Obj{"id": id, "lotId": S(lot, "name")},
 		[]Obj{prev, lot},
 		Obj{"site": fromSite, "receiver": toSite, "designRef": designRef, "checks": passed("packing-list-matches-lot")},
-		keys, w)
+		keys, w, shipperProxy(by))
 }
 
 // writeData writes a data file a record names, with a random salt when the
@@ -185,6 +208,12 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 	}
 	final := finals[0]
 	designRef := Obj{"name": S(final, "name"), "digest": O(final, "digest"), "release": releaseRD}
+	by := map[string]Obj{}
+	for _, step := range MfgSteps {
+		if by[step], err = onBehalf(sc, step); err != nil {
+			return err
+		}
+	}
 
 	// F1: wafer fabrication
 	fab, lot := O(sc, "fab"), O(sc, "waferLot")
@@ -198,13 +227,13 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 		Obj{"lotId": S(lot, "lotId"), "maskSetId": S(fab, "maskSetId"), "processNode": S(fab, "processNode")},
 		[]Obj{releaseRD},
 		Obj{"site": O(fab, "site"), "designRef": designRef, "checks": passed("mask-vs-gds-xor", "inline-parametrics")},
-		keys, w)
+		keys, w, by["wafer-fab"])
 	if err != nil {
 		return err
 	}
 	sort := O(sc, "sort")
 	transfers := Truthy(get(sc, "transfers"))
-	t1, err := transfer(bundle, "wafer-fab", transfers, f1, waferLot, wafers, O(fab, "site"), O(sort, "site"), designRef, keys, w)
+	t1, err := transfer(bundle, "wafer-fab", transfers, f1, waferLot, wafers, O(fab, "site"), O(sort, "site"), designRef, keys, w, by["wafer-fab"])
 	if err != nil {
 		return err
 	}
@@ -239,29 +268,49 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 			}
 		}
 	}
-	if err := writeData(filepath.Join(art, "wafer-maps.json"), Obj{"waferLot": S(waferLot, "name"), "dies": nonNil(dies)}, w); err != nil {
-		return err
-	}
-	mapsRD, err := fileRD(filepath.Join(art, "wafer-maps.json"), "")
-	if err != nil {
-		return err
-	}
-	f2, err := mfgRecord(bundle, "wafer-sort", []Obj{mapsRD},
-		Obj{"lotId": S(lot, "lotId"), "probeProgram": get(sort, "program")},
-		[]Obj{t1, waferLot},
-		Obj{
-			"site":      O(sort, "site"),
-			"designRef": designRef,
-			"yield":     Obj{"in": len(dies), "passed": len(good), "failed": len(dies) - len(good)},
-			"checks":    passed("probe"),
-		},
-		keys, w)
-	if err != nil {
-		return err
+	var f2, mapsRD Obj
+	if S(by["wafer-sort"], "kind") == ByEvidence {
+		// The sort house hands over paper only: its certificate and traveller
+		// stand in for F2, and no wafer map enters the bundle.
+		if err := removeStale(filepath.Join(art, "wafer-maps.json")); err != nil {
+			return err
+		}
+		docs, entries, err := writeDocuments(bundle, "wafer-sort", sc)
+		if err != nil {
+			return err
+		}
+		f2, err = mfgRecord(bundle, "wafer-sort", docs,
+			Obj{"lotId": S(lot, "lotId")},
+			[]Obj{t1, waferLot},
+			Obj{"site": O(sort, "site"), "designRef": designRef, "evidence": Obj{"covers": "wafer-sort", "documents": entries}},
+			keys, w, by["wafer-sort"])
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := writeData(filepath.Join(art, "wafer-maps.json"), Obj{"waferLot": S(waferLot, "name"), "dies": nonNil(dies)}, w); err != nil {
+			return err
+		}
+		if mapsRD, err = fileRD(filepath.Join(art, "wafer-maps.json"), ""); err != nil {
+			return err
+		}
+		f2, err = mfgRecord(bundle, "wafer-sort", []Obj{mapsRD},
+			Obj{"lotId": S(lot, "lotId"), "probeProgram": get(sort, "program")},
+			[]Obj{t1, waferLot},
+			Obj{
+				"site":      O(sort, "site"),
+				"designRef": designRef,
+				"yield":     Obj{"in": len(dies), "passed": len(good), "failed": len(dies) - len(good)},
+				"checks":    passed("probe"),
+			},
+			keys, w, by["wafer-sort"])
+		if err != nil {
+			return err
+		}
 	}
 
 	pkg := O(sc, "packaging")
-	t2, err := transfer(bundle, "wafer-sort", transfers, f2, waferLot, wafers, O(sort, "site"), O(pkg, "site"), designRef, keys, w)
+	t2, err := transfer(bundle, "wafer-sort", transfers, f2, waferLot, wafers, O(sort, "site"), O(pkg, "site"), designRef, keys, w, by["wafer-sort"])
 	if err != nil {
 		return err
 	}
@@ -293,21 +342,25 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 	if err != nil {
 		return err
 	}
+	f3Deps := []Obj{t2}
+	if mapsRD != nil {
+		f3Deps = append(f3Deps, mapsRD)
+	}
 	f3, err := mfgRecord(bundle, "packaging", []Obj{packaged, genRD},
 		Obj{"lotId": S(pkg, "assemblyLot"), "packageType": S(pkg, "packageType")},
-		[]Obj{t2, mapsRD},
+		f3Deps,
 		Obj{
 			"site":      O(pkg, "site"),
 			"designRef": designRef,
 			"checks":    passed("die-attach", "wire-bond", "x-ray-sample", "marking"),
 		},
-		keys, w)
+		keys, w, by["packaging"])
 	if err != nil {
 		return err
 	}
 
 	ft := O(sc, "finalTest")
-	t3, err := transfer(bundle, "packaging", transfers, f3, packaged, packagedUnits, O(pkg, "site"), O(ft, "site"), designRef, keys, w)
+	t3, err := transfer(bundle, "packaging", transfers, f3, packaged, packagedUnits, O(pkg, "site"), O(ft, "site"), designRef, keys, w, by["packaging"])
 	if err != nil {
 		return err
 	}
@@ -346,7 +399,7 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 			"yield":     Obj{"in": len(packagedUnits), "passed": len(shipped), "failed": anyStrings(sortedCopy(failedUnits))},
 			"checks":    passed("final-test-per-unit", "yield-within-limits"),
 		},
-		keys, w)
+		keys, w, by["final-test"])
 	if err != nil {
 		return err
 	}

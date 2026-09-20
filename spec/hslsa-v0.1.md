@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 7 (2026-09-20). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 8 (2026-09-20). See the [changelog](#changelog).
 
 ## Overview
 
@@ -81,7 +81,7 @@ Four rules apply across tracks:
 1. **Transparency logs may be private.** Every L3 log requirement is met by a private log (a private Rekor instance, or an RFC 9162 style log run by the buyer or a consortium), since no foundry will publish lot IDs or yields.
 2. **Provisioning is Firmware, rated by its site.** Firmware Ln needs every provisioning site rated at least Ln in its own track (Wafer, Package/Test or Assembly).
 3. **One check for the buyer.** At every level the buyer collects the attestations, confirms each subject matches the identity the device proves at boot, and compares the stated levels against policy. From Design L3, the tapeout check also requires the equivalence record.
-4. **Evidence in place of a record, at L1 only.** When a supplier gives no record for a step, the next party MAY cover it with an [evidence record](#evidence-record) that names a certificate, audit report or paper record by digest. A track with any step covered this way is at L1.
+4. **Signing for a supplier, at L1 only.** When a supplier signs no record for a step, the party that received from it MAY sign one on its behalf as a [proxy](#proxy-signed-record): a full record built from the supplier's own data, or, when the supplier gives no data, an [evidence record](#evidence-record) that names a certificate, audit report or paper record by digest. A track with any record signed this way is at L1, and a buyer's policy MAY refuse such records altogether.
 
 **Firmware L2 through a board-level root of trust.** A part without a secure-boot ROM MAY reach Firmware L2 on a board whose root of trust verifies the external flash, but only when that root of trust is itself attested (its own HBOM entry, Firmware provenance and provisioning record at L2 or higher) and it verifies each image before the SoC is released from reset. The claim is made for the board, not the bare part: the bare part stays at Firmware L1, and the board's verification summary states Firmware L2. The board HBOM lists the root of trust in `parts[]` with its own chain, which the board receipt check verifies like any other chip's.
 
@@ -116,7 +116,8 @@ Every record in HSLSA is an [in-toto Statement v1](https://github.com/in-toto/at
 | Rebuild (L4) | `https://github.com/Horiodino/hw-slsa/design-flow/v0.1`, buildType `.../design-flow/step/rebuild@v1` | `hwFlow` | Second builder | Final GDS of the release it rebuilt |
 | Manufacturing step | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `hwMfg` | Fab, sort, OSAT, test and EMS sites | Wafer lot, packaged lot, shipped lot, or board lot and boards |
 | Distribution | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1`, buildType `.../mfg/step/distribution@v1` | `hwMfg` | The shipper: a distributor, a manufacturer shipping direct, or a manufacturing site shipping to the next ([transfer](#transfers-between-manufacturing-sites)) | The shipment's packing list |
-| Evidence (L1 only) | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1`, buildType `.../mfg/step/evidence@v1` | `hwMfg` | The next party in the chain, for a supplier's step that has no record ([Evidence record](#evidence-record)) | The certificate, audit report or paper record, by file digest |
+| Proxy-signed step (L1 only) | As the step it records, with `hwMfg.proxy` | `hwMfg` | The party that received from a supplier that signs nothing ([Proxy-signed record](#proxy-signed-record)) | As the step it records |
+| Evidence (L1 only) | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1`, buildType `.../mfg/step/evidence@v1` | `hwMfg` | The party that received from a supplier that gives no data, only documents ([Evidence record](#evidence-record)) | The certificate, audit report or paper record, by file digest |
 | Physical inspection (L4) | `https://github.com/Horiodino/hw-slsa/physical-inspection/v0.1` | none | Independent lab | Shipped lot and each sampled unit or board |
 | Firmware image build | `https://slsa.dev/provenance/v1` (unchanged), buildType named for the builder (for example `.../firmware/caliptra-builder@v1`) | none | Firmware build platform | Image digest |
 | Firmware provisioning | `https://github.com/Horiodino/hw-slsa/fw-provisioning/v0.1`, buildType `.../fw-provisioning/step/provision@v1` | `hwProvision` | Programming station at fab, OSAT or EMS | Each unit written |
@@ -199,7 +200,7 @@ Platforms and sites sign step records; people sign only decisions.
 | Programming station | `fw-provisioning` records | The site key of the site it sits in |
 | Independent lab (L4) | Inspection records | Lab's own key under a trust root separate from the producer's |
 | Receiver: an EMS, OEM or buyer | [Receipt records](#receipt-record) for the lots it checked on receipt | Its site key; an EMS uses the key it signs A1 with |
-| Next party in the chain (L1 only) | [Evidence records](#evidence-record) for a supplier's step that has no record | Its site key |
+| Proxy: whoever received from a supplier that signs nothing, which is the next site in the chain, or the product owner after final test (L1 only) | [Proxy-signed records](#proxy-signed-record) and [evidence records](#evidence-record) for that supplier's step and the transfer it ships | The key it signs its own records with, never a key listed for the supplier |
 | Escrow auditor | Design and receipt VSAs for the buyers it checks for ([Verifier escrow](#verifier-escrow)) | Its own key, listed in each buyer's trust root as `auditor` |
 
 None of these key models requires a public transparency log. The reference tool signs every record as a DSSE envelope with a local ECDSA P-256 key, publishes nothing, and hands the buyer a trust root of public keys by role; that meets every requirement up to L2, and L3 logs may be private (see the rules under [Core requirements](#core-requirements)).
@@ -218,7 +219,7 @@ A reference to a record (a `resolvedDependencies` entry, an HBOM `*Ref`, a VSA's
 
 ### Record shapes
 
-The examples needed four record shapes the drafts left open, commercial flows need one more, for network access, and the [NIST IR 8536 profile](nist-ir-8536-profile.md) adds transfers, receipts and evidence records. Each is still an in-toto Statement whose predicate is a superset of SLSA Provenance v1.
+The examples needed four record shapes the drafts left open, commercial flows need one more, for network access, the [NIST IR 8536 profile](nist-ir-8536-profile.md) adds transfers, receipts and evidence records, and suppliers that will not sign need proxy-signed records. Each is still an in-toto Statement whose predicate is a superset of SLSA Provenance v1.
 
 #### Pinning tools and PDKs
 
@@ -330,18 +331,34 @@ A receipt record is a SLSA VSA signed by whoever received a lot and ran the [lot
 
 From Assembly L2 the EMS signs one for each chip lot it receives before placement, and A1 links it. A buyer MAY sign one for what it receives. Under [verifier escrow](#verifier-escrow) the auditor signs it for the buyer. The board receipt check accepts an EMS receipt when it is signed by the EMS that signed A1, passed under the chip bundle's policy, states that policy's lot levels, covers exactly the units shipped to the EMS, and A1 links it.
 
-#### Evidence record
+#### Proxy-signed record
 
-Some suppliers give no digital record at all, only a certificate of conformance, an audit report or a paper traveller. An evidence record lets the next party in the chain cover such a step with that document instead of breaking the chain:
+Suppliers will not sign records until a customer requires it. Until then, the party that received a supplier's output (the next site in the chain, or the product owner after final test) MAY sign the supplier's record for it, from the supplier's own data, and say so. That party is the step's proxy. A proxy-signed record is the step's full record, with the step's own buildType and subjects, and differs from the supplier's own in three ways:
 
 | Field | Holds |
 | --- | --- |
-| Predicate | `manufacturing-step` with buildType `.../mfg/step/evidence@v1`, signed by the party that received from the supplier, never by the supplier |
-| Subject | Each document, by file digest |
-| `resolvedDependencies` | The record before the missing step, so the chain stays linked |
-| `hwMfg.evidence` | `covers` (the step it stands in for), `supplier`, `kind` (`certificate`, `audit-report`, `paper-record` or `other`) and `issuer` |
+| `hwMfg.site` | The supplier that ran the step, as in its own record |
+| `hwMfg.proxy` | `signer` (the proxy, named as in its own records), `reason` (`supplier-does-not-sign`) and `source`, the supplier's data export by file digest |
+| `runDetails.builder.id` | `urn:hslsa:proxy:<signer>`, so a SLSA verifier that reads only the builder does not take the record for the supplier's own |
 
-A step covered by an evidence record holds its track at L1, whatever the other steps reach, because the record shows only that its signer held the document. Phase 2 of the [roadmap](../docs/roadmap.md) adds proxy signing, where the same next party signs a full record from the supplier's own data; that record says so, and is also capped at L1. The reference tool does not accept evidence records yet; it will with proxy signing.
+The export is what the supplier handed over: its site, the step's parameters, every `hwMfg` field it reported, and the content of every data file the record names. The proxy signs with the key it signs its own records with. A transfer that leaves a supplier that signs nothing MAY be proxy-signed the same way, by the site that received the shipment.
+
+A verifier accepts a proxy-signed record when the policy accepts proxy-signed records, it is signed by the key of the party that received from the supplier (the site that signed the next step, or the product owner whose HBOM names the lot), `hwMfg.proxy.signer` names that party, and the record matches the export: same supplier, step and parameters, every reported field, and every data file. A record that carries `hwMfg.proxy` is never checked against the supplier's key, and one without it never against the proxy's, so a proxy cannot pass its record off as the supplier's. The check shows that the proxy added nothing the supplier did not report; it cannot show that the supplier's data is true, so the record holds its track at L1. The [PicoRV32 proxy example](../docs/proxy-signing.md) has its final test proxy-signed by the product owner.
+
+#### Evidence record
+
+Some suppliers give no digital record at all, only a certificate of conformance, an audit report or a paper traveller. An evidence record lets the party that received from such a supplier cover the step with those documents instead of breaking the chain:
+
+| Field | Holds |
+| --- | --- |
+| Predicate | `manufacturing-step` with buildType `.../mfg/step/evidence@v1`, signed by the proxy as for a [proxy-signed record](#proxy-signed-record), never by the supplier |
+| Subject | Each document, by file digest, and nothing else |
+| `resolvedDependencies` | The record before the missing step, so the chain stays linked |
+| `hwMfg` | `site` (the supplier), `designRef`, `proxy` (`signer` and `reason`, as for a proxy-signed record) and `evidence`: `covers` (the step it stands in for) and `documents[]`, each with `name`, `kind` (`certificate`, `audit-report`, `paper-record` or `other`) and `issuer` |
+
+An evidence record can stand in only for a step whose subjects no later record binds to. In the chip chain that is wafer sort: wafer fab, packaging and final test each name a lot (the wafer lot, the packaged lot, the shipped lot) that later records and the HBOM bind to by digest, which a document cannot do, so a supplier of one of those steps that signs nothing needs a proxy-signed record. When wafer sort is covered by evidence there is no wafer map, so the genealogy check confirms only that each unit traces to a unique die of the wafer lot, not that the die passed sort.
+
+A step covered by an evidence record holds its track at L1, whatever the other steps reach, because the record shows only that its signer held the documents. A verifier accepts it under the same rules as a proxy-signed record, with the policy accepting evidence records, and checks that it covers the step it stands in for and that its subjects are exactly its documents.
 
 #### Firmware provisioning record
 
@@ -495,7 +512,7 @@ The programming station is the firmware's last builder. For every part it writes
 **At lot receipt**, by the buyer, OEM or EMS:
 
 1. The HBOM's lot subject equals the F4 shipped lot digest, and every received unit is in it (at L3, each unit answers a challenge with a certificate whose digest is in the lot).
-2. F1 to F4 are all present, signed by allowed sites, and linked by digest. Every [transfer](#transfers-between-manufacturing-sites) present is signed by the site that shipped, links the record it follows, ships exactly the lot it names between the sites that signed the steps on either side, and is linked by the next step; from Wafer L3 and Package/Test L3, or when the policy asks, every transfer between two companies is present.
+2. F1 to F4 are all present, signed by allowed sites, and linked by digest; a record signed on a supplier's behalf is accepted only as a [proxy-signed record](#proxy-signed-record) or an [evidence record](#evidence-record) under a policy that accepts it, and holds its track at L1. Every [transfer](#transfers-between-manufacturing-sites) present is signed by the site that shipped, links the record it follows, ships exactly the lot it names between the sites that signed the steps on either side, and is linked by the next step; from Wafer L3 and Package/Test L3, or when the policy asks, every transfer between two companies is present.
 3. Every step's `designRef` names the same GDS, and its release attestation verifies at the buyer's minimum Design level.
 4. Genealogy is complete and yields reconcile from F2 to F4.
 5. Every required gate passed and every deviation or rework is signed.
@@ -693,7 +710,8 @@ Some threats are outside HSLSA altogether: changes made after the buyer's checks
 3. **Hardware roots of trust.** A unit's identity key stays inside it, and the ROM that measures its firmware does what its design says. Fault injection, side channels or invasive extraction that recover a device key let a clone answer the identity challenge.
 4. **The cryptography.** SHA-256, SHA-384 and ECDSA.
 5. **The verifier and its policy.** The policy decides which sites, checks and levels are acceptable.
-6. **The escrow auditor**, when the buyer uses [verifier escrow](#verifier-escrow). The buyer cannot rerun the check and trusts the auditor's key and its check the way it would trust its own verifier; the auditor holds the site keys in the buyer's place.
+6. **Proxies**, when the policy accepts records signed on a supplier's behalf. A [proxy-signed record](#proxy-signed-record) proves only that the proxy signed what the supplier's export says, and an [evidence record](#evidence-record) only that the proxy held the documents; neither proves that the supplier wrote them. That is why both hold their track at L1.
+7. **The escrow auditor**, when the buyer uses [verifier escrow](#verifier-escrow). The buyer cannot rerun the check and trusts the auditor's key and its check the way it would trust its own verifier; the auditor holds the site keys in the buyer's place.
 
 HSLSA does not require a public transparency log (see [Signing and keys](#signing-and-keys)). Private records keep supplier data private but leave two gaps a shared log would close:
 
@@ -768,6 +786,7 @@ An inspection record therefore names the regions and layers it imaged and the te
 | --- | --- | --- |
 | Design L3 | Every step ran isolated with pinned, approved tools, and equivalence between RTL and final netlist was recorded | That the RTL, IP or tools contain no malicious logic |
 | Wafer L3 | The fab's records are signed with HSM keys at an accredited site; the fab says it checked its masks against the released GDS; every die carries a hardware identity | That the silicon has no trojan. Only Wafer L4 looks at silicon, and only at samples |
+| Package/Test L1 with a proxy-signed final test | The product owner signed the lot the test house's data export lists, and the export travels with the record | That the test house stands behind the record, or that its export is complete |
 | Package/Test L2 | Each unit's serial is in a lot the test site signed | That a part carrying that serial is genuine; that needs Package/Test L3 |
 | Assembly L3 | Every part with a hardware identity was verified at build | That parts without an identity are the ones the records name |
 | Firmware L3 | The device booted images that were built in isolation, reviewed and logged, and its measurements match its records | That the reviewed firmware has no vulnerabilities |
@@ -803,12 +822,12 @@ Four examples run in this repository's GitHub Actions and exercise the spec end 
 
 | Example | Exercises | Levels verified | Docs |
 | --- | --- | --- | --- |
-| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM with its CycloneDX and SPDX renderings, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md) |
+| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM with its CycloneDX and SPDX renderings, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs; the same lot again with wafer sort covered by an evidence record and final test proxy-signed | Design L2, Wafer L2, Package/Test L2; with proxies, Wafer L1 and Package/Test L1 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md), [proxy-signing.md](../docs/proxy-signing.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]` and its renderings, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
 | Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, firmware reference values as a signed CoRIM, the firmware review check on simulated S.A.F.E. reports, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
-The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, renders them as CycloneDX 1.6 and SPDX 3.1-RC1 (`hslsa render`, which also checks a rendering against a signed HBOM), runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
+The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, renders them as CycloneDX 1.6 and SPDX 3.1-RC1 (`hslsa render`, which also checks a rendering against a signed HBOM), runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also accepts proxy-signed and evidence records under a policy that allows them, withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
 What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key and the firmware review provider are simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
 
@@ -868,6 +887,12 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 8 (2026-09-20)
+
+- **Proxy signing.** A supplier that signs nothing can have its record signed for it by whoever received its output, the next site in the chain or the product owner after final test, from the supplier's own data export ([Proxy-signed record](#proxy-signed-record)). The record keeps the supplier as `hwMfg.site`, names its signer in `hwMfg.proxy` and in `builder.id`, carries the export by digest, and holds its track at L1. Rule 4 under [Core requirements](#core-requirements) covers proxy-signed and evidence records together, and a buyer's policy may refuse either.
+- **Evidence records, settled for the tool.** The proxy signs evidence records too. `hwMfg.site` is now the supplier, the signer moves to `hwMfg.proxy`, and the documents are listed in `hwMfg.evidence.documents[]` with their kind and issuer. Evidence may stand in only for a step no later record binds to by digest, which in the chip chain is wafer sort.
+- **Reference tool.** The lot receipt check accepts proxy-signed records, proxy-signed transfers and evidence records when the policy's `manufacturing.acceptOnBehalf` lists them (by default it refuses both), checks each against its signer, the supplier's export or its documents, and refuses a policy that claims more than L1 for a track that has one. A [PicoRV32 proxy example](../docs/proxy-signing.md) runs the same lot with a sort house that gives only paper and a test house that signs nothing, at Wafer L1 and Package/Test L1.
 
 ### Revision 7 (2026-09-20)
 

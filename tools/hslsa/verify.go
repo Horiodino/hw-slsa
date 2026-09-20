@@ -227,6 +227,7 @@ type LotResult struct {
 	Lot         Obj      // the shipped lot subject
 	Inputs      []Obj    // the manufacturing envelopes and the HBOM
 	NotRecorded []string // optional records the bundle does not have
+	OnBehalf    []string // records signed on a supplier's behalf, which hold their track at L1
 }
 
 // LotCheck verifies F1 to F4, any transfers between them (all of them when
@@ -240,16 +241,34 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 		return nil, err
 	}
 	stmts := map[string]Obj{}
+	by := map[string]string{}
+	capped := map[string]string{} // track -> the first record that holds it at L1
 	var transfers []Obj
+	var onBehalf []string
 	prev := design.Release
 	for i, step := range MfgSteps {
 		label := step
-		stmt, err := trust.Open(filepath.Join(bundle, "att", MfgAtt[step]), MfgSigner[step], MfgStep)
+		stmt, kind, err := openRecord(trust, filepath.Join(bundle, "att", MfgAtt[step]), MfgSigner[step], ProxySigner[step])
 		if err != nil {
 			return nil, err
 		}
-		if buildType(stmt) != mfgStepType(step) {
+		want := mfgStepType(step)
+		if kind == ByEvidence {
+			want = mfgStepType("evidence")
+		}
+		if buildType(stmt) != want {
 			return nil, failf("%s: wrong buildType", label)
+		}
+		if kind != "" {
+			note, err := onBehalfCheck(bundle, policy, stmt, label, step, kind)
+			if err != nil {
+				return nil, err
+			}
+			by[step] = kind
+			onBehalf = append(onBehalf, note)
+			if _, ok := capped[mfgTrack(step)]; !ok {
+				capped[mfgTrack(step)] = step
+			}
 		}
 		if err := asSLSAProvenance(stmt, label); err != nil {
 			return nil, err
@@ -261,9 +280,15 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 			return nil, err
 		}
 		if i > 0 {
-			t, err := transferCheck(bundle, trust, design, MfgSteps[i-1], stmts, stmt, prev)
+			t, note, err := transferCheck(bundle, trust, policy, design, MfgSteps[i-1], stmts, stmt, prev)
 			if err != nil {
 				return nil, err
+			}
+			if note != "" {
+				onBehalf = append(onBehalf, note)
+				if _, ok := capped[mfgTrack(MfgSteps[i-1])]; !ok {
+					capped[mfgTrack(MfgSteps[i-1])] = "the transfer from " + MfgSteps[i-1]
+				}
 			}
 			if t != nil {
 				prev = t
@@ -282,20 +307,27 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 		prev = envRD(bundle, MfgAtt[step])
 	}
 
-	// Genealogy: every packaged unit came from a passing die of this wafer lot, each die used once.
+	// Genealogy: every packaged unit came from a passing die of this wafer lot,
+	// each die used once. When wafer sort left only documents, there is no
+	// wafer map to check the bins against.
 	waferLot := firstSubject(stmts["wafer-fab"])
-	maps, err := ReadObj(filepath.Join(art, "wafer-maps.json"))
-	if err != nil {
-		return nil, failf("wafer-sort: wafer maps: %v", err)
-	}
-	if S(maps, "waferLot") != S(waferLot, "name") {
-		return nil, failf("wafer-sort: wafer maps name a different wafer lot")
-	}
+	bins := by["wafer-sort"] != ByEvidence
 	good := map[string]bool{}
-	for _, d := range Objs(maps, "dies") {
-		if S(d, "bin") == "pass" {
-			good[dieKey(d["wafer"], d["x"], d["y"])] = true
+	if bins {
+		maps, err := ReadObj(filepath.Join(art, "wafer-maps.json"))
+		if err != nil {
+			return nil, failf("wafer-sort: wafer maps: %v", err)
 		}
+		if S(maps, "waferLot") != S(waferLot, "name") {
+			return nil, failf("wafer-sort: wafer maps name a different wafer lot")
+		}
+		for _, d := range Objs(maps, "dies") {
+			if S(d, "bin") == "pass" {
+				good[dieKey(d["wafer"], d["x"], d["y"])] = true
+			}
+		}
+	} else {
+		onBehalf = append(onBehalf, "packaging: genealogy checked without wafer maps, since an evidence record stands in for wafer sort")
 	}
 	genealogyFile, err := ReadObj(filepath.Join(art, "genealogy.json"))
 	if err != nil {
@@ -306,7 +338,7 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	for _, unit := range sortedKeys(genealogy) {
 		g := O(genealogy, unit)
 		die := dieKey(get(g, "wafer"), get(g, "x"), get(g, "y"))
-		if S(g, "waferLot") != S(waferLot, "name") || !good[die] || used[die] {
+		if S(g, "waferLot") != S(waferLot, "name") || (bins && !good[die]) || used[die] {
 			return nil, failf("packaging: genealogy for %s does not trace to a unique passing die", unit)
 		}
 		used[die] = true
@@ -347,6 +379,21 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	if err := ValidateHBOM(get(hb, "predicate")); err != nil {
 		return nil, err
 	}
+	// A record signed on a supplier's behalf is signed by whoever received
+	// from that supplier: the site of the next step, or the product owner,
+	// named in the HBOM, after final test. Then no track claims more than L1.
+	for i, step := range MfgSteps {
+		if by[step] == "" {
+			continue
+		}
+		want := get(hb, "predicate", "product", "manufacturer")
+		if i+1 < len(MfgSteps) {
+			want = get(stmts[MfgSteps[i+1]], "predicate", "hwMfg", "site")
+		}
+		if signer := get(stmts[step], "predicate", "hwMfg", "proxy", "signer"); !jsonEqual(signer, want) {
+			return nil, failf("%s: signed on its supplier's behalf by %s, which did not receive from it", step, S(signer, "name"))
+		}
+	}
 	subj := map[string]any{}
 	for _, s := range Objs(hb, "subject") {
 		subj[S(s, "name")] = get(s, "digest")
@@ -385,6 +432,10 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 		}
 	}
 
+	if err := capAtL1(policy, capped); err != nil {
+		return nil, err
+	}
+
 	for _, unit := range units {
 		if !contains(shipped, unit) {
 			return nil, failf("received unit %s is not in the shipped lot", unit)
@@ -396,7 +447,7 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	}
 	inputs = append(inputs, transfers...)
 	inputs = append(inputs, envRD(bundle, "hbom.intoto.json"))
-	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded}, nil
+	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded, OnBehalf: onBehalf}, nil
 }
 
 // signVSA signs a SLSA Verification Summary Attestation for one subject.
@@ -458,6 +509,12 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 	fmt.Println(msg)
 	if len(lot.NotRecorded) > 0 {
 		fmt.Printf("not recorded, and not required by the policy: %s\n", strings.Join(lot.NotRecorded, "; "))
+	}
+	if len(lot.OnBehalf) > 0 {
+		fmt.Println("signed on a supplier's behalf, so their tracks are held at L1:")
+		for _, line := range lot.OnBehalf {
+			fmt.Printf("  %s\n", line)
+		}
 	}
 	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", "hbom.intoto.json"), "hbom"); err != nil {
 		return nil, nil, err

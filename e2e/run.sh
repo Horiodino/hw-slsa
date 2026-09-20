@@ -3,6 +3,7 @@
 #
 #   e2e/run.sh produce   run the design flow and the simulated lot, sign every record
 #   e2e/run.sh verify    check the chain, emit VSAs, verify them with slsa-verifier
+#   e2e/run.sh proxy     after produce: the same lot with two suppliers that sign nothing
 #
 # Nothing here uploads to a transparency log: every signature is a DSSE
 # envelope made with a local ECDSA P-256 key.
@@ -104,9 +105,31 @@ verify() {
   rm -rf "$vkey"
 }
 
+# The lot again, with two suppliers that sign nothing (docs/proxy-signing.md):
+# the sort house hands over only a certificate and a paper traveller, which the
+# OSAT covers with an evidence record, and the test house hands over its data,
+# which the product owner signs on its behalf. Reuses produce's design records
+# and keys, so it runs after produce, in the same job.
+proxy() {
+  local pb=$OUT/proxy
+  rm -rf "$pb" && cp -r "$BUNDLE" "$pb"
+  cp "$E2E/proxy/policy.json" "$pb/policy.json"
+  hslsa mfg  --bundle "$pb" --scenario "$E2E/proxy/mfg-scenario.json" --keys "$KEYS"
+  hslsa hbom --bundle "$pb" --lock "$E2E/inputs.lock.json" --scenario "$E2E/proxy/mfg-scenario.json" --key "$KEYS/product-owner.key.pem"
+  hslsa verify --bundle "$pb" --trust-root "$pb/trust-root.json" --policy "$pb/policy.json" --units "$E2E/received-units.txt"
+  # The main example's policy claims Wafer and Package/Test L2 and accepts no
+  # record signed on a supplier's behalf, so it must refuse this lot.
+  if hslsa verify --bundle "$pb" --trust-root "$pb/trust-root.json" --policy "$E2E/policy.json" >/dev/null 2>&1; then
+    echo "FAIL: the L2 policy accepted a lot with proxy-signed records" >&2
+    exit 1
+  fi
+  echo "ok: the L2 policy refuses the proxy-signed lot"
+}
+
 case "${1:-}" in
   produce) produce ;;
   verify) verify ;;
-  all) produce; verify ;;
-  *) echo "usage: $0 produce|verify|all" >&2; exit 2 ;;
+  proxy) proxy ;;
+  all) produce; verify; proxy ;;
+  *) echo "usage: $0 produce|verify|proxy|all" >&2; exit 2 ;;
 esac

@@ -86,7 +86,7 @@ func withheldList(predicateType string) []string {
 var protectedFields = map[string][]string{
 	MfgStep: {
 		"/buildDefinition/buildType", "/buildDefinition/resolvedDependencies",
-		"/runDetails/builder", "/hwMfg/step", "/hwMfg/designRef", "/hwMfg/checks",
+		"/runDetails/builder", "/hwMfg/step", "/hwMfg/designRef", "/hwMfg/checks", "/hwMfg/proxy", "/hwMfg/evidence",
 	},
 	HBOMType: {"/hbomVersion", "/product"},
 }

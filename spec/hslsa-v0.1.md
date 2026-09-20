@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 5 (2026-09-18). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 6 (2026-09-20). See the [changelog](#changelog).
 
 ## Overview
 
@@ -8,7 +8,7 @@ HSLSA is a framework for proving how a chip or board was made, the way SLSA, SBO
 
 This is version 0.1, a working draft. It consolidates the project's earlier drafts (the unified level scheme, a standards gap analysis, design provenance for RTL-to-GDS flows, fabrication and assembly attestations, firmware attestations, and the HBOM schema) into one text, and supersedes them where they disagree. Revision 2 writes in what the four [worked examples](#worked-examples-and-reference-implementation) needed: records for board parts, per-tool design steps, rebuilds and provisioning, and the checks a buyer runs on a board and on a booted device. Where the spec and the examples differ, the spec now matches what the examples, the HBOM schema and the reference tool do.
 
-**Scope.** Digital ASIC and SoC design from RTL to GDSII, mask making, wafer fabrication and sort, packaging and final test, board assembly, and all firmware that ships in the part or on the board, through to the device proving what it booted. The full chain, down to the at-boot check, applies to parts with a hardware identity. Every other part on a board gets a distribution record and lot-level naming, which cannot detect one part swapped for another inside a lot. Out of scope for 0.1: distribution after the first buyer, the internals of secure boot and update protocols, and firmware for off-chip components (their vendors attest it, and it enters here as a dependency). Whether analog and mixed-signal flows can reach Design L3 is an open question.
+**Scope.** Digital ASIC and SoC design from RTL to GDSII, mask making, wafer fabrication and sort, packaging and final test, board assembly, and all firmware that ships in the part or on the board, through to the device proving what it booted. The full chain, down to the at-boot check, applies to parts with a hardware identity. Every other part on a board gets a distribution record and lot-level naming, which cannot detect one part swapped for another inside a lot. Storage is not recorded: while parts sit in a warehouse, a distributor's stock or a die bank, the only claim about them is the shipper's distribution record. Out of scope for 0.1: distribution after the first buyer and anything that happens to a product after it (field firmware updates, rework, returns), the internals of secure boot and update protocols, and firmware for off-chip components (their vendors attest it, and it enters here as a dependency). Whether analog and mixed-signal flows can reach Design L3 is an open question.
 
 **What the records prove.** A signed record proves which party made a claim and that nobody changed it afterwards, not that the claim is physically true. Levels L1 to L3 make the records tamper-evident and their signers accountable; only the L4 defense profile examines physical parts, and only a sample of them. The [threat model](#threat-model) says, track by track, which attacks each level stops and which it only makes accountable.
 
@@ -22,14 +22,15 @@ These terms mean the same thing in every section and every predicate.
 | --- | --- |
 | Track | One stage of the supply chain rated on its own: Design, Wafer, Package/Test, Assembly or Firmware. A product states one level per track. |
 | Level | What a buyer can verify about a track: L0 (no claim) to L3 in the core, plus an optional L4 defense profile. Levels are cumulative within a track. |
-| Step | One attested unit of work, run by one party: a design flow step (0 to 7, plus 6a ROM merge), a rebuild, a manufacturing step (F1 to F4, A1), a distribution (D), an inspection (X), a firmware build, or a provisioning pass. |
+| Step | One attested unit of work, run by one party: a design flow step (0 to 7, plus 6a ROM merge), a rebuild, a manufacturing step (F1 to F4, A1), a transfer between manufacturing sites (T), a distribution (D), a receipt (R), an inspection (X), a firmware build, or a provisioning pass. |
 | Site | The organization and physical location that runs a manufacturing or provisioning step, identified by its site key. |
 | Subject | What an attestation is about. Files are named by digest; physical things are named by a URN plus the digest of a canonical list that defines them. |
 | Wafer lot | The wafers a fab started together. Subject of F1. |
 | Packaged lot | Every unit that left the package line. Subject of F3. |
 | Shipped lot | The units that passed final test. Subject of F4 and the lot subject of the HBOM; its digest is the lot digest. |
 | Unit | One packaged part. Named by serial at Package/Test L2, and by the digest of its device identity certificate at L3. |
-| Shipment | Parts one party ships to another, described by a packing list (manufacturer, part number, lot, date code, quantity, and serials where the part has them). Subject of a distribution record. |
+| Shipment | Parts one party ships to another, described by a packing list (manufacturer, part number, lot, date code, quantity, and serials where the part has them). Subject of a distribution record, or of a transfer when wafers or units move between two manufacturing sites. |
+| Receipt | The units one receiver got from a shipped lot. Subject of a [receipt record](#receipt-record), which the receiver signs after its lot receipt check. |
 | Board lot | The boards from one A1 build that passed test. Named and digested like a shipped lot, with board serials as the unit identifiers. |
 | Device identity | A per-unit key rooted in hardware (DICE or Caliptra class), provisioned at sort or final test and endorsed by a CA. At L3 it is the unit's name in every attestation. |
 | Release attestation | The tapeout authority's signed statement over the final GDS. Every manufacturing step points at it through `designRef`. |
@@ -46,9 +47,9 @@ A product is rated per track, never overall: for example Design L3, Wafer L3, Pa
 | Track | Covers | Who runs it | Steps |
 | --- | --- | --- | --- |
 | Design | RTL, IP, PDK, EDA flow to GDSII, mask ROM contents | Design house | 0 to 7, plus 6a ROM merge |
-| Wafer | Mask making, wafer fabrication, wafer sort | Foundry, mask shop, sort house | F1, F2 |
-| Package/Test | Packaging, final test | OSAT, test house | F3, F4 |
-| Assembly | Part shipments to the assembler, PCB, board and system build | Distributors, EMS or contract manufacturer | D, A1 |
+| Wafer | Mask making, wafer fabrication, wafer sort, and the transfers these sites ship | Foundry, mask shop, sort house | F1, F2, T |
+| Package/Test | Packaging, final test, and the transfers these sites ship | OSAT, test house | F3, F4, T |
+| Assembly | Part shipments to the assembler, their receipt, PCB, board and system build | Distributors, EMS or contract manufacturer | D, R, A1 |
 | Firmware | Boot ROM, device and board firmware, provisioning | Firmware team, programming stations at fab, OSAT and EMS | Image builds, provisioning passes |
 
 Wafer and Package/Test are separate tracks because foundry and OSAT are usually different companies, and one rating hid the weaker of them.
@@ -70,16 +71,17 @@ Each cell adds to the one on its left.
 | Track | L1: Provenance exists | L2: Signed by the producer | L3: Hardened |
 | --- | --- | --- | --- |
 | Design | Every flow step emits a `design-flow` attestation (tools, PDK, parameters, subject digests) and the chain from GDS back to RTL is complete; the release record lists IP blocks and versions and the GDS digest; an HBOM is published | Steps run on a managed flow platform, not a workstation, and the platform identity signs each attestation; source freeze is a signed, reviewed tag; waivers are signed by a signoff owner; third-party IP arrives with signed provenance | Steps are isolated from each other and from the network, except that a step MAY reach declared license servers ([Network access and licensed tools](#network-access-and-licensed-tools)); tools and PDK are pinned by digest and on an allow-list (a container image digest and a [PDK tree digest](#pinning-tools-and-pdks) count as pins); signing keys are unreachable from step code; formal equivalence between RTL and final netlist is recorded, and enough is attested for an independent party to rerun equivalence and LVS |
-| Wafer | Lot record names the fab, mask set revision, GDS digest and probe program version | Each step signs with a site key; wafer fab names the wafer lot as subject; from sort onward, records name each unit | Keys held in HSMs at accredited sites (for example DMEA or O-TTPS); the fab verifies the design release attestation before mask making and records the mask-vs-GDS XOR; identities provisioned at sort are rooted in an on-die RoT (DICE or Caliptra class) and issued by an HSM-backed CA |
-| Package/Test | Record names the OSAT, assembly lot and test program version for each lot | Each step signs with a site key; records name each unit, with genealogy to wafer and die position; every unit has a unique identity by final test; final test signs the shipped lot digest | Keys held in HSMs at accredited sites; every unit answers an identity challenge at final test, rooted in hardware; the shipped lot digest covers the units' certificate digests |
-| Assembly | Board HBOM with lot and date code for every part, plus IPC-1782 style build records per serial number | Each assembly step signs its record against the board serial and the identities of its key components; every part lot arrives with a [distribution record](#distribution-record) signed by its shipper, and the assembler runs the lot receipt check on each chip before placement; a part without a hardware identity is named only by lot and date code, which cannot detect a swap inside a lot | Signing at accredited sites; every component with a hardware identity is checked by attestation at build; a platform certificate binds the system to those parts; parts without an identity stay at lot-level naming, as at L2 |
+| Wafer | Lot record names the fab, mask set revision, GDS digest and probe program version | Each step signs with a site key; wafer fab names the wafer lot as subject; from sort onward, records name each unit | Keys held in HSMs at accredited sites (for example DMEA or O-TTPS); the fab verifies the design release attestation before mask making and records the mask-vs-GDS XOR; identities provisioned at sort are rooted in an on-die RoT (DICE or Caliptra class) and issued by an HSM-backed CA; every shipment of wafers to another company's site is a signed [transfer](#transfers-between-manufacturing-sites) |
+| Package/Test | Record names the OSAT, assembly lot and test program version for each lot | Each step signs with a site key; records name each unit, with genealogy to wafer and die position; every unit has a unique identity by final test; final test signs the shipped lot digest | Keys held in HSMs at accredited sites; every unit answers an identity challenge at final test, rooted in hardware; the shipped lot digest covers the units' certificate digests; every shipment of wafers or units to another company's site is a signed [transfer](#transfers-between-manufacturing-sites) |
+| Assembly | Board HBOM with lot and date code for every part, plus IPC-1782 style build records per serial number | Each assembly step signs its record against the board serial and the identities of its key components; every part lot arrives with a [distribution record](#distribution-record) signed by its shipper, and the assembler runs the lot receipt check on each chip before placement and signs a [receipt record](#receipt-record) for the units it received, which A1 links; a part without a hardware identity is named only by lot and date code, which cannot detect a swap inside a lot | Signing at accredited sites; every component with a hardware identity is checked by attestation at build; a platform certificate binds the system to those parts; parts without an identity stay at lot-level naming, as at L2 |
 | Firmware | SLSA Build L1 provenance and an SBOM for every image; mask ROM content is proven by the Design track's ROM merge step | SLSA Build L2; images are signed and verified before the SoC runs them, by a secure-boot ROM on the silicon or by an attested board-level root of trust (see below); a part with neither stops at Firmware L1 | SLSA Build L3; firmware is independently reviewed, shown by a signed OCP S.A.F.E. report (see [Firmware review](#firmware-review)); releases appear in a transparency log; the device reports firmware measurements under a DICE or Caliptra class identity, and they match the attested image digests |
 
-Three rules apply across tracks:
+Four rules apply across tracks:
 
 1. **Transparency logs may be private.** Every L3 log requirement is met by a private log (a private Rekor instance, or an RFC 9162 style log run by the buyer or a consortium), since no foundry will publish lot IDs or yields.
 2. **Provisioning is Firmware, rated by its site.** Firmware Ln needs every provisioning site rated at least Ln in its own track (Wafer, Package/Test or Assembly).
 3. **One check for the buyer.** At every level the buyer collects the attestations, confirms each subject matches the identity the device proves at boot, and compares the stated levels against policy. From Design L3, the tapeout check also requires the equivalence record.
+4. **Evidence in place of a record, at L1 only.** When a supplier gives no record for a step, the next party MAY cover it with an [evidence record](#evidence-record) that names a certificate, audit report or paper record by digest. A track with any step covered this way is at L1.
 
 **Firmware L2 through a board-level root of trust.** A part without a secure-boot ROM MAY reach Firmware L2 on a board whose root of trust verifies the external flash, but only when that root of trust is itself attested (its own HBOM entry, Firmware provenance and provisioning record at L2 or higher) and it verifies each image before the SoC is released from reset. The claim is made for the board, not the bare part: the bare part stays at Firmware L1, and the board's verification summary states Firmware L2. The board HBOM lists the root of trust in `parts[]` with its own chain, which the board receipt check verifies like any other chip's.
 
@@ -113,14 +115,15 @@ Every record in HSLSA is an [in-toto Statement v1](https://github.com/in-toto/at
 | Third-party IP release | `https://slsa.dev/provenance/v1` (unchanged), buildType `.../ip-release@v1` or the vendor's own | none | IP vendor | The released IP files |
 | Rebuild (L4) | `https://github.com/Horiodino/hw-slsa/design-flow/v0.1`, buildType `.../design-flow/step/rebuild@v1` | `hwFlow` | Second builder | Final GDS of the release it rebuilt |
 | Manufacturing step | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `hwMfg` | Fab, sort, OSAT, test and EMS sites | Wafer lot, packaged lot, shipped lot, or board lot and boards |
-| Distribution | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1`, buildType `.../mfg/step/distribution@v1` | `hwMfg` | The shipper: a distributor, or a manufacturer shipping direct | The shipment's packing list |
+| Distribution | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1`, buildType `.../mfg/step/distribution@v1` | `hwMfg` | The shipper: a distributor, a manufacturer shipping direct, or a manufacturing site shipping to the next ([transfer](#transfers-between-manufacturing-sites)) | The shipment's packing list |
+| Evidence (L1 only) | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1`, buildType `.../mfg/step/evidence@v1` | `hwMfg` | The next party in the chain, for a supplier's step that has no record ([Evidence record](#evidence-record)) | The certificate, audit report or paper record, by file digest |
 | Physical inspection (L4) | `https://github.com/Horiodino/hw-slsa/physical-inspection/v0.1` | none | Independent lab | Shipped lot and each sampled unit or board |
 | Firmware image build | `https://slsa.dev/provenance/v1` (unchanged), buildType named for the builder (for example `.../firmware/caliptra-builder@v1`) | none | Firmware build platform | Image digest |
 | Firmware provisioning | `https://github.com/Horiodino/hw-slsa/fw-provisioning/v0.1`, buildType `.../fw-provisioning/step/provision@v1` | `hwProvision` | Programming station at fab, OSAT or EMS | Each unit written |
 | Firmware review | None of its own: the OCP S.A.F.E. short-form report, used as published (see [Firmware review](#firmware-review)) | none | Review provider | Image digest, inside the report |
 | Firmware reference values | Not an in-toto predicate: a signed CoRIM with profile `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` (see [Firmware reference values](#firmware-reference-values)) | none | Firmware build platform | Each measured image's digest, as the reference value for the device layer that measures it |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | none | Product owner | Design (final GDS or board design) and lot (shipped lot or board lot) |
-| Verification summary | `https://slsa.dev/verification_summary/v1` | none | Vendor or buyer verifier, or an [escrow auditor](#verifier-escrow) | Any subject above, or the units a buyer received |
+| Verification summary | `https://slsa.dev/verification_summary/v1` | none | Vendor or buyer verifier, an [escrow auditor](#verifier-escrow), or a receiver signing a [receipt record](#receipt-record) | Any subject above, or the units one receiver got |
 
 Step types are named `https://github.com/Horiodino/hw-slsa/design-flow/step/<step>@v1` and `https://github.com/Horiodino/hw-slsa/mfg/step/<step>@v1`. A flow platform MAY instead name the tool that ran the step, as in `.../design-flow/step/openlane2@v1`, when it also states the spec step in `hwFlow.step` (see [Per-tool design steps](#per-tool-design-steps)). A verification summary reports levels as `HSLSA_<TRACK>_LEVEL_<n>` (for example `HSLSA_WAFER_LEVEL_3`); SLSA allows custom `verifiedLevels` values that do not start with `SLSA_`.
 
@@ -157,7 +160,7 @@ Files are named by sha256 (sha384 where a device reports SHA-384 measurements, a
 | Shipment | The packing list file | File digest |
 | Board lot | `urn:hslsa:lot:<board-lot-id>` | The lot digest (below), over the serials of the boards that passed test |
 | Board | `urn:hslsa:board:<manufacturer>:<serial>` | The DER identity certificate once the board has one; until then the serial itself, as UTF-8 bytes with no trailing newline |
-| Receipt | `urn:hslsa:receipt:<lot-id>` | The lot digest formula over the units one buyer received from the shipped lot `<lot-id>`, used by a receipt VSA under [verifier escrow](#verifier-escrow) |
+| Receipt | `urn:hslsa:receipt:<lot-id>` | The lot digest formula over the units one receiver got from the shipped lot `<lot-id>`; the subject of a [receipt record](#receipt-record) |
 
 `<manufacturer>` in a board URN is the manufacturer's name in lowercase with spaces replaced by hyphens.
 
@@ -195,9 +198,15 @@ Platforms and sites sign step records; people sign only decisions.
 | Firmware build platform | Image provenance and SBOM | As for the design flow platform |
 | Programming station | `fw-provisioning` records | The site key of the site it sits in |
 | Independent lab (L4) | Inspection records | Lab's own key under a trust root separate from the producer's |
+| Receiver: an EMS, OEM or buyer | [Receipt records](#receipt-record) for the lots it checked on receipt | Its site key; an EMS uses the key it signs A1 with |
+| Next party in the chain (L1 only) | [Evidence records](#evidence-record) for a supplier's step that has no record | Its site key |
 | Escrow auditor | Design and receipt VSAs for the buyers it checks for ([Verifier escrow](#verifier-escrow)) | Its own key, listed in each buyer's trust root as `auditor` |
 
 None of these key models requires a public transparency log. The reference tool signs every record as a DSSE envelope with a local ECDSA P-256 key, publishes nothing, and hands the buyer a trust root of public keys by role; that meets every requirement up to L2, and L3 logs may be private (see the rules under [Core requirements](#core-requirements)).
+
+### Fetching records
+
+A reference to a record (a `resolvedDependencies` entry, an HBOM `*Ref`, a VSA's `inputAttestations`) is a digest plus a URI. The URI MAY be an `https` address in the repository of the party that holds the record, and that repository MAY require the reader to be a buyer or auditor the holder chose. A site that serves its records SHOULD serve each at an address that ends in its envelope's sha256, such as `https://records.example-osat.com/hslsa/sha256/<hex>`, so a verifier holding only the digest can ask for it. `file:` URIs name files in a bundle, as the reference tool writes them. Wherever a record comes from, the verifier checks it against the digest that names it. Finding records by subject, without knowing their digest, waits for the transparency log work in phase 1 of the [roadmap](../docs/roadmap.md).
 
 ### Rules every step follows
 
@@ -209,7 +218,7 @@ None of these key models requires a public transparency log. The reference tool 
 
 ### Record shapes
 
-The examples needed four record shapes the drafts left open, and commercial flows need one more, for network access. Each is still an in-toto Statement whose predicate is a superset of SLSA Provenance v1.
+The examples needed four record shapes the drafts left open, commercial flows need one more, for network access, and the [NIST IR 8536 profile](nist-ir-8536-profile.md) adds transfers, receipts and evidence records. Each is still an in-toto Statement whose predicate is a superset of SLSA Provenance v1.
 
 #### Pinning tools and PDKs
 
@@ -295,6 +304,45 @@ Records cannot show who operates a key. That the second builder is independently
 
 A distribution record is a manufacturing-step statement with buildType `.../mfg/step/distribution@v1`, signed by whoever ships a lot of parts to the assembler. Its subject is the shipment's packing list, by file digest. For a part that has its own chain, it consumes that part's shipped lot (the URN and lot digest), and the packing list names the serials shipped. `hwMfg.site` names the shipper, and `hwMfg.checks` carries at least `certificate-of-conformance` and `traceable-to-manufacturer`. The board HBOM points at it from `parts[].distributionRef`. See the [board example](../docs/board-example.md).
 
+#### Transfers between manufacturing sites
+
+When wafers or units move from one manufacturing site to another (fab to sort house, sort house to OSAT, OSAT to test house), the site that ships them MAY sign a transfer: a distribution record whose packing list names the lot and exactly what was sent. From Wafer L3 and Package/Test L3, every such shipment to another company's site MUST have one; a buyer's policy MAY require them at any level.
+
+| Field | Holds |
+| --- | --- |
+| Subject | The packing list, by file digest: `from` and `to` (the two sites, as named in their records), `lot` (the URN of the wafer lot or packaged lot shipped), `items` (the wafer ids or unit serials sent) and `quantity` |
+| `resolvedDependencies` | The shipping step's record, by envelope digest, and the lot it ships |
+| `hwMfg` | `site` (the shipper), `receiver`, `designRef`, and `checks` with at least `packing-list-matches-lot` |
+
+The receiving step then links the transfer instead of the shipping step's record, so the chain runs F1, T, F2, T, F3, T, F4. A verifier accepts a transfer when it is signed by the shipping site, links the record it follows, names the same design release, names as `site` and `receiver` the sites that signed the steps on either side, ships exactly the lot it names (the lot digest over `items` equals the lot's digest), and the receiving step links it. The packing list names wafer ids or serials, so a producer that withholds those salts the file like any other data file. The [PicoRV32 example](../docs/e2e-test.md) records all three transfers between its four sites, and its policy requires them.
+
+#### Receipt record
+
+A receipt record is a SLSA VSA signed by whoever received a lot and ran the [lot receipt check](#where-the-chain-is-checked) on it: an EMS before placement, an OEM, or a buyer. It is the record of the receipt event:
+
+| Field | Holds |
+| --- | --- |
+| Subject | `urn:hslsa:receipt:<lot-id>`, digested with the lot digest formula over exactly the units received, so it says nothing about the rest of the lot |
+| `resourceUri` | The shipped lot's URN |
+| `policy` | The policy the check ran under, by digest |
+| `inputAttestations` | The records the check read, by digest |
+| `verifiedLevels` | The levels the check verified |
+
+From Assembly L2 the EMS signs one for each chip lot it receives before placement, and A1 links it. A buyer MAY sign one for what it receives. Under [verifier escrow](#verifier-escrow) the auditor signs it for the buyer. The board receipt check accepts an EMS receipt when it is signed by the EMS that signed A1, passed under the chip bundle's policy, states that policy's lot levels, covers exactly the units shipped to the EMS, and A1 links it.
+
+#### Evidence record
+
+Some suppliers give no digital record at all, only a certificate of conformance, an audit report or a paper traveller. An evidence record lets the next party in the chain cover such a step with that document instead of breaking the chain:
+
+| Field | Holds |
+| --- | --- |
+| Predicate | `manufacturing-step` with buildType `.../mfg/step/evidence@v1`, signed by the party that received from the supplier, never by the supplier |
+| Subject | Each document, by file digest |
+| `resolvedDependencies` | The record before the missing step, so the chain stays linked |
+| `hwMfg.evidence` | `covers` (the step it stands in for), `supplier`, `kind` (`certificate`, `audit-report`, `paper-record` or `other`) and `issuer` |
+
+A step covered by an evidence record holds its track at L1, whatever the other steps reach, because the record shows only that its signer held the document. Phase 2 of the [roadmap](../docs/roadmap.md) adds proxy signing, where the same next party signs a full record from the supplier's own data; that record says so, and is also capped at L1. The reference tool does not accept evidence records yet; it will with proxy signing.
+
 #### Firmware provisioning record
 
 A `fw-provisioning` record is SLSA Provenance v1 with buildType `.../fw-provisioning/step/provision@v1` and one extra block, `hwProvision`:
@@ -375,7 +423,7 @@ flowchart TD
   DEV -. "verifier walks back" .-> H
 ```
 
-Each arrow is a digest link. A board has its own HBOM, with the board design and board lot as subjects, that points at A1, at each distribution record and at each chip's HBOM. Firmware joins twice: mask ROM content through the Design flow, everything else through provisioning records. The dashed lines are the checks a verifier runs from a live device.
+Each arrow is a digest link. Where a shipment between two manufacturing sites is recorded as a [transfer](#transfers-between-manufacturing-sites), the transfer sits between the two steps, and the EMS's [receipt record](#receipt-record) for each chip lot sits between that lot and A1. A board has its own HBOM, with the board design and board lot as subjects, that points at A1, at each distribution record and at each chip's HBOM. Firmware joins twice: mask ROM content through the Design flow, everything else through provisioning records. The dashed lines are the checks a verifier runs from a live device.
 
 ### Steps
 
@@ -393,13 +441,15 @@ Each arrow is a digest link. A board has its own HBOM, with the board design and
 | Release | Design | Run summary over steps 0 to 7 | Final GDS | Tapeout policy check (below) |
 | Rebuild (L4) | Design | Release attestation, the same pinned inputs | Final GDS of the release | `gds-bit-exact`, `gds-equal-ignoring-timestamps` |
 | F1. Wafer fabrication | Wafer | GDS release, mask set record | Wafer lot | Mask data vs GDS XOR; inline parametrics |
-| F2. Wafer sort | Wafer | F1, wafer lot | Wafer maps; unit identities if provisioned here | Probe pass; identity provisioning log |
-| F3. Packaging | Package/Test | F2, wafer maps, package material certificates | Packaged lot, die-to-unit genealogy | Die attach, wire bond, X-ray sample, marking |
-| F4. Final test | Package/Test | F3, packaged lot | Shipped lot, unit identities, STDF results | Final test per unit; identity challenge; yield within limits |
+| T. Transfer | The shipping site's track (Wafer or Package/Test) | The shipping step's record, the lot it ships | The packing list | Packing list matches the lot |
+| F2. Wafer sort | Wafer | F1 or its transfer, wafer lot | Wafer maps; unit identities if provisioned here | Probe pass; identity provisioning log |
+| F3. Packaging | Package/Test | F2 or its transfer, wafer maps, package material certificates | Packaged lot, die-to-unit genealogy | Die attach, wire bond, X-ray sample, marking |
+| F4. Final test | Package/Test | F3 or its transfer, packaged lot | Shipped lot, unit identities, STDF results | Final test per unit; identity challenge; yield within limits |
 | Firmware build | Firmware | Firmware source and toolchain | Image and its SBOM | As for any SLSA build |
 | Provisioning | Firmware | Images (after verifying their provenance), fuse map, key origins | Each unit written | Readback digest per image and fuse field |
 | D. Distribution | Assembly | For a part with its own chain, its shipped lot | The shipment's packing list | Certificate of conformance; traceable to the manufacturer |
-| A1. Board assembly | Assembly | Every distribution record, the HBOM and F4 record of each chip with its own chain, the chip shipped lots, the board design | Board lot, each board, the per-serial build records; platform certificate at L3 | Part lot receipt check; AOI, BGA X-ray, ICT, functional test; yield; component identity check at L3 |
+| R. Receipt | Assembly, or the buyer | The records the lot receipt check read | The units received | Lot receipt check passed |
+| A1. Board assembly | Assembly | Every distribution record, the HBOM, F4 record and receipt record of each chip with its own chain, the chip shipped lots, the board design | Board lot, each board, the per-serial build records; platform certificate at L3 | Part lot receipt check; AOI, BGA X-ray, ICT, functional test; yield; component identity check at L3 |
 | X. Inspection (L4) | Wafer, Package/Test or Assembly | Sampled units or boards, committed seed | Result over lot and sampled identities | Per-unit pass, fail or inconclusive |
 
 The design steps stop at the signed GDS release; mask data preparation (OPC, fracturing) happens inside the foundry and is recorded in F1. On a multi-project wafer, F1 is issued once per customer design, so no customer sees another's GDS digest. Wafer lots and assembly lots are many-to-many, so F3 records (wafer lot, wafer, X, Y) for every unit.
@@ -422,6 +472,8 @@ The programming station is the firmware's last builder. For every part it writes
 
 ### Where the chain is checked
 
+**Gaps first.** Before a receipt check walks the chain, it looks for every record it will need and reports all of them that are missing, or that withhold a field no disclosure was given for, each with the track it belongs to. The check still fails, but the buyer sees every gap at once and where it lies, instead of only the first broken link. A record the policy does not require and the bundle does not have (a transfer at L2, for example) is reported as not recorded, without failing. The reference tool does this for the lot receipt and board receipt checks.
+
 **At tapeout**, before the GDS leaves for the foundry:
 
 1. The GDS digest matches the release attestation, signed by an allowed tapeout authority.
@@ -435,20 +487,20 @@ The programming station is the firmware's last builder. For every part it writes
 **At lot receipt**, by the buyer, OEM or EMS:
 
 1. The HBOM's lot subject equals the F4 shipped lot digest, and every received unit is in it (at L3, each unit answers a challenge with a certificate whose digest is in the lot).
-2. F1 to F4 are all present, signed by allowed sites, and linked by digest.
+2. F1 to F4 are all present, signed by allowed sites, and linked by digest. Every [transfer](#transfers-between-manufacturing-sites) present is signed by the site that shipped, links the record it follows, ships exactly the lot it names between the sites that signed the steps on either side, and is linked by the next step; from Wafer L3 and Package/Test L3, or when the policy asks, every transfer between two companies is present.
 3. Every step's `designRef` names the same GDS, and its release attestation verifies at the buyer's minimum Design level.
 4. Genealogy is complete and yields reconcile from F2 to F4.
 5. Every required gate passed and every deviation or rework is signed.
 6. For an L4 claim, an inspection record from an allowed lab covers the lot, with an acceptable sampling plan and no failed sample.
 
-Board assembly runs this same check on each part before placement, then adds A1, so a system integrator verifies the board and, through it, every part. Under [verifier escrow](#verifier-escrow) an auditor runs this check for the buyer, with the buyer's policy and received units, and the buyer receives only a receipt VSA.
+Whoever runs this check MAY sign a [receipt record](#receipt-record) for the units it received. Board assembly runs this same check on each part before placement, signs the receipt record, then adds A1, so a system integrator verifies the board and, through it, every part. Under [verifier escrow](#verifier-escrow) an auditor runs this check for the buyer, with the buyer's policy and received units, and the buyer receives only the auditor's receipt record.
 
 **At board receipt**, by the system integrator or board buyer:
 
 1. The board HBOM is signed by the board owner and valid against the schema, and its lot subject is A1's board lot.
-2. A1 is signed by an allowed EMS site, its gates passed, it names the same board design, and it consumes every distribution record and each chip's shipped lot and HBOM.
+2. A1 is signed by an allowed EMS site, its gates passed, it names the same board design, and it consumes every distribution record and each chip's shipped lot, HBOM and receipt record.
 3. Every `parts[]` entry has a distribution record signed by a shipper the policy names, with the same lot and date code. `authorized: true` holds only where the policy lists that shipper as an authorized channel for the manufacturer, and the policy MAY require an authorized channel for every part.
-4. Each chip with its own chain passes the lot receipt check above under its own trust root, every chip shipped to the EMS is in its shipped lot, and the board HBOM names the lot that chain proves.
+4. Each chip with its own chain passes the lot receipt check above under its own trust root, every chip shipped to the EMS is in its shipped lot, and the board HBOM names the lot that chain proves. The EMS's receipt record for that lot passed under the chip's policy and covers exactly the units shipped to the EMS.
 5. `parts[]` covers exactly the board design's reference designators; every placement in the build records is a listed lot; no serialized part is placed twice or placed without being shipped, and no lot is placed more often than it was shipped.
 6. The board lot is the set of boards that passed test, A1's yield accounts for the rest, every board in the lot is an A1 subject, and every received board is in the lot.
 
@@ -537,11 +589,15 @@ Withheld fields hide values, but the records around them still show how many rec
 2. The auditor runs the tapeout and lot receipt checks under the buyer's policy, for those units, with every withheld field restored.
 3. The auditor signs two VSAs with its own key and gives the buyer nothing else:
    - a **design VSA** for the released design, as the buyer's own verifier would sign it;
-   - a **receipt VSA**, whose subject is `urn:hslsa:receipt:<lot-id>` with the lot digest formula applied to the received units only, and whose `resourceUri` is the shipped lot's URN. The buyer recomputes the digest from its own list, so the receipt covers exactly its units and says nothing about the rest of the lot.
+   - a **receipt VSA**, a [receipt record](#receipt-record) whose subject is `urn:hslsa:receipt:<lot-id>` with the lot digest formula applied to the received units only, and whose `resourceUri` is the shipped lot's URN. The buyer recomputes the digest from its own list, so the receipt covers exactly its units and says nothing about the rest of the lot.
 4. Both VSAs name the buyer's policy by digest and list one input attestation, the **escrow manifest**: every envelope, data file and disclosure the auditor checked, by digest. The auditor keeps the manifest. It lets a later dispute establish exactly what was checked, without telling the buyer how many records there were.
 5. The buyer accepts the two VSAs when both are signed by a key its trust root lists for the `auditor` role, passed, name the buyer's policy, state every level the policy claims and name the same manifest, and when the receipt's subject is the digest of the units it received. `slsa-verifier verify-vsa` checks the signature, subject digest, resource URI and levels.
 
 The auditor takes over the buyer's check, and with it the buyer's trust root: the auditor holds the site keys, and the buyer holds only the auditor's key. The at-boot check reads each unit's provisioning record and firmware provenance, so under escrow either the auditor runs it too, as a RATS verifier for the buyer, or the supplier discloses those records to the buyer. No example runs the at-boot check under escrow yet.
+
+### Retention and access
+
+Each signer keeps its records, the data files they name, and the salts and disclosures of anything it withheld, for at least the support life of the product, and longer where a contract or a regulation asks. A withheld field whose disclosure is lost can never be audited again. A receiver keeps its receipt records and the VSAs it relied on for as long. Full records go only to the buyers and auditors the signer chooses; verifier escrow is the way to give a buyer the result without the records. Where the records are kept is the signer's choice, and a reference to them carries a URI as described under [Fetching records](#fetching-records).
 
 ### What each view reveals
 
@@ -551,7 +607,7 @@ The reference tool's `leaks` command measures this on a bundle, and a producer c
 | --- | --- | --- |
 | Withheld values: yields, programs, mask set, wafer ids | Hidden | Hidden |
 | Data files: wafer maps, genealogy, test results | Hidden (salted) | Hidden |
-| Records | 11 envelopes, by predicate type | One manifest digest |
+| Records | 14 envelopes, by predicate type | One manifest digest |
 | Parties | 9 signing key ids, the same across lots and buyers; builder ids name each site | The auditor |
 | Site, fab and lot ids | In builder ids and subject URNs, such as `urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A` | The shipped lot's id |
 | Timing | `finishedOn` on every step record | When the auditor checked |
@@ -635,7 +691,7 @@ Each row adds to the rows above it. At L1 records need not be signed, so they st
 
 | Level | Stops | Makes accountable | Does not address |
 | --- | --- | --- | --- |
-| L2 | Forged or altered packaging and test records; a unit added to a shipped lot after F4, or received with a serial not in it; a scrapped unit shipped, through the lot digest and yield reconciliation | The OSAT, for genealogy and marking; the test site, for each result and the test program it names | A copied serial: serials are not secrets, so a fake part carrying a valid serial passes a serial check; a die swapped or remarked at the OSAT under a genuine serial; a test site that signs results for tests it did not run |
+| L2 | Forged or altered packaging and test records; a unit added to a shipped lot after F4, or received with a serial not in it; a scrapped unit shipped, through the lot digest and yield reconciliation; where transfers are recorded, wafers or units that leave one site and are not the ones the next site records | The OSAT, for genealogy and marking; the test site, for each result and the test program it names | A copied serial: serials are not secrets, so a fake part carrying a valid serial passes a serial check; a die swapped or remarked at the OSAT under a genuine serial; a test site that signs results for tests it did not run |
 | L3 | A clone, a remarked part or anything else that cannot answer an identity challenge rooted in the die, at final test and again at lot receipt | The site's accreditation | A genuine die in a modified package (an added die, changed bonding); a clone carrying a key extracted from a genuine die; an HSM misused by its authorized operators |
 | L4 | Statistically, die swaps, remarking and additions to the package that decapsulation and X-ray show on sampled units | The lab | Units not sampled; changes inside the die, which are the Wafer track's to find |
 
@@ -643,7 +699,7 @@ Each row adds to the rows above it. At L1 records need not be signed, so they st
 
 | Level | Stops | Makes accountable | Does not address |
 | --- | --- | --- | --- |
-| L2 | Forged or altered build records; a part lot from a shipper the policy does not name; a chip whose own chain fails; more of a lot placed than was shipped, or a serialized part placed twice | Each shipper, for its certificate of conformance and traceability claim; the EMS, for every placement | A swap inside a lot: a part without a hardware identity is named only by lot and date code, so a counterfeit placed from a correctly labelled reel matches its records; a shipper that certifies counterfeit parts; rework or implants added after A1 |
+| L2 | Forged or altered build records; a part lot from a shipper the policy does not name; a chip whose own chain fails; more of a lot placed than was shipped, or a serialized part placed twice | Each shipper, for its certificate of conformance and traceability claim; the EMS, for every placement | A swap inside a lot: a part without a hardware identity is named only by lot and date code, so a counterfeit placed from a correctly labelled reel matches its records; a shipper that certifies counterfeit parts; a swap while parts are stored, which no record covers; rework or implants added after A1 |
 | L3 | Substitution of a component that has a hardware identity, which must pass attestation at build; such a component swapped after build, where the buyer checks the platform certificate | The site's accreditation | The same swap inside a lot for every part without an identity, which is most of a board (passives, power parts, commodity logic); an added chip or changed trace, which no record describes |
 | L4 | Statistically, counterfeit or substituted components and board-level implants that X-ray and component authentication show on sampled boards | The lab | Boards not sampled; implants inside a genuine component's package; counterfeits good enough to pass the authentication tests |
 
@@ -759,6 +815,7 @@ The source drafts were not edited; this spec settles each difference as follows.
 - [ ] Should Design L4 accept `gds-equal-ignoring-timestamps` by default, or only `gds-bit-exact`? This spec requires bit-exact unless the policy says otherwise.
 - [ ] How should a verifier treat post-quantum identity chains (Caliptra 2.x also issues ML-DSA-87 certificates) until common X.509 libraries can verify them?
 - [ ] What identity should a board carry once it has one: a platform certificate, a board-level DICE identity, or the identity of its root of trust?
+- [ ] How should events after the first buyer be recorded: a firmware update in the field, board rework, a return? NIST IR 8536 also leaves these to future work. The roadmap takes it up once a real board boots in phase 2.
 
 ### Next steps
 
@@ -776,6 +833,18 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 6 (2026-09-20)
+
+Settles the ten gaps the [NIST IR 8536 profile](nist-ir-8536-profile.md) found in HSLSA.
+
+- **Transfers between manufacturing sites.** A shipment of wafers or units from one manufacturing site to another is a distribution record signed by the site that ships, whose packing list names the lot and exactly what was sent; the next step links it ([Transfers between manufacturing sites](#transfers-between-manufacturing-sites)). Optional at L2, required at Wafer L3 and Package/Test L3 between companies. New step T. The PicoRV32 example records its three transfers and its policy requires them.
+- **Receipt records.** The receipt VSA from verifier escrow becomes the record of any receipt ([Receipt record](#receipt-record)). From Assembly L2 the EMS signs one for each chip lot it checks before placement and A1 links it; the board receipt check verifies it. New step R.
+- **Gaps first.** The lot receipt and board receipt checks report every missing record, and every withheld field with no disclosure, with its track, before they walk the chain, and list optional records that were not recorded.
+- **Evidence records.** At L1 only, the next party in the chain may cover a supplier's step that has no record with an evidence record naming a certificate, audit report or paper record by digest ([Evidence record](#evidence-record)). The reference tool does not accept them yet.
+- **Fetching records.** A reference may carry an `https` URI into its holder's repository, which may require access; a site that serves records serves each at an address ending in its digest ([Fetching records](#fetching-records)).
+- **Retention and access.** Signers keep records, data files, salts and disclosures for at least the product's support life ([Retention and access](#retention-and-access)).
+- **Storage and later events.** The scope now says that storage is not recorded, and that events after the first buyer are out of scope; the latter is an open question and a roadmap item. GS1 EPCIS is left to the supplier adapters of phase 3.
 
 ### Revision 5 (2026-09-18)
 

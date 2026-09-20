@@ -7,6 +7,7 @@
     "source": {"tagSigner": "source-owner", "reviewer": "source-reviewer"},
     "thirdPartyIP": [{"name": "picorv32", "signer": "ip-vendor", "files": ["picorv32.v"]}]
   },
+  "manufacturing": {"requireTransfers": true},
   "claims": {
     "design": ["HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_2"],
     "lot": ["HSLSA_WAFER_LEVEL_2", "HSLSA_PACKAGE_TEST_LEVEL_2", "HSLSA_DESIGN_LEVEL_2"]

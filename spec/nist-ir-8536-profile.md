@@ -1,6 +1,6 @@
 # HSLSA as the semiconductor profile of NIST IR 8536
 
-**Status:** draft, 2026-09-18. Written against the final [NIST IR 8536](https://doi.org/10.6028/NIST.IR.8536), *Supply Chain Traceability: Manufacturing Meta-Framework* (September 2026), and [HSLSA v0.1](hslsa-v0.1.md). This is item 1 of phase 1 in the [roadmap](../docs/roadmap.md).
+**Status:** draft, 2026-09-20; the ten gaps it found in HSLSA were decided on 2026-09-20 and applied in spec revision 6. Written against the final [NIST IR 8536](https://doi.org/10.6028/NIST.IR.8536), *Supply Chain Traceability: Manufacturing Meta-Framework* (September 2026), and [HSLSA v0.1](hslsa-v0.1.md). This is item 1 of phase 1 in the [roadmap](../docs/roadmap.md).
 
 ## Summary
 
@@ -12,7 +12,7 @@ HSLSA fills that slot for semiconductors and the boards built from them:
 - HSLSA's step predicates are the semiconductor payload templates, and its tracks and levels are the risk scale that IR 8536's principle 2 asks for but does not define.
 - This profile adds four requirements on top of HSLSA (organization identifiers, event times, record-digest links, and how another ecosystem carries an HSLSA record unchanged), maps every HSLSA step to an IR 8536 event, and lists what each side lacks.
 
-The largest gaps in HSLSA are that receipt, storage and transfers between fab and OSAT are not recorded as events, that a missing record fails the chain instead of being reported as a gap, and that nothing is recorded after the first buyer. The largest gaps in IR 8536, for this sector, are design provenance, assurance levels with pass or fail checks, and the binding of a booted device to its records. Both lists are below with a proposal for each.
+The largest gaps this profile found in HSLSA were that receipt and transfers between fab and OSAT were not recorded as events, that a missing record failed the chain instead of being reported as a gap, that storage was not recorded, and that nothing is recorded after the first buyer. Spec revision 6 closes the first two, states the third in the scope, and leaves the last as an open question. The largest gaps in IR 8536, for this sector, are design provenance, assurance levels with pass or fail checks, and the binding of a booted device to its records. Both lists are below with a proposal for each.
 
 The roadmap also asks whether IR 8536's reference implementation can ingest HSLSA records. It cannot be checked yet: NIST says the Python reference implementation is in final approval and its repository will be public when that completes, and it was not public on 2026-09-18. [Reference implementation](#reference-implementation) says what will be done once it is.
 
@@ -68,14 +68,15 @@ The data type identifier of an HSLSA record is its predicate type. Where several
 | Source review | `https://github.com/Horiodino/hw-slsa/source-review/v0.1` | None |
 | Third-party IP release | `https://slsa.dev/provenance/v1` | The vendor's, or `.../ip-release@v1` |
 | Manufacturing step | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `.../mfg/step/<step>@v1` |
-| Distribution | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `.../mfg/step/distribution@v1` |
+| Distribution | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `.../mfg/step/distribution@v1`, also for transfers between manufacturing sites |
+| Evidence (L1 only) | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `.../mfg/step/evidence@v1` |
 | Physical inspection (L4) | `https://github.com/Horiodino/hw-slsa/physical-inspection/v0.1` | None |
 | Firmware image build | `https://slsa.dev/provenance/v1` | Named for the builder |
 | Firmware provisioning | `https://github.com/Horiodino/hw-slsa/fw-provisioning/v0.1` | `.../fw-provisioning/step/provision@v1` |
 | Firmware review | The OCP S.A.F.E. short-form report's own CoRIM profile | None |
 | Firmware reference values | The HSLSA CoRIM profile, `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` | None |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | None |
-| Verification summary | `https://slsa.dev/verification_summary/v1` | None |
+| Verification summary | `https://slsa.dev/verification_summary/v1` | None; a receipt record is one whose subject is `urn:hslsa:receipt:<lot-id>` |
 
 ## Events
 
@@ -97,19 +98,20 @@ Most HSLSA steps are run by a different company from the step before them, so th
 | Release | Make | Shared | The design as a digital object; every manufacturing step links to it |
 | Rebuild (L4) | None | Supplemental evidence | An independent check of the release, not a transformation |
 | F1. Wafer fabrication | Make | Shared | Includes mask making, which HSLSA does not record separately |
+| T. Transfer | Ship | Shared | Signed by the site that ships wafers or units to the next manufacturing site; the receiving site's next record links it, which records the matching Receive |
 | F2. Wafer sort | Make | Shared | |
 | F3. Packaging | Assemble | Shared | Die into package |
 | F4. Final test | Make | Shared | Produces the shipped lot |
 | Firmware build | Make | Shared | A digital object |
 | Provisioning | Make | Shared | Changes the unit: images, fuses, identity |
 | D. Distribution | Ship | Shared | Signed by the shipper |
+| R. Receipt | Receive | Shared | Signed by the receiver after its lot receipt check; from Assembly L2 the EMS signs one for each chip lot and A1 links it |
 | A1. Board assembly | Assemble | Shared | |
 | X. Inspection (L4) | None | Supplemental evidence | Independent physical verification |
 
-Three events have no HSLSA step:
+Two events have no HSLSA step of their own:
 
-- **Receive.** The lot receipt and board receipt checks run, but only a verification summary records them, and the spec does not require the receiver to sign one. See [H1](#gaps-in-hslsa).
-- **Store.** Nothing records a warehouse or a die bank. See [H3](#gaps-in-hslsa).
+- **Store.** Nothing records a warehouse or a die bank, and the spec's scope says so. See [H3](#gaps-in-hslsa).
 - **Employ.** The at-boot check is the closest: a verifier MAY sign a unit verification summary for a booted device. Under this profile that summary is the Employ record.
 
 Some records are not events. The HBOM is pedigree: what the product is made of, pointing at the events. The verification summary is a decision over a chain, which is what IR 8536's principle 1 says the chain is for. The source review, IP release and S.A.F.E. report are supplemental evidence for the steps that consume them. The firmware reference values are supplemental evidence for Employ: the measurements a firmware build should produce on a device, which the at-boot check compares the device against.
@@ -121,12 +123,12 @@ Some records are not events. The HBOM is pedigree: what the product is made of, 
 | 1. Decision-centric traceability | Four checks (tapeout, lot receipt, board receipt, at boot), each a buyer's decision, ending in a signed verification summary | Met |
 | 2. Proportional, risk-scaled traceability | Levels per track, L0 to L3, with an optional L4 defense profile for root-of-trust and defense parts; a buyer asks for the level the part's risk needs | Met; HSLSA supplies the scale IR 8536 leaves open |
 | 3. Incentive-aligned participation | L1 needs no signing infrastructure, and a product states a level per track, so one weak supplier does not block the others. Proxy signing for suppliers who will not sign is planned in phase 2 | Partial: incentives are commercial, not something a spec can supply |
-| 4. Evidence-based provenance, not perfect transparency | Accreditation (DMEA, O-TTPS), S.A.F.E. reports, certificates of conformance and signed waivers count as evidence; salted digests give bounded disclosure | Partial: a step with no record breaks the chain, with no way to put paper evidence in its place ([H6](#gaps-in-hslsa)) |
-| 5. Measure and communicate traceability gaps | The track level is the lowest level of its steps, so the weakest link shows; the threat model states what each level leaves open; parts without identity are named as such | Partial: the verifier fails on a missing record instead of reporting it ([H5](#gaps-in-hslsa)) |
-| 6. Lifecycle-oriented provenance | The at-boot check covers what a device runs now, including its SVN against anti-rollback fuses | Gap: nothing after the first buyer, no record of field updates, rework or return ([H4](#gaps-in-hslsa)) |
+| 4. Evidence-based provenance, not perfect transparency | Accreditation (DMEA, O-TTPS), S.A.F.E. reports, certificates of conformance and signed waivers count as evidence; salted digests give bounded disclosure | Met: at L1 an [evidence record](hslsa-v0.1.md#evidence-record) puts a certificate or paper record in place of a missing step ([H6](#gaps-in-hslsa)) |
+| 5. Measure and communicate traceability gaps | The track level is the lowest level of its steps, so the weakest link shows; the threat model states what each level leaves open; parts without identity are named as such | Met: the receipt checks list every missing record and every undisclosed withheld field with its track, and name optional records that were not recorded ([H5](#gaps-in-hslsa)) |
+| 6. Lifecycle-oriented provenance | The at-boot check covers what a device runs now, including its SVN against anti-rollback fuses | Gap: nothing after the first buyer, no record of field updates, rework or return; an open question in the spec, taken up in phase 2 ([H4](#gaps-in-hslsa)) |
 | 7. Verifiable organization attribution | Every step is signed by a site key whose certificate names the site; buyers list allowed signers by role | Met with [P1](#profile-requirements), which adds a standard identifier |
 | 8. Cyber-physical and digital linkage | Files by digest; lots by URN and canonical-list digest; units by serial at L2 and by hardware identity at L3, challenged at test, receipt and boot | Met, and stronger than IR 8536 asks |
-| 9. Interoperability over uniformity | in-toto, DSSE, SLSA Provenance, CycloneDX, SPDX, CoRIM, SEMI E142 and STDF are reused unchanged; a plain SLSA verifier can check every step record | Met, except that nothing maps to GS1 EPCIS ([H9](#gaps-in-hslsa)) |
+| 9. Interoperability over uniformity | in-toto, DSSE, SLSA Provenance, CycloneDX, SPDX, CoRIM, SEMI E142 and STDF are reused unchanged; a plain SLSA verifier can check every step record | Met; GS1 EPCIS is left to the supplier adapters of phase 3 ([H9](#gaps-in-hslsa)) |
 
 ## Profile requirements
 
@@ -151,7 +153,7 @@ IR 8536 defines record elements, not a wire format, so an ecosystem such as the 
 | Tracked entity | `subject[]` |
 | Organization | `hwMfg.site.id` (P1), or the certificate of the signing key |
 | Time | `runDetails.metadata.finishedOn` (P2) |
-| Links | The envelope digests in `resolvedDependencies` (P3), each with a URI where the record can be fetched |
+| Links | The envelope digests in `resolvedDependencies` (P3), each with a URI where the record can be [fetched](hslsa-v0.1.md#fetching-records) |
 | Payload | The DSSE envelope, unchanged (P4) |
 
 For example, F3 packaging in such a container might look like this. The container's field names here are illustrative; the ecosystem defines its own.
@@ -172,20 +174,20 @@ The adapter adds nothing a buyer must trust: every value in the container except
 
 ## Gaps in HSLSA
 
-Each gap is something IR 8536 expects and HSLSA does not yet do, with a proposal. None changes a level yet; each needs a decision before it goes into the spec.
+Each gap is something IR 8536 expects and HSLSA did not do. The decisions were made on 2026-09-20 and applied in spec revision 6 (see its [changelog](hslsa-v0.1.md#changelog)).
 
-| | Gap | IR 8536 | Proposal |
+| | Gap | IR 8536 | Decision |
 | --- | --- | --- | --- |
-| H1 | Receipt is checked but not recorded | Receive event | The receiver signs the verification summary of its lot receipt or board receipt check, with the packing list as a subject; that summary is the Receive record |
-| H2 | No record of wafers or dies moving between fab, sort house and OSAT; F3 links straight to F2 | Ship and Receive at every handoff between organizations | Allow a distribution record for inter-site transfers, whose packing list names the wafer IDs or die bank lot, and require it at Package/Test L3 when the sites are different companies |
-| H3 | No record of storage at a distributor or die bank | Store event | Out of scope for v0.1; the distribution record covers only the shipper's claim that the parts are traceable to the manufacturer. Revisit with distributors in phase 4 |
-| H4 | Nothing after the first buyer: field firmware updates, rework, returns | Principle 6; post-Employ events are future work in IR 8536 too | A firmware update record signed by the updater, linked to the unit's provisioning record, and an Assembly rework record; the at-boot check already covers what finally runs |
-| H5 | A missing or withheld record fails the check; the result does not say which | Principle 5 | The verification summary lists each record it could not obtain or that was withheld, and the track it belongs to, so a buyer sees the gap instead of a bare failure |
-| H6 | No place for paper or audit evidence in place of a record | Principle 4 | At L1 only, a step MAY be covered by an evidence record signed by the next party, which names the certificate or document by digest and says it is not the supplier's own record. This pairs with proxy signing in phase 2 |
-| H7 | Organization identifiers optional | Principle 7 | P1 above; the HBOM schema now accepts `uei:` and `gln:` and checks the prefix |
-| H8 | References are digests with bundle-relative URIs; no way to fetch a record from its owner | Federated repositories, traceback links (section 4.3.2) and link-based querying (section 4.4.3) | References carry a URI into the owner's repository, which may require access; a private RFC 9162 or SCITT log can index records by subject digest (phase 1, item 4) |
-| H9 | Nothing maps to GS1 EPCIS, a widely used event format for shipping, receiving and storage | Principle 9 | Accept an EPCIS event as supplemental evidence for Ship, Receive and Store from distributors that already emit it; do not replace the distribution record |
-| H10 | No retention period or access rule for records | Controlled access and data retention (section 4.4.2) | State a minimum retention (the product's support life) and that access to full records is granted per buyer or auditor; [verifier escrow](hslsa-v0.1.md#verifier-escrow) defines who sees what |
+| H1 | Receipt was checked but not recorded | Receive event | Adopted. Whoever runs the lot receipt check MAY sign a [receipt record](hslsa-v0.1.md#receipt-record), a VSA over exactly the units it received; that is the Receive record. From Assembly L2 the EMS signs one for each chip lot before placement, A1 links it, and the board receipt check verifies it |
+| H2 | No record of wafers or units moving between fab, sort house, OSAT and test house; each step linked straight to the one before | Ship and Receive at every handoff between organizations | Adopted. The shipping site MAY sign a [transfer](hslsa-v0.1.md#transfers-between-manufacturing-sites), a distribution record whose packing list names the lot and exactly what was sent, and the next step links it. Required at Wafer L3 and Package/Test L3 between companies, or when a buyer's policy asks; the PicoRV32 example records all three and requires them |
+| H3 | No record of storage at a distributor or die bank | Store event | Deferred. The spec's scope and the Assembly threat model now say that storage is not recorded, so a swap in storage is a stated residual risk. Revisit with distributors in phase 4 |
+| H4 | Nothing after the first buyer: field firmware updates, rework, returns | Principle 6; post-Employ events are future work in IR 8536 too | Deferred. An open question in the spec and a phase 2 roadmap item, once a real board boots and a field update can be tried; the at-boot check still covers what finally runs |
+| H5 | A missing or withheld record failed the check at the first broken link | Principle 5 | Adopted. Before they walk the chain, the lot receipt and board receipt checks list every missing record and every withheld field with no disclosure, each with its track, and name optional records that were not recorded |
+| H6 | No place for paper or audit evidence in place of a record | Principle 4 | Adopted in the spec. At L1 only, the next party MAY cover a supplier's step with an [evidence record](hslsa-v0.1.md#evidence-record) naming the certificate or document by digest; the track is then at L1. The reference tool will accept them with proxy signing in phase 2 |
+| H7 | Organization identifiers optional | Principle 7 | Done in this profile: P1 above, and the HBOM schema accepts `uei:` and `gln:` and checks the prefix |
+| H8 | References were digests with bundle-relative URIs; no way to fetch a record from its owner | Federated repositories, traceback links (section 4.3.2) and link-based querying (section 4.4.3) | Adopted as spec text: a reference MAY carry an `https` URI into its holder's repository, which may require access, and a site SHOULD serve each record at an address ending in its digest ([Fetching records](hslsa-v0.1.md#fetching-records)). Finding records by subject waits for the transparency log item of phase 1 |
+| H9 | Nothing maps to GS1 EPCIS, a widely used event format for shipping, receiving and storage | Principle 9 | Deferred to the supplier adapters of phase 3: accept an EPCIS event as supplemental evidence for Ship, Receive and Store from distributors that already emit it, without replacing the distribution record |
+| H10 | No retention period or access rule for records | Controlled access and data retention (section 4.4.2) | Adopted. Signers keep records, data files, salts and disclosures for at least the product's support life, and give full records only to the buyers and auditors they choose ([Retention and access](hslsa-v0.1.md#retention-and-access)) |
 
 The Semiconductor Industry Association's [comments on the second draft](https://www.semiconductors.org/wp-content/uploads/2025/10/SIA-Final-Comments-on-NIST-IR-8536-2pd_10.03.pdf) asked that a traceability system link to data its owner controls rather than collect it, and stay out of each company's internal systems. H8 and H10 follow that: records stay with their owners, and the internal design steps are disclosed only as the design house chooses.
 

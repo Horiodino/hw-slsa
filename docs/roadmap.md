@@ -44,7 +44,7 @@ Work that needs no partner. Target: spec v0.2.
 
 Target: spec v0.3 and a profile document.
 
-1. **HSLSA as a NIST IR 8536 profile.** Map each HSLSA record onto the IR 8536 meta-framework's provenance chain and event model, and check that its open-source reference implementation can ingest HSLSA records, or that a thin adapter can. Publish the mapping as `spec/nist-ir-8536-profile.md`. The mapping is published in [nist-ir-8536-profile.md](../spec/nist-ir-8536-profile.md); the ingest check waits for NIST to publish the reference implementation.
+1. **HSLSA as a NIST IR 8536 profile.** Map each HSLSA record onto the IR 8536 meta-framework's provenance chain and event model, and check that its open-source reference implementation can ingest HSLSA records, or that a thin adapter can. Publish the mapping as `spec/nist-ir-8536-profile.md`. The mapping is published in [nist-ir-8536-profile.md](../spec/nist-ir-8536-profile.md); the ingest check waits for NIST to publish the reference implementation. Spec revision 6 settles the ten gaps the profile found: transfers between manufacturing sites and receipt records are recorded, the receipt checks report every gap at once, and evidence records, fetchable references and retention are in the spec. Storage, events after the first buyer and GS1 EPCIS are deferred to the items below.
 2. **Selective disclosure.** Design a verifier-escrow mode: an accredited auditor sees full records, the buyer sees only check results and a signed VSA. Measure what salted digests still leak (record counts, lot sizes, timing) and say what the escrow mode hides. Done in spec revision 5 ([selective-disclosure.md](selective-disclosure.md)): records withhold fields with SD-JWT style salted digests, and an auditor signs a design VSA and a receipt VSA for the buyer's units. On the PicoRV32 lot, a party holding the records still recovered both lot sizes and the scrapped serials from the lot digests, and saw site names, lot ids and timing; the escrow buyer saw only the design digest, the lot id, the levels and the auditor.
 3. **Output formats.** Emit the HBOM as CycloneDX 1.6 and as SPDX 3.1 once 3.1 is final. Publish firmware reference measurements as CoRIM, so standard RATS verifiers can run part of the at-boot check. The CoRIM half is done: the Caliptra example signs the reference values for its FMC and runtime as a CoRIM, the at-boot check appraises each unit against it, and Veraison's cocli decodes it in CI ([caliptra-e2e.md](caliptra-e2e.md#firmware-reference-values-corim)). The CycloneDX and SPDX renderings are still to do.
 4. **Transparency logs.** Show SEMI T26 (ledger-based traceability) or a private RFC 9162 log as the L3 log for manufacturing records.
@@ -59,8 +59,9 @@ Target: the first chain where physical records come from a real run.
 1. **Real board boot.** Run the at-boot check on a physical board: OpenTitan or Caliptra on an FPGA board, provisioned by a script that signs `fw-provisioning` records, then booted and checked against them.
 2. **Open-PDK tapeout.** Put a small design with a unique ID through an open-PDK shuttle (SKY130 or GF180), with the Design chain from phase 0.
 3. **Real package and test data.** Turn the packaging and test data the shuttle returns (unit lists, test logs, wafer maps where available) into F2 to F4 records.
-4. **Proxy signing.** Suppliers will not sign at first. Define a `proxy` signer role: this project signs a record on a supplier's behalf from the supplier's own data, and the record says so. A proxy-signed step caps its track at L1, but the chain shape is real.
+4. **Proxy signing.** Suppliers will not sign at first. Define a `proxy` signer role: this project signs a record on a supplier's behalf from the supplier's own data, and the record says so. A proxy-signed step caps its track at L1, but the chain shape is real. The reference tool accepts the spec's L1 evidence records at the same time.
 5. **Real board build.** Assemble a small batch of boards and record A1 from the real build and the real distributor invoices.
+6. **After the first buyer.** With a real board booting, define records for what happens to it in the field: a firmware update signed by the updater and linked to the unit's provisioning record, rework, and returns. This is IR 8536's principle 6 and an open question in the spec.
 
 **Exit:** a public or buyer-shared chain from RTL to a real booted device, with every simulated record replaced by a real or proxy-signed one.
 
@@ -73,7 +74,7 @@ Target: turn an unchanged supplier export into signed records. This is what make
 | Commercial EDA wrapper | Tcl hooks in the flow scripts (Innovus, ICC2, Fusion Compiler, Calibre) | `design-flow` records per step |
 | MES and test sidecar | Lot events, SEMI E142 wafer maps, STDF test results | F1 to F4 records |
 | Provisioning station plugin | Station logs and readback | `fw-provisioning` records |
-| Distributor importer | Certificates of conformance, packing lists | Distribution records |
+| Distributor importer | Certificates of conformance, packing lists, GS1 EPCIS shipping, receiving and storage events | Distribution records, with EPCIS events kept as supplemental evidence |
 | HSM signing | PKCS#11 | Site-key signatures at L3 |
 
 The EDA wrapper needs a design-house partner with licenses. The rest can be built against sample data from phase 2.

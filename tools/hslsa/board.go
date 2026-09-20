@@ -6,7 +6,8 @@ package hslsa
 // have no HBOM of their own. Every lot reaches the assembler through a signed
 // distribution record (a distributor, or a manufacturer shipping direct), the
 // EMS runs the chip's lot receipt check before placement and signs A1 against
-// each board serial and the chip serial placed on it, and the board owner
+// each board serial and the chip serial placed on it (after signing a receipt
+// VSA for the chips it received), and the board owner
 // signs a board HBOM whose parts[] points at those records.
 //
 // As with the chip, the physical data (shipments, placements, board test
@@ -34,6 +35,10 @@ const (
 
 // ShipAtt is the envelope file name of one shipment's distribution record.
 func ShipAtt(shipmentID string) string { return "mfg-distribution-" + shipmentID + ".intoto.json" }
+
+// ReceiptAtt is the envelope file name of the receipt VSA the EMS signs for
+// the units of one chip lot it received.
+func ReceiptAtt(lotID string) string { return "receipt-" + lotID + ".vsa.intoto.json" }
 
 // boardRD is a board subject: its URN plus the digest of its serial (UTF-8, no
 // newline) until boards carry an identity certificate.
@@ -235,6 +240,26 @@ func BoardProduce(bundle, chipBundle, scenarioPath, designPath, policyPath, keys
 	}
 	chipLot := chipResult.Lot
 	fmt.Printf("part lot receipt check: PASSED for %s, %d units received\n", S(chipLot, "name"), len(chipUnits))
+	// The EMS records the receipt: a VSA over exactly the units it received,
+	// under the chip bundle's policy, naming the chip records it checked.
+	receipt, err := ReceiptSubject(S(chipLot, "name"), chipUnits)
+	if err != nil {
+		return err
+	}
+	chipPolicy, err := ReadObj(filepath.Join(chip, "policy.json"))
+	if err != nil {
+		return err
+	}
+	var checked []Obj
+	for _, in := range chipResult.Inputs {
+		checked = append(checked, Obj{"name": chipRel + "/" + S(in, "name"), "digest": get(in, "digest")})
+	}
+	receiptName := ReceiptAtt(S(chipLine.line, "lot"))
+	if err := signVSA(receipt, S(chipLot, "name"), get(chipPolicy, "claims", "lot"), checked, filepath.Join(chip, "policy.json"),
+		filepath.Join(keys, emsRole+".key.pem"), filepath.Join(bundle, "att", receiptName)); err != nil {
+		return err
+	}
+	fmt.Printf("receipt %s: signed by %s for %d units\n", S(receipt, "name"), emsRole, len(chipUnits))
 	asm := O(sc, "assembly")
 	mfr := S(sc, "product", "manufacturer", "name")
 	failedBoards := Strs(asm, "failedBoards")
@@ -300,6 +325,7 @@ func BoardProduce(bundle, chipBundle, scenarioPath, designPath, policyPath, keys
 	deps = append(deps,
 		relRD(bundle, chipRel+"/att/"+BoardHBOM),
 		relRD(bundle, chipRel+"/att/mfg-f4-final-test.intoto.json"),
+		relRD(bundle, "att/"+receiptName),
 		chipLot, design)
 	if _, err := boardRecord(bundle, "board-assembly", BoardA1, subjects,
 		Obj{"id": S(asm, "boardLot"), "boardDesign": BoardDesign}, deps,
@@ -371,12 +397,16 @@ type partLine struct {
 	line Obj
 }
 
-// BoardCheck verifies the board HBOM, A1, every shipment and part, and the
+// BoardCheck reports every missing record first, then verifies the board
+// HBOM, A1, every shipment and part with the EMS's receipt for it, and the
 // board lot; received may be nil.
 func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []string) (*LotResult, error) {
 	art := filepath.Join(bundle, "artifacts")
 	pol, err := ReadObj(policyPath)
 	if err != nil {
+		return nil, err
+	}
+	if err := gapError("board receipt check", boardGaps(bundle)); err != nil {
 		return nil, err
 	}
 	shippers := O(pol, "shippers")
@@ -502,7 +532,7 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 			return nil, failf("parts: policy requires an authorized channel, and %s lot %s was not bought through one", mpn, lot)
 		}
 		if Has(part, "hbomRef") {
-			if err := partCheck(bundle, a1, part, line); err != nil {
+			if err := partCheck(bundle, trust, a1, part, line); err != nil {
 				return nil, err
 			}
 		}
@@ -619,9 +649,10 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 	return &LotResult{Lot: lotSubj, Inputs: append([]Obj{relRD(bundle, "att/"+BoardHBOM)}, inputs...)}, nil
 }
 
-// partCheck runs a part's own chain checks when it has an HBOM, and binds its
-// lot, its HBOM and the units shipped to A1.
-func partCheck(bundle string, a1, part, line Obj) error {
+// partCheck runs a part's own chain checks when it has an HBOM, checks the
+// EMS's receipt VSA for the units it received, and binds the lot, the HBOM
+// and the receipt to A1.
+func partCheck(bundle string, trust *TrustRoot, a1, part, line Obj) error {
 	mpn := S(part, "mpn")
 	rel := strings.TrimPrefix(S(part, "hbomRef", "uri"), "file:")
 	chip := filepath.Dir(filepath.Dir(filepath.Join(bundle, rel)))
@@ -649,7 +680,53 @@ func partCheck(bundle string, a1, part, line Obj) error {
 	if S(result.Lot, "name") != "urn:hslsa:lot:"+S(part, "lot") {
 		return failf("parts: board claims %s lot %s, but its HBOM names %s", mpn, S(part, "lot"), S(result.Lot, "name"))
 	}
-	return requireLink(a1, "board-assembly", []Obj{result.Lot, relRD(bundle, rel)}, mpn+" lot and HBOM")
+	receiptRel := "att/" + ReceiptAtt(S(part, "lot"))
+	if err := receiptCheck(bundle, trust, chip, receiptRel, result.Lot, units, mpn); err != nil {
+		return err
+	}
+	return requireLink(a1, "board-assembly", []Obj{result.Lot, relRD(bundle, rel), relRD(bundle, receiptRel)}, mpn+" lot, HBOM and receipt")
+}
+
+// receiptCheck verifies the receipt VSA the EMS signed for the units of a
+// chip lot it received: it passed under the chip bundle's policy, states
+// that policy's lot levels, and covers exactly the units shipped to the EMS.
+func receiptCheck(bundle string, trust *TrustRoot, chip, rel string, lot Obj, units []string, mpn string) error {
+	label := mpn + " receipt " + filepath.Base(rel)
+	stmt, err := trust.Open(filepath.Join(bundle, rel), emsRole, VSAType)
+	if err != nil {
+		return err
+	}
+	p := O(stmt, "predicate")
+	if S(p, "verifier", "id") != VerifierID || S(p, "verificationResult") != "PASSED" {
+		return failf("%s: not a passed lot receipt check", label)
+	}
+	policyPath := filepath.Join(chip, "policy.json")
+	policyDigest, err := sha256File(policyPath)
+	if err != nil {
+		return err
+	}
+	if S(p, "policy", "digest", "sha256") != policyDigest {
+		return failf("%s: checked under another policy than the chip's", label)
+	}
+	policy, err := ReadObj(policyPath)
+	if err != nil {
+		return err
+	}
+	for _, l := range Strs(policy, "claims", "lot") {
+		if !contains(Strs(p, "verifiedLevels"), l) {
+			return failf("%s: does not state %s", label, l)
+		}
+	}
+	want, err := ReceiptSubject(S(lot, "name"), units)
+	if err != nil {
+		return failf("%s: %v", label, err)
+	}
+	got := Objs(stmt, "subject")
+	if len(got) != 1 || S(got[0], "name") != S(want, "name") || !jsonEqual(get(got[0], "digest"), get(want, "digest")) ||
+		S(p, "resourceUri") != S(lot, "name") {
+		return failf("%s: covers other units than the %d shipped to the EMS", label, len(units))
+	}
+	return nil
 }
 
 // BoardVerify runs the board receipt check, then signs the board VSA when vsaKey is set.

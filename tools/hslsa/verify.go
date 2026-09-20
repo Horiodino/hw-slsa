@@ -3,8 +3,10 @@ package hslsa
 // The buyer's check: walk the chain by digest, then emit a signed SLSA VSA.
 //
 // Implements the tapeout check and the lot receipt check from the spec section
-// "Where the chain is checked". Any failure returns a VerificationError naming
-// the first broken link; nothing is emitted unless every check passes.
+// "Where the chain is checked". The lot receipt check first reports every
+// missing or undisclosed record at once (gaps.go); after that, any failure
+// returns a VerificationError naming the first broken link. Nothing is
+// emitted unless every check passes.
 
 import (
 	"fmt"
@@ -233,17 +235,25 @@ func requireDesignL2Rules(policy, rel Obj) error {
 
 // LotResult is what the lot receipt check vouches for.
 type LotResult struct {
-	Lot    Obj   // the shipped lot subject
-	Inputs []Obj // the manufacturing envelopes and the HBOM
+	Lot         Obj      // the shipped lot subject
+	Inputs      []Obj    // the manufacturing envelopes and the HBOM
+	NotRecorded []string // optional records the bundle does not have
 }
 
-// LotCheck verifies F1 to F4 and the HBOM against the design, and that every
-// received unit is in the shipped lot (units may be nil).
+// LotCheck verifies F1 to F4, any transfers between them (all of them when
+// the policy's manufacturing.requireTransfers is set) and the HBOM against
+// the design, and that every received unit is in the shipped lot (units may
+// be nil).
 func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult, units []string) (*LotResult, error) {
 	art := filepath.Join(bundle, "artifacts")
+	gaps, notRecorded := chipGaps(bundle, policy)
+	if err := gapError("lot receipt check", gaps); err != nil {
+		return nil, err
+	}
 	stmts := map[string]Obj{}
+	var transfers []Obj
 	prev := design.Release
-	for _, step := range MfgSteps {
+	for i, step := range MfgSteps {
 		label := step
 		stmt, err := trust.Open(filepath.Join(bundle, "att", MfgAtt[step]), MfgSigner[step], MfgStep)
 		if err != nil {
@@ -260,6 +270,16 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 		}
 		if err := requireFiles(bundle, stmt, label); err != nil {
 			return nil, err
+		}
+		if i > 0 {
+			t, err := transferCheck(bundle, trust, design, MfgSteps[i-1], stmts, stmt, prev)
+			if err != nil {
+				return nil, err
+			}
+			if t != nil {
+				prev = t
+				transfers = append(transfers, t)
+			}
 		}
 		if err := requireLink(stmt, label, []Obj{prev}, "previous step"); err != nil {
 			return nil, err
@@ -385,8 +405,9 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	for _, s := range MfgSteps {
 		inputs = append(inputs, envRD(bundle, MfgAtt[s]))
 	}
+	inputs = append(inputs, transfers...)
 	inputs = append(inputs, envRD(bundle, "hbom.intoto.json"))
-	return &LotResult{Lot: lotRD, Inputs: inputs}, nil
+	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded}, nil
 }
 
 // signVSA signs a SLSA Verification Summary Attestation for one subject.
@@ -446,6 +467,9 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 		msg += fmt.Sprintf(", %d received units found in the lot", len(units))
 	}
 	fmt.Println(msg)
+	if len(lot.NotRecorded) > 0 {
+		fmt.Printf("not recorded, and not required by the policy: %s\n", strings.Join(lot.NotRecorded, "; "))
+	}
 	if vsaKey != "" {
 		claims := O(policy, "claims")
 		if err := signVSA(design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"],

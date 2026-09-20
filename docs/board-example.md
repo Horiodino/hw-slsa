@@ -24,23 +24,24 @@ This example puts the PicoSoC from the [end-to-end test](e2e-test.md) on a small
 | Record | Signed by (trust root role) | Subject | Consumes (by digest) |
 | --- | --- | --- | --- |
 | Distribution, one per shipment | The shipper: `dist-franchised`, or `pcb-fab` shipping direct | The shipment's packing list (manufacturer, MPN, lot, date code, quantity; chip serials for the chip line) | The chip shipped lot, for the chip line |
-| A1 board assembly | `ems-site` | The board lot `urn:hslsa:lot:BRD-EXAMPLE-01`, each board `urn:hslsa:board:<manufacturer>:<serial>`, and the per-serial build records | Every shipment record, the chip HBOM and F4 record, the chip shipped lot, the board design |
+| Receipt, one per chip lot | `ems-site` | `urn:hslsa:receipt:ASM-EXAMPLE-17`, digested over the chips the EMS received ([receipt record](../spec/hslsa-v0.1.md#receipt-record)) | The chip records its lot receipt check read, and the chip's policy |
+| A1 board assembly | `ems-site` | The board lot `urn:hslsa:lot:BRD-EXAMPLE-01`, each board `urn:hslsa:board:<manufacturer>:<serial>`, and the per-serial build records | Every shipment record, the chip HBOM, F4 record and receipt, the chip shipped lot, the board design |
 | Board HBOM | `board-owner` | The board design and the board lot | `parts[]` points at each shipment through `distributionRef` and at the chip's HBOM through `hbomRef`; `manufacturing.boardAssembly.attestationRef` points at A1 |
 
-The EMS receives 8 chips from shipped lot `ASM-EXAMPLE-17`, runs the chip's tapeout and lot receipt checks on them before placement (the spec's "board assembly runs this same check on each part"), builds 6 boards and fails one at test, so the board lot holds 5 boards. The build records name the chip serial on U1 of every board and the lot of every other placement, which is the IPC-1782 style per-serial record the Assembly track asks for. The chip vendor's bundle travels inside the board bundle under `parts/picosoc/`.
+The EMS receives 8 chips from shipped lot `ASM-EXAMPLE-17`, runs the chip's tapeout and lot receipt checks on them before placement (the spec's "board assembly runs this same check on each part"), signs a receipt record for those 8 chips, builds 6 boards and fails one at test, so the board lot holds 5 boards. The build records name the chip serial on U1 of every board and the lot of every other placement, which is the IPC-1782 style per-serial record the Assembly track asks for. The chip vendor's bundle travels inside the board bundle under `parts/picosoc/`.
 
 ## What the buyer checks
 
-`hslsa board verify` ([`tools/hslsa/board.go`](../tools/hslsa/board.go)), then a signed SLSA VSA for the board lot checked with slsa-verifier:
+`hslsa board verify` ([`tools/hslsa/board.go`](../tools/hslsa/board.go)), then a signed SLSA VSA for the board lot checked with slsa-verifier. Before it walks the chain, the check lists every record it needs that is missing, with its track, so a buyer sees every gap at once.
 
 1. The board HBOM is signed by the board owner, matches the schema, and its lot subject is A1's board lot.
-2. A1 is signed by the EMS, passed its gates, names the same board design, and consumes every shipment record and the chip's lot and HBOM.
+2. A1 is signed by the EMS, passed its gates, names the same board design, and consumes every shipment record and the chip's lot, HBOM and receipt.
 3. Every `parts[]` entry has a shipment record signed by the shipper the policy names, and its lot and date code match that shipment. `authorized: true` holds only if the policy lists the shipper as an authorized channel for that manufacturer, and the policy can require the authorized channel for every part.
-4. The chip passes its own full chain check (tapeout and lot receipt) with its own trust root, every chip shipped to the EMS is in its shipped lot, and the board HBOM names the lot that chain proves.
+4. The chip passes its own full chain check (tapeout and lot receipt) with its own trust root, every chip shipped to the EMS is in its shipped lot, and the board HBOM names the lot that chain proves. The EMS's receipt for the chip lot is signed by the EMS, passed under the chip's policy and levels, and covers exactly the chips shipped to it.
 5. `parts[]` covers exactly the board design's reference designators; every placement is a listed lot; no chip is placed twice or placed without being shipped; no lot is placed more often than it was shipped.
 6. The board lot is the set of boards that passed test, A1's yield accounts for the rest, and every shipped board is an A1 subject. Received boards are in the lot.
 
-[`tools/hslsa/board_test.go`](../tools/hslsa/board_test.go) breaks these links in 24 ways and requires each to fail for the stated reason, including a swapped part lot, a changed date code, flash bought from a broker (both marked unauthorized and falsely marked authorized), more parts placed than shipped, a board that claims a chip lot it did not receive, a chip that failed final test shipped to the EMS, a chip on two boards, a shipment signed by the wrong party, and a tampered record in the chip chain under the board.
+[`tools/hslsa/board_test.go`](../tools/hslsa/board_test.go) breaks these links in 24 ways and requires each to fail for the stated reason, including a swapped part lot, a changed date code, flash bought from a broker (both marked unauthorized and falsely marked authorized), more parts placed than shipped, a board that claims a chip lot it did not receive, a chip that failed final test shipped to the EMS, a chip on two boards, a shipment signed by the wrong party, and a tampered record in the chip chain under the board. [`tools/hslsa/receipt_test.go`](../tools/hslsa/receipt_test.go) adds six for the receipt: missing, missing along with other records (all named in one report), signed by the shipper instead of the EMS, covering other chips, recording a failed check, and not linked from A1.
 
 ## Levels claimed
 

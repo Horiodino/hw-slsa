@@ -10,5 +10,5 @@
       "/manufacturing/test/1/program"
     ]
   },
-  "saltFiles": ["wafer-maps.json", "genealogy.json", "final-test-results.json"]
+  "saltFiles": ["wafer-maps.json", "genealogy.json", "final-test-results.json", "transfer-wafer-fab.json", "transfer-wafer-sort.json", "transfer-packaging.json"]
 }

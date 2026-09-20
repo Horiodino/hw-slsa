@@ -27,6 +27,7 @@
     "serialPrefix": "PSOC130-A0-",
     "units": 40
   },
+  "transfers": true,
   "finalTest": {
     "site": {"name": "Example Test House", "country": "US"},
     "program": {"name": "psoc130-ft", "version": "1.2.0"},

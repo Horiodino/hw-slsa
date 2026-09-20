@@ -60,7 +60,7 @@ The auditor's run:
 ```
 tapeout check: PASSED for picorv32.netlist.v sha256:f9c3b9d9...
 lot receipt check: PASSED for urn:hslsa:lot:ASM-EXAMPLE-17 sha256:4876860b..., 3 received units found in the lot
-escrow audit: VSAs for the design and 3 received units written to out/buyer/vsa; manifest of 11 records, 13 files and 4 disclosure files kept at out/auditor/escrow-manifest.json
+escrow audit: VSAs for the design and 3 received units written to out/buyer/vsa; manifest of 14 records, 16 files and 4 disclosure files kept at out/auditor/escrow-manifest.json
 ok: rejects a received unit that was scrapped at final test
 ```
 
@@ -87,14 +87,14 @@ slsa-verifier verify-vsa \
 
 | What | Measured |
 | --- | --- |
-| Records | 11 envelopes: 4 `design-flow`, 1 `hbom`, 4 `manufacturing-step`, 1 `source-review`, 1 SLSA Provenance (the IP release) |
+| Records | 14 envelopes: 4 `design-flow`, 1 `hbom`, 7 `manufacturing-step` (F1 to F4 and the three transfers between them), 1 `source-review`, 1 SLSA Provenance (the IP release) |
 | Signing keys | 9 distinct key ids, each naming one party in every record it signs, across lots and buyers |
 | Builders | the flow platform, `urn:hslsa:site:example-wafer-fab`, `urn:hslsa:site:example-sort-house`, `urn:hslsa:site:example-osat`, `urn:hslsa:site:example-test-house` |
 | Subject names | `urn:hslsa:lot:ASM-EXAMPLE-17`, `urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A`, `urn:hslsa:assembly-lot:ASM-EXAMPLE-17` |
-| Timeline | `finishedOn` on 9 records |
+| Timeline | `finishedOn` on 12 records |
 | Withheld fields | 9, values hidden |
 | Withheld values shown elsewhere | none |
-| Data files named by manufacturing records | `wafer-maps.json`, `genealogy.json` and `final-test-results.json`, all salted |
+| Data files named by manufacturing records | `wafer-maps.json`, `genealogy.json`, `final-test-results.json` and the three transfer packing lists, all salted |
 | `urn:hslsa:assembly-lot:ASM-EXAMPLE-17` | recovered from its digest by guessing: 40 units, serials PSOC130-A0-00001 to PSOC130-A0-00040, found at guess 1 |
 | `urn:hslsa:lot:ASM-EXAMPLE-17` | recovered from its digest by guessing: 37 units (3 of the run missing), serials PSOC130-A0-00001 to PSOC130-A0-00040, found at guess 3802 |
 | `urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A` | not attempted: a buyer holds no wafer ids |

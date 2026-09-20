@@ -13,10 +13,13 @@ package hslsa
 //	             IDevID CSR from the real ROM, endorse it, write the firmware to
 //	             flash, then sign one fw-provisioning record per unit
 //	hbom         the product owner's HBOM, with firmware[] filled in
+//	review       simulated OCP S.A.F.E. reports for the ROM, FMC and runtime
+//	             (CaliptraReview, in safe.go)
 //
 // Buyer side, CaliptraVerify: the tapeout and lot receipt checks, then the
-// Firmware track and the spec's at-boot check on every received unit that was
-// booted, then SLSA VSAs.
+// Firmware track, the S.A.F.E. review check when the policy asks for it, and
+// the spec's at-boot check on every received unit that was booted, then SLSA
+// VSAs.
 
 import (
 	"bytes"
@@ -1827,6 +1830,19 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 		return err
 	}
 	fmt.Printf("firmware check: PASSED, ROM is the TAC-frozen image, FMC and runtime svn %s\n", num(get(fw.Manifest, "svn")))
+	images := []ReviewImage{{"caliptra-rom", fw.ROM}, {"caliptra-fmc", fw.FMC}, {"caliptra-runtime", fw.Runtime}}
+	if Has(O(policy, "firmware"), "review") {
+		rev, err := ReviewCheck(bundle, trust, policy, images)
+		if err != nil {
+			return err
+		}
+		fw.Inputs = append(fw.Inputs, rev.Inputs...)
+		fmt.Printf("firmware review: PASSED, an accepted S.A.F.E. report for %s, from %s\n",
+			strings.Join(Strs(policy, "firmware", "review", "images"), ", "), strings.Join(rev.Providers, ", "))
+	}
+	if err := requireFirmwareL3Rules(policy, images); err != nil {
+		return err
+	}
 	var devices []*DeviceResult
 	for _, u := range units {
 		dev, err := DeviceCheck(bundle, trust, policy, design, lot, fw, u, filepath.Join(bootsDir, u))

@@ -38,6 +38,7 @@ var commands = map[string]command{
 	"subject":       {"print the name and sha256 of an envelope's first subject", subject},
 	"validate-hbom": {"validate HBOM statements or envelopes against the schema", validateHBOM},
 	"corim":         {"show a signed CoRIM, or appraise DICE certificates against it", corimCmd},
+	"safe":          {"sign, show or check an OCP S.A.F.E. short-form report", safeCmd},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -468,7 +469,7 @@ func openlane(args []string) error {
 }
 
 func caliptra(args []string) error {
-	act, rest, err := action(args, "ca", "firmware", "design", "fab", "rtl-model", "provision", "hbom", "verify")
+	act, rest, err := action(args, "ca", "firmware", "design", "fab", "rtl-model", "provision", "hbom", "review", "verify")
 	if err != nil {
 		return err
 	}
@@ -541,6 +542,12 @@ func caliptra(args []string) error {
 			return err
 		}
 		return hslsa.CaliptraHBOM(*bundle, *lock, *scenario, *key)
+	case "review":
+		bundle, lock, key := f.str("bundle", "", true), f.str("lock", "", true), f.str("key", "simulated review provider key", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.CaliptraReview(*bundle, *lock, *key)
 	}
 	bundle, trust, policy := f.str("bundle", "", true), f.str("trust-root", "", true), f.str("policy", "", true)
 	units, boots := f.str("units", "", true), f.str("boots", "", true)
@@ -719,4 +726,94 @@ func corimCmd(args []string) error {
 	}
 	fmt.Printf("appraisal: PASSED against %s\n", c.ID)
 	return nil
+}
+
+func safeCmd(args []string) error {
+	act, rest, err := action(args, "sign", "show", "check")
+	if err != nil {
+		return err
+	}
+	f := newFlags("safe " + act)
+	report := f.str("report", "sign: the JSON short-form report; show, check: the signed report", true)
+	key := f.str("key", "sign: the review provider's private key", act == "sign")
+	format := f.str("format", "sign: jws or corim", act == "sign")
+	out := f.str("out", "sign: where to write the signed report", act == "sign")
+	trust := f.str("trust-root", "trust root holding the review providers' keys", act == "check")
+	policy := f.str("policy", "check: policy whose firmware.review the report must meet", act == "check")
+	digest := f.str("digest", "check: the image digest as alg:hex; repeat with commas for more algorithms", act == "check")
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	if act == "sign" {
+		rep, err := hslsa.ReadObj(*report)
+		if err != nil {
+			return err
+		}
+		signer, err := hslsa.LoadSigner(*key)
+		if err != nil {
+			return err
+		}
+		data, err := hslsa.SignSFR(rep, signer, *format)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(*out, data, 0o644)
+	}
+	r, err := hslsa.ReadSFR(*report)
+	if err != nil {
+		return fmt.Errorf("%s: %w", *report, err)
+	}
+	if act == "show" {
+		for _, l := range r.Describe() {
+			fmt.Println(l)
+		}
+		if *trust == "" {
+			fmt.Println("signature: not checked (pass --trust-root)")
+			return nil
+		}
+		t, err := hslsa.LoadTrustRoot(*trust)
+		if err != nil {
+			return err
+		}
+		for _, role := range sortedRoles(t) {
+			for _, k := range t.Roles[role] {
+				if r.Verify(k.Public) == nil {
+					fmt.Printf("signature: verified with a %s key\n", role)
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("signature: verifies with no key in %s", *trust)
+	}
+	t, err := hslsa.LoadTrustRoot(*trust)
+	if err != nil {
+		return err
+	}
+	pol, err := hslsa.ReadObj(*policy)
+	if err != nil {
+		return err
+	}
+	image := hslsa.Obj{}
+	for _, d := range strings.Split(*digest, ",") {
+		alg, hex, found := strings.Cut(d, ":")
+		if !found {
+			return usageError{"--digest takes alg:hex, for example sha384:..."}
+		}
+		image[alg] = strings.ToLower(hex)
+	}
+	role, err := hslsa.AcceptSFR(r, hslsa.Obj{"digest": image}, t, hslsa.O(pol, "firmware", "review"))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("review check: PASSED, signed by a %s key, %s\n", role, r.Provider)
+	return nil
+}
+
+func sortedRoles(t *hslsa.TrustRoot) []string {
+	roles := make([]string, 0, len(t.Roles))
+	for r := range t.Roles {
+		roles = append(roles, r)
+	}
+	sort.Strings(roles)
+	return roles
 }

@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 6 (2026-09-20). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 7 (2026-09-20). See the [changelog](#changelog).
 
 ## Overview
 
@@ -369,6 +369,14 @@ Firmware L3 asks for an independent review of each image. HSLSA defines no recor
 3. the report's scope and open issues meet the policy (for example, no unresolved issue above a severity the policy names).
 
 An image with no such report cannot count toward Firmware L3.
+
+S.A.F.E. publishes the report in two forms, and a verifier accepts either as the provider signed it: the JSON report signed as a compact JWS, the form of every report OCP has published so far, and the [S.A.F.E. CoRIM profile](https://github.com/opencomputeproject/OCP-Security-SAFE/blob/main/Documentation/corim_profile/OCP-SAFE-CoRIM-Extension-Profile-Specification.md) (OID 1.3.6.1.4.1.42623.1.1) signed as COSE_Sign1, whose firmware digests are the condition of a conditional endorsement triple. Three readings make the checks above exact:
+
+- The firmware digests are the report's image hashes (`fw_hash_sha2_384` and `fw_hash_sha2_512` in JSON, the condition's digests and each `fw-file-digests` in CoRIM). When the report carries a source manifest, those hashes cover the manifest, so the report names no image. A report that names no image digest cannot count, however genuine; a policy that trusts reviews of a source tree needs a rule this spec does not yet have.
+- A report must state its scope number. Reports under framework versions before scope numbers existed (0.3, for example) cannot count.
+- The policy lists the allowed providers by their keys, the minimum scope, and the highest CVSS score an open issue may have, and may list the framework versions it accepts. A report lists only issues left open at the reviewed version, so each one is held to that score.
+
+A bundle carries the reports for its firmware under `review/`. The verifier lists each accepted report, by digest, among the inputs of the VSAs it signs for that firmware.
 
 #### Firmware reference values
 
@@ -771,11 +779,11 @@ Four examples run in this repository's GitHub Actions and exercise the spec end 
 | PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]`, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
-| Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, firmware reference values as a signed CoRIM, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
+| Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, firmware reference values as a signed CoRIM, the firmware review check on simulated S.A.F.E. reports, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
-The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, and signs VSAs. It also withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
+The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
-What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key is simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
+What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key and the firmware review provider are simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
 
 ## Decisions and open questions
 
@@ -833,6 +841,10 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 7 (2026-09-20)
+
+- **Firmware review checks.** The [Firmware review](#firmware-review) section says which report forms a verifier accepts (the JWS-signed JSON report and the S.A.F.E. CoRIM profile), what counts as the image digest, that a report must state its scope, and what the policy lists. The reference tool now runs the three checks, the Caliptra example checks a simulated review of its ROM, FMC and runtime, and the tool refuses a Firmware L3 claim until it also checks SLSA Build L3 and transparency log inclusion. Reports that review providers published for Caliptra in 2023 and 2024 verify under their providers' keys, but neither can count here: the 2023 FMC report predates scope numbers and names an image of an older release, and the 2024 report names commits rather than an image.
 
 ### Revision 6 (2026-09-20)
 

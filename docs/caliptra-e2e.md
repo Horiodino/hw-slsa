@@ -6,8 +6,8 @@ The workflow in [`.github/workflows/caliptra-e2e.yml`](../.github/workflows/cali
 
 | Job | Plays | Does |
 | --- | --- | --- |
-| Produce | Firmware team, design house, tapeout authority, fab, sort house, OSAT, test house and its programming station, product owner | Builds the ROM and the signed FMC + runtime bundle with `caliptra-builder`, lints the RTL, merges the ROM into the design, releases it, signs F1 to F4 for a lot, programs every shipped unit and exports its IDevID CSR from the real ROM, endorses it, signs one `fw-provisioning` record per unit, signs a CoRIM with the reference values for the FMC and runtime, builds the HBOM |
-| Verify | Buyer | Boots the three units it received, checks that the ROM refuses tampered firmware, runs the tapeout, lot, firmware and at-boot checks, appraises each unit's measurements against the CoRIM and has Veraison's cocli decode it, signs six SLSA VSAs, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
+| Produce | Firmware team, design house, tapeout authority, fab, sort house, OSAT, test house and its programming station, product owner | Builds the ROM and the signed FMC + runtime bundle with `caliptra-builder`, lints the RTL, merges the ROM into the design, releases it, signs F1 to F4 for a lot, programs every shipped unit and exports its IDevID CSR from the real ROM, endorses it, signs one `fw-provisioning` record per unit, signs a CoRIM with the reference values for the FMC and runtime, builds the HBOM, signs simulated S.A.F.E. review reports for the ROM, FMC and runtime |
+| Verify | Buyer | Boots the three units it received, checks that the ROM refuses tampered firmware, runs the tapeout, lot, firmware, firmware review and at-boot checks, appraises each unit's measurements against the CoRIM and has Veraison's cocli decode it, signs six SLSA VSAs, verifies them with slsa-verifier v2.7.1, then runs the tamper tests |
 | Verify on the RTL | Buyer, with the device built from the released design | Verilates the released design, then for one received unit (`rtl-units` sets how many) either runs the ROM until it exports the IDevID CSR and checks the key against the endorsed IDevID certificate (`rtl-stage: identity`, the default), or boots to runtime and runs the same checks and slsa-verifier calls as Verify (`rtl-stage: boot`). Runs only when dispatched by hand with `rtl` set; see [Booting on the RTL](#booting-on-the-rtl) |
 
 All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/caliptra.lock.json): caliptra-sw at tag `fw-2.1.3`, and the caliptra-rtl and adams-bridge commits that tag uses, each checked by commit and git tree.
@@ -22,7 +22,7 @@ All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/ca
 - **Secure boot.** The verify job flips one bit in a unit's runtime image and boots it: the ROM refuses it with `IMAGE_VERIFIER_ERR_RUNTIME_DIGEST_MISMATCH`. A unit fused for another vendor key is refused with `IMAGE_VERIFIER_ERR_VENDOR_PUB_KEY_DIGEST_INVALID`.
 - **Reference values.** The firmware build signs a [CoRIM](#firmware-reference-values-corim) with the FMC and runtime measurements a unit booting this bundle must report, and the at-boot check compares each unit's alias certificates against it. Veraison's `cocli`, which this project did not write, decodes it.
 
-**Simulated:** wafer maps, genealogy and test results come from [`e2e/caliptra/mfg-scenario.json`](../e2e/caliptra/mfg-scenario.json) (8 units packaged, 1 fails final test, 7 shipped). The programming station's HSM is `os.urandom`, and fuse and flash readback re-reads the files it wrote. The identity CA is a local P-384 key.
+**Simulated:** wafer maps, genealogy and test results come from [`e2e/caliptra/mfg-scenario.json`](../e2e/caliptra/mfg-scenario.json) (8 units packaged, 1 fails final test, 7 shipped). The programming station's HSM is `os.urandom`, and fuse and flash readback re-reads the files it wrote. The identity CA is a local P-384 key. The [firmware review](#firmware-review-simulated) is simulated: no review provider has reviewed these images, and the reports say so.
 
 **Not run yet:**
 
@@ -76,7 +76,7 @@ Firmware reaches L2. Every image has SLSA provenance signed by the firmware buil
 
 Two caveats apply to the L2 claim. The firmware is signed with Caliptra's public test keys (`caliptra-image-fake-keys`), so anyone could sign firmware these units accept. A real product fuses the hash of its own HSM-held vendor keys, and the policy pins that hash. Also, as in the PicoRV32 test, the platform key is generated per run and its trust root travels with the bundle.
 
-Firmware L3 is out of reach: it needs SLSA Build L3, an independent review, and releases in a transparency log. Its device requirement is already met, though. The units report firmware measurements under a Caliptra identity, and the verifier matches each one to an image with provenance.
+Firmware L3 is out of reach: it needs SLSA Build L3, an independent review, and releases in a transparency log. Its device requirement is already met, though. The units report firmware measurements under a Caliptra identity, and the verifier matches each one to an image with provenance. The review check runs too, on simulated reports, but the reference tool refuses a Firmware L3 claim until it also checks SLSA Build L3 and log inclusion.
 
 ## The at-boot check
 
@@ -113,15 +113,24 @@ hslsa corim appraise --corim out/caliptra/bundle/artifacts/caliptra-fw.corim \
 
 The verify job runs both, then decodes the file with [Veraison's `cocli`](https://github.com/veraison/cocli) (`corim display`), a CoRIM tool from outside this project, and fails if cocli does not read it as a signed CoRIM with one CoMID. cocli does not check the signature here: its `corim verify` loads a JWK through a function that accepts only private keys, so a buyer holding the public key cannot use it. The reference tool checks the signature instead. The reference tool and cocli both use [Veraison's corim library](https://github.com/veraison/corim), whose last release (v1.1.2, April 2024) predates draft 11, so both are pinned to commits on its main branch.
 
+## Firmware review (simulated)
+
+Firmware L3 takes a signed [OCP S.A.F.E.](https://github.com/opencomputeproject/OCP-Security-SAFE) short-form report for each image ([spec](../spec/hslsa-v0.1.md#firmware-review)). No review provider has reviewed the images this example builds, so `hslsa caliptra review` signs one report per image with a key named `review-provider`, generated per run like every other key. Each report names its image by SHA-384, gives the provider as "SIMULATED review provider (not an OCP S.A.F.E. approved provider; no review took place)", states scope 1, and lists one placeholder issue at CVSS 1.6. The ROM's report is the JSON report signed as a JWS, the form review providers publish today; the FMC's and runtime's use the S.A.F.E. CoRIM profile, so the verifier reads both.
+
+The policy's `firmware.review` names the images that need a report, the trust root roles allowed to sign one, the minimum scope (1) and the highest CVSS score an open issue may have (3.9). For each image, `hslsa caliptra verify` looks in `review/` for a report that verifies under an allowed key, names the image's digest under an algorithm its provenance also lists, and meets the scope and issue limits. The verify job also shows the FMC's report with `hslsa safe show`, checks two reports on their own with `hslsa safe check`, and requires the FMC's report to fail for the ROM.
+
+Real reports exist for Caliptra: NCC Group reviewed the ROM, FMC and runtime of `release_v20231014_0` in 2023, and IOActive reviewed the firmware at a 2024 commit. The unit tests verify both under the providers' published keys, and check that neither can count here. The 2023 FMC report names the SHA-384 and SHA-512 of an FMC ELF from that older release, and its framework version (0.3) predates scope numbers; the 2024 report names commits and pull requests, not an image. A real Firmware L3 claim for this bundle would need a report naming these images, and if the report also gives a SHA-512, provenance that lists one. The tests also read reports signed by OCP's own [`OcpReportLib`](https://github.com/opencomputeproject/OCP-Security-SAFE/tree/main/shortform_report-main) in both forms; see [`tools/hslsa/testdata/safe`](../tools/hslsa/testdata/safe/README.md).
+
 ## What the tamper tests prove
 
-[`tools/hslsa/caliptra_test.go`](../tools/hslsa/caliptra_test.go) breaks the chain in 28 ways and requires each to fail for the stated reason. As in the PicoRV32 tests, the fixture re-signs the bundle with test keys so it can forge validly signed records:
+[`tools/hslsa/caliptra_test.go`](../tools/hslsa/caliptra_test.go) breaks the chain in 33 ways and requires each to fail for the stated reason. As in the PicoRV32 tests, the fixture re-signs the bundle with test keys so it can forge validly signed records:
 
 - **The device:** a certificate from another unit, a missing alias certificate, an LDevID certificate with the right names signed by the wrong key, a received unit that failed final test.
 - **Provisioning:** another unit's record, a record signed by the wrong site, a record edited without re-signing, an IDevID endorsed by another CA. Also records that lie about the vendor fuses, the SVN fuse or the design release, and a policy minimum SVN above the image.
 - **Firmware:** provenance, manifest and HBOM that all agree on an FMC the device did not run, and a CoRIM re-issued for it (only the device's measurement catches it), a ROM that is not the frozen image, firmware signed by the design flow platform, a swapped SBOM, an HBOM listing another runtime.
 - **The CoRIM:** one signed by a key outside the firmware platform's role, one edited after the build, one whose runtime digest, SVN or runtime entry differs from the provenance, and an HBOM pointing at another CoRIM.
 - **The mask ROM:** a ROM merge that does not consume the ROM, a failed `rom-readback`, a swapped released design, a failed lint, a unit added to the lot.
+- **The firmware review:** the FMC's report put in place of the runtime's, reports signed by a key the policy does not list, no reports at all, a policy that allows no open issue as severe as the placeholder one, and a policy claiming Firmware L3.
 
 The verify job also runs slsa-verifier three times expecting failure: Firmware L3 for a unit verified at L2, SLSA Build L3 for the firmware, and one unit's VSA presented for another unit.
 

@@ -27,7 +27,7 @@ var (
 	calLock     = filepath.Join(calDir, "caliptra.lock.json")
 	calScenario = filepath.Join(calDir, "mfg-scenario.json")
 	calPolicy   = filepath.Join(calDir, "policy.json")
-	calRoles    = []string{"flow-platform", "tapeout-authority", "firmware-platform", "fab-site", "sort-site", "osat-site", "test-site", "product-owner"}
+	calRoles    = []string{"flow-platform", "tapeout-authority", "firmware-platform", "fab-site", "sort-site", "osat-site", "test-site", "product-owner", "review-provider"}
 )
 
 const (
@@ -202,7 +202,10 @@ func calWork(t *testing.T) string {
 		if err := reendorse(bundle, keys); err != nil {
 			return err
 		}
-		return calRebuild(bundle, true)
+		if err := calRebuild(bundle, true); err != nil {
+			return err
+		}
+		return CaliptraReview(bundle, calLock, filepath.Join(keys, "review-provider.key.pem"))
 	})
 	return copyOf(t, valid)
 }
@@ -377,7 +380,8 @@ func TestFirmwareProvenanceForAnotherFMC(t *testing.T) {
 			}
 		}
 	})
-	// Every record agrees with every other, the CoRIM included; only the device's own measurement catches the lie.
+	must(t, CaliptraReview(bundle, calLock, filepath.Join(work, "keys", "review-provider.key.pem")))
+	// Every record agrees with every other, the CoRIM and the review included; only the device's own measurement catches the lie.
 	calRejects(t, work, "device "+calUnit+": FMC measurement matches no reference value in the firmware CoRIM")
 }
 
@@ -524,6 +528,48 @@ func TestCaliptraUnitListTampered(t *testing.T) {
 	work := calWork(t)
 	appendFile(t, filepath.Join(work, "bundle", "artifacts", "shipped-lot.txt"), "CLP-99999\n")
 	calRejects(t, work, "shipped lot list does not match the attested lot digest")
+}
+
+// The firmware review (simulated S.A.F.E. reports)
+
+func TestReviewReportForAnotherImage(t *testing.T) {
+	work := calWork(t)
+	review := filepath.Join(work, "bundle", ReviewDir)
+	must(t, os.Remove(filepath.Join(review, "caliptra-runtime.sfr.cose")))
+	must(t, copyFile(filepath.Join(review, "caliptra-fmc.sfr.cose"), filepath.Join(review, "caliptra-runtime.sfr.cose")))
+	calRejects(t, work, "firmware review: no accepted S.A.F.E. report for caliptra-runtime (no report names its digest)")
+}
+
+func TestReviewReportsFromAnUnlistedProvider(t *testing.T) {
+	work := calWork(t)
+	must(t, CaliptraReview(filepath.Join(work, "bundle"), calLock, filepath.Join(work, "keys", "attacker.key.pem")))
+	calRejects(t, work, "firmware review: no accepted S.A.F.E. report for caliptra-rom (review/caliptra-rom.sfr.jws: "+
+		"signature does not verify with a key of any review provider the policy allows)")
+}
+
+func TestReviewReportsMissing(t *testing.T) {
+	work := calWork(t)
+	must(t, os.RemoveAll(filepath.Join(work, "bundle", ReviewDir)))
+	calRejects(t, work, "firmware review: no accepted S.A.F.E. report for caliptra-rom")
+}
+
+func TestReviewIssueAbovePolicy(t *testing.T) {
+	// The simulated reports carry one issue at CVSS 1.6; a policy allowing none above 1.0 refuses them.
+	work := calWork(t)
+	policy := ok(ReadObj(calPolicy))
+	O(policy, "firmware", "review")["maxOpenIssueCVSS"] = 1.0
+	path := filepath.Join(t.TempDir(), "policy.json")
+	must(t, WriteJSON(path, policy))
+	rejects(t, calCheck(t, work, nil, path), `open issue "SIMULATED low-severity issue" scores CVSS 1.6, above the policy's 1`)
+}
+
+func TestFirmwareL3NotClaimable(t *testing.T) {
+	work := calWork(t)
+	policy := ok(ReadObj(calPolicy))
+	O(policy, "claims")["firmware"] = []any{"HSLSA_FIRMWARE_LEVEL_3"}
+	path := filepath.Join(t.TempDir(), "policy.json")
+	must(t, WriteJSON(path, policy))
+	rejects(t, calCheck(t, work, nil, path), "policy claims Firmware L3, but the reference tool does not yet check SLSA Build L3 or transparency log inclusion")
 }
 
 func TestROMHexRoundTrip(t *testing.T) {

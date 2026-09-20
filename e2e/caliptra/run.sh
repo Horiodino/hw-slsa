@@ -89,7 +89,7 @@ produce() {
   mkdir -p "$BUNDLE" "$KEYS" "$DEVICES"
   # One key per party; only public halves leave this job.
   hslsa keygen --out "$KEYS" flow-platform tapeout-authority firmware-platform \
-    fab-site sort-site osat-site test-site product-owner
+    fab-site sort-site osat-site test-site product-owner review-provider
   hslsa caliptra ca --keys "$KEYS"
   mkdir -p "$KEYS/pub" && cp "$KEYS"/*.pub.pem "$KEYS/pub/"
   hslsa trust-root --keys "$KEYS/pub" --out "$BUNDLE/trust-root.json"
@@ -108,6 +108,8 @@ produce() {
     --scenario "$E2E/mfg-scenario.json" --lock "$lock"
   hslsa caliptra hbom --bundle "$BUNDLE" --lock "$lock" --scenario "$E2E/mfg-scenario.json" \
     --key "$KEYS/product-owner.key.pem"
+  # Simulated: no review provider has reviewed these images. See docs/caliptra-e2e.md.
+  hslsa caliptra review --bundle "$BUNDLE" --lock "$lock" --key "$KEYS/review-provider.key.pem"
 }
 
 # The fab for the RTL boot: build the device from the released design itself.
@@ -250,6 +252,23 @@ corim_checks() {
   echo "cocli $COCLI_VERSION: decoded the signed CoRIM and its CoMID, $(grep -c '"environment"' "$shown") reference values (${shown#"$ROOT/"})"
 }
 
+# The simulated S.A.F.E. reports on their own: each is shown, and checked
+# against its image; a report for one image must not pass for another.
+review_checks() {
+  local trust=$BUNDLE/trust-root.json policy=$BUNDLE/policy.json rom fmc
+  echo "== S.A.F.E. reports (simulated review provider)"
+  hslsa safe show --report "$BUNDLE/review/caliptra-fmc.sfr.cose" --trust-root "$trust"
+  fmc=$(jq -r '.subject[] | select(.name == "caliptra-fmc.bin") | .digest.sha384' <(hslsa_payload "$BUNDLE/att/fw-bundle.intoto.json"))
+  rom=$(jq -r '.subject[0].digest.sha384' <(hslsa_payload "$BUNDLE/att/fw-rom.intoto.json"))
+  hslsa safe check --report "$BUNDLE/review/caliptra-fmc.sfr.cose" --trust-root "$trust" --policy "$policy" --digest "sha384:$fmc"
+  hslsa safe check --report "$BUNDLE/review/caliptra-rom.sfr.jws" --trust-root "$trust" --policy "$policy" --digest "sha384:$rom"
+  expect_fail "the FMC's report for the ROM" hslsa safe check --report "$BUNDLE/review/caliptra-fmc.sfr.cose" \
+    --trust-root "$trust" --policy "$policy" --digest "sha384:$rom"
+}
+
+# The in-toto statement inside a DSSE envelope.
+hslsa_payload() { jq -r .payload "$1" | base64 -d; }
+
 buyer_checks() {
   local units=$1 boots=$2 vsa_dir=$3 vkey=$4
   echo "== buyer checks"
@@ -264,6 +283,8 @@ buyer_checks() {
   hslsa caliptra verify --bundle "$BUNDLE" --trust-root "$BUNDLE/trust-root.json" --policy "$BUNDLE/policy.json" \
     --units "$units" --boots "$boots" --vsa-key "$vkey/verifier.key.pem" --vsa-out "$vsa_dir"
   corim_checks "$units" "$boots"
+  review_checks
+
 
   local sv=${SLSA_VERIFIER:-slsa-verifier} keyid
   keyid=$(hslsa keyid --key "$vsa_dir/verifier.pub.pem")

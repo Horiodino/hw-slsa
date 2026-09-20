@@ -196,18 +196,7 @@ func TapeoutCheck(bundle string, trust *TrustRoot, policy Obj, release bool) (*D
 }
 
 // designClaim is the highest Design level the policy's claims name.
-func designClaim(policy Obj) int {
-	level := 0
-	for _, list := range O(policy, "claims") {
-		for _, c := range Strs(Obj{"v": list}, "v") {
-			var n int
-			if _, err := fmt.Sscanf(c, "HSLSA_DESIGN_LEVEL_%d", &n); err == nil && n > level {
-				level = n
-			}
-		}
-	}
-	return level
-}
+func designClaim(policy Obj) int { return trackClaim(policy, "DESIGN") }
 
 // requireDesignL2Rules refuses a Design L2 or higher claim unless the policy
 // makes the tapeout check verify the signed, reviewed source freeze and signed

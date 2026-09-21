@@ -520,9 +520,19 @@ func DesignRelease(bundle, lockPath, key, trustRoot, policyPath string) error {
 	if err != nil {
 		return err
 	}
+	// A lock with a release block names the released artifact and the steps
+	// before it (the FPGA example releases a bitstream); otherwise the
+	// synthesized netlist stands in for the GDS.
 	final := filepath.Join(bundle, "artifacts", S(lock, "synthesis", "top")+".netlist.v")
+	kind := "gate-level netlist (stands in for GDS until steps 3 to 7 run)"
+	steps := DesignSteps
+	if rel := O(lock, "release"); rel != nil {
+		final = filepath.Join(bundle, "artifacts", S(rel, "artifact"))
+		kind = S(rel, "kind")
+		steps = Strs(rel, "steps")
+	}
 	var deps []Obj
-	for _, s := range DesignSteps {
+	for _, s := range steps {
 		d, err := fileRD(filepath.Join(bundle, "att", AttName(s)), "att/"+AttName(s))
 		if err != nil {
 			return err
@@ -538,7 +548,7 @@ func DesignRelease(bundle, lockPath, key, trustRoot, policyPath string) error {
 		Obj{
 			"design":            S(lock, "design"),
 			"finalArtifact":     filepath.Base(final),
-			"finalArtifactKind": "gate-level netlist (stands in for GDS until steps 3 to 7 run)",
+			"finalArtifactKind": kind,
 			"ipBlocks":          ipBlocks(lock),
 		},
 		deps, nil, []Obj{gate}, nil, started,

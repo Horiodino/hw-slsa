@@ -1,0 +1,19 @@
+{
+  "note": "Released design for the FPGA board, an iCEBreaker-like board with a root of trust added. Stands in for the full design package (schematic, Gerbers, pick-and-place); its digest is the board HBOM's design subject. U5 holds U1's CRESET_B low and owns the SPI flash until it has verified every image in it.",
+  "board": "FPGA-DEVB-01",
+  "revision": "A",
+  "bom": [
+    {"refDes": ["PCB1"], "manufacturer": "Example PCB Fab", "mpn": "FPGA-DEVB-01-PCB", "description": "Bare PCB, 4 layer FR-4, 85 x 50 mm"},
+    {"refDes": ["U1"], "manufacturer": "Lattice Semiconductor", "mpn": "ICE40UP5K-SG48ITR", "description": "iCE40 UltraPlus 5K FPGA, QFN-48; no secure-boot ROM, configures itself from U2 when CRESET_B rises"},
+    {"refDes": ["U2"], "manufacturer": "Winbond Electronics", "mpn": "W25Q128JVSIQ", "description": "128 Mbit SPI NOR flash, SOIC-8: bitstream, boot manifest and SoC firmware"},
+    {
+      "refDes": ["U5"], "manufacturer": "Example RoT Co", "mpn": "EXR-01", "description": "Board root of trust (the example's simulated part): gates U1 CRESET_B and the flash's chip select",
+      "rootOfTrust": {"guards": ["U1"], "images": ["icebreaker.bin", "picosoc-fw.bin"]}
+    },
+    {"refDes": ["U3"], "manufacturer": "Texas Instruments", "mpn": "TLV75512PDBVR", "description": "1.2 V 500 mA LDO for the FPGA core, SOT-23-5"},
+    {"refDes": ["U4"], "manufacturer": "Texas Instruments", "mpn": "TLV75533PDBVR", "description": "3.3 V 500 mA LDO for I/O and flash, SOT-23-5"},
+    {"refDes": ["Y1"], "manufacturer": "Abracon", "mpn": "ASE-12.000MHZ-LC-T", "description": "12 MHz CMOS oscillator, 3.2 x 2.5 mm"},
+    {"refDes": ["C1", "C2", "C3", "C4", "C5", "C6"], "manufacturer": "Murata Electronics", "mpn": "GRM188R61A106KE69D", "description": "10 uF 10 V X5R 0603 decoupling"},
+    {"refDes": ["R1", "R2", "R3"], "manufacturer": "YAGEO", "mpn": "RC0402FR-0710KL", "description": "10 kOhm 1% 0402: CRESET_B pull-down, flash chip-select pull-up, RoT reset"}
+  ]
+}

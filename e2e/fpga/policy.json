@@ -1,0 +1,43 @@
+{
+  "note": "The buyer's policy for the FPGA board: its shippers, the board owner's FPGA design and the images in the board's flash, and the root of trust that verifies them. The board owner is also the FPGA design house, so one trust root covers both.",
+  "shippers": {
+    "Example Franchised Distributor": {
+      "role": "dist-franchised",
+      "authorizedFor": [
+        "Example RoT Co", "Lattice Semiconductor", "Winbond Electronics", "Texas Instruments", "Abracon", "Murata Electronics", "YAGEO"
+      ]
+    },
+    "Example PCB Fab": {"role": "pcb-fab", "authorizedFor": ["Example PCB Fab"]}
+  },
+  "requireAuthorizedChannel": true,
+  "design": {
+    "requiredSteps": ["source-freeze", "simulation", "synthesis", "routing", "signoff", "bitstream"],
+    "consumes": {
+      "simulation": ["source-freeze"],
+      "synthesis": ["source-freeze"],
+      "routing": ["synthesis"],
+      "signoff": ["routing"],
+      "bitstream": ["routing"]
+    },
+    "finalArtifactFrom": "bitstream",
+    "allowedTools": ["iverilog", "vvp", "yosys", "nextpnr-ice40", "icetime", "icepack", "iceunpack"],
+    "source": {"tagSigner": "source-owner", "reviewer": "source-reviewer"},
+    "thirdPartyIP": [
+      {"name": "picorv32", "signer": "ip-vendor", "files": ["picorv32.v"]},
+      {"name": "picosoc", "signer": "ip-vendor", "files": ["picosoc/ice40up5k_spram.v", "picosoc/icebreaker.v", "picosoc/picosoc.v", "picosoc/simpleuart.v", "picosoc/spimemio.v"]}
+    ]
+  },
+  "firmware": {
+    "builder": "firmware-platform",
+    "imageSigner": "code-signer",
+    "provisioningSigner": "ems-site",
+    "minSvn": 1,
+    "requireSoCBoot": true
+  },
+  "rootOfTrust": {"mpn": "EXR-01", "mustGuard": ["U1"]},
+  "claims": {
+    "design": ["HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_2"],
+    "board": ["HSLSA_ASSEMBLY_LEVEL_2", "HSLSA_FIRMWARE_LEVEL_2"],
+    "device": ["HSLSA_ASSEMBLY_LEVEL_2", "HSLSA_FIRMWARE_LEVEL_2"]
+  }
+}

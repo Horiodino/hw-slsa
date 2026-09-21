@@ -63,24 +63,43 @@ func gitHeaders(raw []byte) map[string]string {
 	return out
 }
 
-// gitTree parses a raw tree object into name -> blob id, refusing anything but
-// regular files at the top level.
-func gitTree(raw []byte) (map[string]string, error) {
+// gitTree parses a raw tree object into path -> blob id. Subdirectories are
+// read through subtree, which returns the raw tree object with a given id;
+// anything but regular files and directories is refused.
+func gitTree(raw []byte, subtree func(id string) ([]byte, error)) (map[string]string, error) {
 	out := map[string]string{}
+	return out, walkGitTree(raw, "", subtree, out)
+}
+
+func walkGitTree(raw []byte, prefix string, subtree func(id string) ([]byte, error), out map[string]string) error {
 	for len(raw) > 0 {
 		sp := bytes.IndexByte(raw, ' ')
 		nul := bytes.IndexByte(raw, 0)
 		if sp < 0 || nul < sp || len(raw) < nul+21 {
-			return nil, fmt.Errorf("malformed tree object")
+			return fmt.Errorf("malformed tree object")
 		}
-		mode, name := string(raw[:sp]), string(raw[sp+1:nul])
-		if mode != "100644" {
-			return nil, fmt.Errorf("tree entry %s has mode %s, want a regular file", name, mode)
-		}
-		out[name] = hex.EncodeToString(raw[nul+1 : nul+21])
+		mode, name := string(raw[:sp]), prefix+string(raw[sp+1:nul])
+		id := hex.EncodeToString(raw[nul+1 : nul+21])
 		raw = raw[nul+21:]
+		switch mode {
+		case "100644":
+			out[name] = id
+		case "40000":
+			sub, err := subtree(id)
+			if err != nil {
+				return fmt.Errorf("tree entry %s: %v", name, err)
+			}
+			if gitObjectID("tree", sub) != id {
+				return fmt.Errorf("tree entry %s: subtree object does not match", name)
+			}
+			if err := walkGitTree(sub, name+"/", subtree, out); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("tree entry %s has mode %s, want a regular file or a directory", name, mode)
+		}
 	}
-	return out, nil
+	return nil
 }
 
 // identEmail is the address inside a git identity "Name <email> ...".
@@ -401,6 +420,20 @@ func SourceTag(bundle, lockPath, key, cache string) error {
 			return err
 		}
 	}
+	// Subdirectories: one tree object each, named by its id.
+	subtrees, err := gitRun(repo, env, "ls-tree", "-r", "-d", "--format=%(objectname)", commitID)
+	if err != nil {
+		return err
+	}
+	for _, id := range strings.Fields(string(subtrees)) {
+		raw, err := gitRun(repo, env, "cat-file", "tree", id)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(out, "tree-"+id), raw, 0o644); err != nil {
+			return err
+		}
+	}
 	fmt.Printf("source-tag: %s signed by the design lead, commit %s\n", tag, commitID)
 	return nil
 }
@@ -479,7 +512,13 @@ func checkSourceTag(bundle string, trust *TrustRoot, rules Obj, archive string) 
 	if ch["tree"] != gitObjectID("tree", treeRaw) {
 		return "", "", nil, failf("source commit %s: tree object does not match", commitID)
 	}
-	tree, err := gitTree(treeRaw)
+	tree, err := gitTree(treeRaw, func(id string) ([]byte, error) {
+		b, err := os.ReadFile(filepath.Join(dir, "tree-"+id))
+		if err != nil {
+			return nil, fmt.Errorf("subtree object %s is missing from the bundle", id)
+		}
+		return b, nil
+	})
 	if err != nil {
 		return "", "", nil, failf("source commit %s: %v", commitID, err)
 	}

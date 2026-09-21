@@ -141,6 +141,7 @@ Step types are named `https://github.com/Horiodino/hw-slsa/design-flow/step/<ste
 | `signoff` | 6. Signoff, including STA, DRC, LVS and extraction, whose results are checks in the record |
 | `rom-merge` | 6a. ROM merge |
 | `gds-stream-out` | 7. GDS stream-out |
+| `bitstream` | 7. Bitstream generation, the FPGA counterpart of stream-out (see [FPGA designs](#fpga-designs)) |
 | `release` | Release |
 | `rebuild` | Rebuild (L4) |
 | `other` | A tool step that fits none of the above; it covers no spec step |

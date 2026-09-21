@@ -1,0 +1,68 @@
+{
+  "design": "picosoc-icebreaker",
+  "source": {
+    "repo": "https://github.com/YosysHQ/picorv32",
+    "commit": "ef203c2b0a3fb793280f5114941416c425c5b461",
+    "rawUrl": "https://raw.githubusercontent.com/YosysHQ/picorv32/{commit}/{path}",
+    "files": {
+      "picorv32.v": "0836050971b3c6cdd28ac3b1e5719a67fb645161912bef1e472e63995ceb0622",
+      "picosoc/ice40up5k_spram.v": "980fe3f8f66c8ad644d018320216b420dc237d3b955749b3f01f461016e26e7b",
+      "picosoc/icebreaker.pcf": "e9bba50889eea6cf20fbc3c3905bf836214cc62904233abb90b75cce25d05da3",
+      "picosoc/icebreaker.v": "f672d5e2a16b5b13c45ab57eff61b1bb6ad81cdb2d5ae7a37a08e51de8c9b451",
+      "picosoc/icebreaker_tb.v": "5e7db346599ad9aee29edb1f1c8a9265cb862610e4cab67bad3232d0aa596ee6",
+      "picosoc/picosoc.v": "86a1693c4844a0d11353e7524f38303d86be7aaf6ee82be2769c87e21b7b7be8",
+      "picosoc/simpleuart.v": "6b970be4255ef5f951f80a3b0cb27f73844df94349f4e4460bc4dbc4bb49ca1b",
+      "picosoc/spiflash.v": "5e30ee6eaadd532e2547ee0a3cb41e5bd4a1ee3c72fd484275ce680dff49ba57",
+      "picosoc/spimemio.v": "3bbd69ef9d49ba82d0fb952a8ca68d0360f6ad4b0bb2aa55e5f1ce1744a7188e"
+    }
+  },
+  "freeze": {
+    "note": "Simulated: the board owner's design team vendors PicoSoC and its iCEBreaker port into its own FPGA repository and freezes it with an SSH-signed git tag. The repository exists only inside the produce job.",
+    "repo": "https://git.example.com/example-board-co/icebreaker-soc.git",
+    "tag": "icebreaker-soc-v1.0",
+    "date": "2026-09-20T12:00:00Z",
+    "author": "Example FPGA Engineer <fpga-engineer@example.com>",
+    "tagger": "Example Board Design Lead <board-lead@example.com>",
+    "reviewer": "Example FPGA Reviewer <fpga-reviewer@example.com>"
+  },
+  "ip": [
+    {"name": "picorv32", "supplier": "YosysHQ", "license": "ISC", "files": ["picorv32.v"]},
+    {"name": "picosoc", "supplier": "YosysHQ", "license": "ISC", "files": ["picosoc/ice40up5k_spram.v", "picosoc/icebreaker.v", "picosoc/picosoc.v", "picosoc/simpleuart.v", "picosoc/spimemio.v"]}
+  ],
+  "simulation": {
+    "top": "testbench",
+    "files": ["picosoc/icebreaker_tb.v", "picosoc/icebreaker.v", "picosoc/ice40up5k_spram.v", "picosoc/spimemio.v", "picosoc/simpleuart.v", "picosoc/picosoc.v", "picorv32.v", "picosoc/spiflash.v"],
+    "defines": ["NO_ICE40_DEFAULT_ASSIGNMENTS"],
+    "uartBanner": ["Booting..", "Press ENTER to continue.."]
+  },
+  "synthesis": {
+    "top": "icebreaker",
+    "files": ["picosoc/icebreaker.v", "picosoc/ice40up5k_spram.v", "picosoc/spimemio.v", "picosoc/simpleuart.v", "picosoc/picosoc.v", "picorv32.v"],
+    "command": "synth_ice40 -dsp -top icebreaker"
+  },
+  "pnr": {"device": "up5k", "package": "sg48", "pcf": "picosoc/icebreaker.pcf", "freqMHz": 13, "seed": 1},
+  "signoff": {"device": "up5k", "clockMHz": 12},
+  "release": {
+    "steps": ["source-freeze", "simulation", "synthesis", "routing", "signoff", "bitstream"],
+    "artifact": "icebreaker.bin",
+    "kind": "iCE40 UltraPlus bitstream (iCE40UP5K-SG48), loaded from SPI flash at offset 0"
+  },
+  "firmware": {
+    "name": "picosoc-fw",
+    "version": "1.0.0",
+    "svn": 1,
+    "files": {
+      "picosoc/firmware.c": "d4309cfcccd605c3a3fe5e1c4b1687e32bb8eb349aec8b0879685d564ce0d7a3",
+      "picosoc/sections.lds": "9e4a843c30cd0f9ffd592f5598cb22fae437a4ebfec808a66adcd2b1cc93ea00",
+      "picosoc/start.s": "2bc57add38c5beb5ca4784f60ee69a076c24d34c0f071725cf36bc0887dccec9"
+    },
+    "cflags": ["-DICEBREAKER", "-mabi=ilp32", "-march=rv32ic", "-Wl,-Bstatic,-T,icebreaker_sections.lds,--strip-debug", "-ffreestanding", "-nostdlib"]
+  },
+  "flash": {
+    "note": "W25Q128JV layout: the iCE40 loads its bitstream from offset 0, PicoSoC runs its firmware from 0x100000 (picosoc/sections.lds), and the root of trust reads the signed boot manifest from 0x0F0000.",
+    "bitstreamOffset": 0,
+    "manifestOffset": 983040,
+    "manifestSize": 4096,
+    "firmwareOffset": 1048576
+  }
+}

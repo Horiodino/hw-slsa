@@ -149,6 +149,12 @@ type shipLine struct {
 
 // BoardProduce signs the shipments, A1 and the board HBOM for a board built on the chip bundle.
 func BoardProduce(bundle, chipBundle, scenarioPath, designPath, policyPath, keys string) error {
+	return boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, keys, nil)
+}
+
+// boardProduceWith is BoardProduce with a hook that adds to the board HBOM's
+// predicate before it is validated and signed.
+func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, keys string, extend func(predicate Obj) error) error {
 	art := filepath.Join(bundle, "artifacts")
 	sc, err := ReadObj(scenarioPath)
 	if err != nil {
@@ -357,6 +363,9 @@ func BoardProduce(bundle, chipBundle, scenarioPath, designPath, policyPath, keys
 		if S(sl.line, "mpn") == chipMPN {
 			part["hbomRef"] = fileRef(bundle, chipRel+"/att/"+BoardHBOM)
 		}
+		if Has(item, "rootOfTrust") {
+			part["rootOfTrust"] = get(item, "rootOfTrust")
+		}
 		parts = append(parts, part)
 	}
 	predicate := Obj{
@@ -371,6 +380,11 @@ func BoardProduce(bundle, chipBundle, scenarioPath, designPath, policyPath, keys
 			},
 		},
 		"parts": nonNil(parts),
+	}
+	if extend != nil {
+		if err := extend(predicate); err != nil {
+			return err
+		}
 	}
 	if err := ValidateHBOM(predicate); err != nil {
 		return err

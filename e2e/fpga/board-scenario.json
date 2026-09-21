@@ -1,0 +1,56 @@
+{
+  "note": "Manufacturers and part numbers are real, except the root of trust, EXR-01 from Example RoT Co, which this example simulates. Distributors, sites, shipment IDs, lot codes, date codes and dates are placeholders, so every such value starts with EXAMPLE or Example.",
+  "product": {
+    "name": "fpga-devboard",
+    "level": "board",
+    "partNumber": "FPGA-DEVB-01",
+    "revision": "A",
+    "manufacturer": {"name": "Example Board Co", "country": "US"},
+    "deviceIdentity": {"scheme": "DICE"}
+  },
+  "chip": {"mpn": "EXR-01", "bundle": "parts/rot"},
+  "shipments": [
+    {
+      "id": "EXAMPLE-SHIP-0101",
+      "shipper": {"name": "Example Franchised Distributor", "country": "US"},
+      "shipDate": "2026-09-24",
+      "lines": [
+        {
+          "manufacturer": "Example RoT Co",
+          "mpn": "EXR-01",
+          "lot": "ASM-EXR-01",
+          "dateCode": "EXAMPLE-2638",
+          "quantity": 5,
+          "units": ["EXR01-A0-00001", "EXR01-A0-00002", "EXR01-A0-00003", "EXR01-A0-00004", "EXR01-A0-00006"]
+        },
+        {"manufacturer": "Lattice Semiconductor", "mpn": "ICE40UP5K-SG48ITR", "lot": "EXAMPLE-LS-LOT-0001", "dateCode": "EXAMPLE-2629", "quantity": 5},
+        {"manufacturer": "Winbond Electronics", "mpn": "W25Q128JVSIQ", "lot": "EXAMPLE-WB-LOT-0002", "dateCode": "EXAMPLE-2621", "quantity": 5},
+        {"manufacturer": "Texas Instruments", "mpn": "TLV75512PDBVR", "lot": "EXAMPLE-TI-LOT-0003", "dateCode": "EXAMPLE-2618", "quantity": 5},
+        {"manufacturer": "Texas Instruments", "mpn": "TLV75533PDBVR", "lot": "EXAMPLE-TI-LOT-0002", "dateCode": "EXAMPLE-2619", "quantity": 5},
+        {"manufacturer": "Abracon", "mpn": "ASE-12.000MHZ-LC-T", "lot": "EXAMPLE-AB-LOT-0001", "dateCode": "EXAMPLE-2611", "quantity": 5},
+        {"manufacturer": "Murata Electronics", "mpn": "GRM188R61A106KE69D", "lot": "EXAMPLE-MU-LOT-0001", "dateCode": "EXAMPLE-2602", "quantity": 50},
+        {"manufacturer": "YAGEO", "mpn": "RC0402FR-0710KL", "lot": "EXAMPLE-YG-LOT-0001", "dateCode": "EXAMPLE-2605", "quantity": 50}
+      ]
+    },
+    {
+      "id": "EXAMPLE-SHIP-0102",
+      "shipper": {"name": "Example PCB Fab", "country": "US"},
+      "shipDate": "2026-09-25",
+      "lines": [
+        {"manufacturer": "Example PCB Fab", "mpn": "FPGA-DEVB-01-PCB", "lot": "EXAMPLE-PCB-LOT-02", "dateCode": "EXAMPLE-2638", "quantity": 5}
+      ]
+    }
+  ],
+  "assembly": {
+    "site": {"name": "Example EMS", "country": "US"},
+    "boardLot": "BRD-EXAMPLE-FPGA-01",
+    "serialPrefix": "FPGB-A-",
+    "boards": 4,
+    "failedBoards": ["FPGB-A-0003"]
+  },
+  "provisioning": {
+    "id": "urn:hslsa:station:example-ems:prog-01",
+    "site": {"name": "Example EMS", "country": "US"},
+    "signer": "ems-site"
+  }
+}

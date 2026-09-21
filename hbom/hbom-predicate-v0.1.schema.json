@@ -164,6 +164,7 @@
             "signoff",
             "rom-merge",
             "gds-stream-out",
+            "bitstream",
             "release",
             "rebuild",
             "other"
@@ -260,7 +261,8 @@
         "storage": {"enum": ["mask-rom", "otp", "on-die-flash", "external-flash"]},
         "digest": {"$ref": "#/$defs/digestSet"},
         "sbomRef": {"$ref": "#/$defs/ref"},
-        "referenceValuesRef": {"$ref": "#/$defs/ref", "description": "Signed CoRIM with the reference values for the measurement a device reports for this image"}
+        "referenceValuesRef": {"$ref": "#/$defs/ref", "description": "Signed CoRIM with the reference values for the measurement a device reports for this image"},
+        "provenanceRef": {"$ref": "#/$defs/ref", "description": "The record that vouches for this image: its build provenance, or the design release for an FPGA bitstream"}
       }
     },
     "part": {
@@ -276,6 +278,16 @@
         "distributor": {"$ref": "#/$defs/org"},
         "authorized": {"type": "boolean", "description": "Bought through the manufacturer's authorized channel"},
         "hbomRef": {"$ref": "#/$defs/ref", "description": "The part's own signed HBOM, when it has one"},
+        "rootOfTrust": {
+          "type": "object",
+          "required": ["guards", "images"],
+          "additionalProperties": false,
+          "description": "This part is the board's root of trust (spec: Firmware L2 through a board-level root of trust)",
+          "properties": {
+            "guards": {"type": "array", "minItems": 1, "items": {"type": "string"}, "description": "refDes of the parts it holds in reset until every image has verified"},
+            "images": {"type": "array", "minItems": 1, "items": {"type": "string"}, "description": "names of the firmware[] entries it verifies"}
+          }
+        },
         "distributionRef": {
           "$ref": "#/$defs/ref",
           "description": "Signed distribution record from whoever shipped this lot to the assembler (distributor, or the manufacturer shipping direct)"

@@ -36,6 +36,7 @@ var commands = map[string]command{
 	"openlane":      {"OpenLane 2 flow with a signed record per step", openlane},
 	"caliptra":      {"the Caliptra example (e2e/caliptra)", caliptra},
 	"board":         {"board-level example: shipments, A1 and board HBOM, or the buyer's board check", board},
+	"fpga":          {"the FPGA board example with a board root of trust (e2e/fpga)", fpga},
 	"lot-digest":    {"compute the lot digest of a unit list", lotDigest},
 	"subject":       {"print the name and sha256 of an envelope's first subject", subject},
 	"validate-hbom": {"validate HBOM statements or envelopes against the schema", validateHBOM},
@@ -601,6 +602,106 @@ func board(args []string) error {
 	}
 	_, err = hslsa.BoardVerify(*bundle, tr, *policy, *boards, *vsaKey, *vsaOut)
 	return err
+}
+
+func fpga(args []string) error {
+	act, rest, err := action(args, "rot-firmware", "rot-provision", "rot-hbom", "firmware", "design", "image",
+		"produce", "provision", "boot", "verify")
+	if err != nil {
+		return err
+	}
+	step := ""
+	if act == "design" {
+		if step, rest, err = action(rest, "simulation", "synthesis", "routing", "signoff", "bitstream"); err != nil {
+			return err
+		}
+	}
+	f := newFlags("fpga " + act)
+	switch act {
+	case "rot-firmware":
+		bundle, src := f.str("bundle", "", true), f.str("src", "the root of trust firmware's Go package", true)
+		key, cs := f.str("key", "", true), f.str("code-signer", "", true)
+		svn := f.Int64("svn", 1, "security version")
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.RoTFirmware(*bundle, *src, *key, *cs, *svn)
+	case "rot-provision":
+		bundle, devices := f.str("bundle", "", true), f.str("devices", "directory for the root of trust units", true)
+		keys, scenario := f.str("keys", "", true), f.str("scenario", "", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.RoTProvision(*bundle, *devices, *keys, *scenario)
+	case "rot-hbom":
+		bundle, lock := f.str("bundle", "", true), f.str("lock", "", true)
+		scenario, key := f.str("scenario", "", true), f.str("key", "", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.RoTHBOM(*bundle, *lock, *scenario, *key)
+	case "firmware":
+		bundle, lock, key := f.str("bundle", "", true), f.str("lock", "", true), f.str("key", "", true)
+		cache := f.str("cache", "", false)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		if *cache == "" {
+			*cache = ".hslsa-cache"
+		}
+		return hslsa.FPGAFirmware(*bundle, *lock, *key, *cache)
+	case "design":
+		bundle, lock, key := f.str("bundle", "", true), f.str("lock", "", true), f.str("key", "", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		run := map[string]func(string, string, string) error{
+			"simulation": hslsa.FPGASimulation, "synthesis": hslsa.FPGASynthesis, "routing": hslsa.FPGARouting,
+			"signoff": hslsa.FPGASignoff, "bitstream": hslsa.FPGABitstream,
+		}
+		return run[step](*bundle, *lock, *key)
+	case "image":
+		bundle, lock, scenario := f.str("bundle", "", true), f.str("lock", "", true), f.str("scenario", "the board scenario (product)", true)
+		key, cs := f.str("key", "", true), f.str("code-signer", "", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.FPGAImage(*bundle, *lock, *scenario, *key, *cs)
+	case "produce":
+		bundle, rot, design := f.str("bundle", "", true), f.str("rot-bundle", "", true), f.str("design-bundle", "", true)
+		scenario, designPath := f.str("scenario", "", true), f.str("design", "the released board design", true)
+		policy, keys := f.str("policy", "", true), f.str("keys", "", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.FPGABoardProduce(*bundle, *rot, *design, *scenario, *designPath, *policy, *keys)
+	case "provision":
+		bundle, devices := f.str("bundle", "", true), f.str("devices", "the root of trust units as shipped", true)
+		boards, scenario, keys := f.str("boards", "directory for the programmed boards", true), f.str("scenario", "", true), f.str("keys", "", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.FPGAProvision(*bundle, *devices, *boards, *scenario, *keys)
+	case "boot":
+		bundle, boards := f.str("bundle", "", true), f.str("boards", "directory of programmed boards", true)
+		list, out := f.str("list", "file with the serials to boot", true), f.str("out", "", true)
+		noSoC := f.Bool("no-soc", false, "skip the SoC simulation")
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.FPGABootAll(*bundle, *boards, *list, *out, !*noSoC)
+	}
+	bundle, trust, policy := f.str("bundle", "", true), f.str("trust-root", "", true), f.str("policy", "", true)
+	boards, boots := f.str("boards", "file with the serials of the boards received", false), f.str("boots", "what each received board returned at boot", false)
+	vsaKey, vsaOut := f.str("vsa-key", "", false), f.str("vsa-out", "", false)
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	tr, err := hslsa.LoadTrustRoot(*trust)
+	if err != nil {
+		return err
+	}
+	return hslsa.FPGAVerify(*bundle, tr, *policy, *boards, *boots, *vsaKey, *vsaOut)
 }
 
 func lotDigest(args []string) error {

@@ -180,6 +180,11 @@ func signHBOM(bundle string, final Obj, lotID string, shipped []string, predicat
 // BuildHBOM builds, validates and signs the PicoRV32 example's HBOM,
 // withholding the fields w names.
 func BuildHBOM(bundle, lockPath, scenarioPath, key string, w *Withholding) error {
+	return BuildChipHBOM(bundle, lockPath, scenarioPath, key, w, nil)
+}
+
+// BuildChipHBOM is BuildHBOM for a chip that also lists firmware.
+func BuildChipHBOM(bundle, lockPath, scenarioPath, key string, w *Withholding, firmware []Obj) error {
 	lock, err := ReadObj(lockPath)
 	if err != nil {
 		return err
@@ -210,18 +215,15 @@ func BuildHBOM(bundle, lockPath, scenarioPath, key string, w *Withholding) error
 		"hbomVersion": "0.1",
 		"product":     get(sc, "product"),
 		"design": Obj{
-			"ipBlocks": []Obj{{
-				"name":     get(lock, "design"),
-				"kind":     "soft",
-				"supplier": Obj{"name": "YosysHQ"},
-				"license":  "ISC",
-				"source":   Obj{"uri": get(src, "repo"), "digest": Obj{"gitCommit": get(src, "commit")}},
-			}},
+			"ipBlocks":    hbomIPBlocks(lock),
 			"rtlSources":  nonNil(rtl),
 			"flow":        flow,
 			"finalLayout": Obj{"uri": "file:artifacts/" + S(final, "name"), "digest": get(final, "digest")},
 		},
 		"manufacturing": manufacturingBlock(bundle, sc),
+	}
+	if len(firmware) > 0 {
+		predicate["firmware"] = firmware
 	}
 	if err := signHBOM(bundle, final, S(sc, "finalTest", "lotId"), shipped, predicate, key, w); err != nil {
 		return err
@@ -232,4 +234,20 @@ func BuildHBOM(bundle, lockPath, scenarioPath, key string, w *Withholding) error
 	}
 	fmt.Println(msg)
 	return nil
+}
+
+// hbomIPBlocks lists the lock's IP blocks for the HBOM, all from its pinned source repository.
+func hbomIPBlocks(lock Obj) []Obj {
+	src := O(lock, "source")
+	var out []Obj
+	for _, ip := range Objs(lock, "ip") {
+		out = append(out, Obj{
+			"name":     get(ip, "name"),
+			"kind":     "soft",
+			"supplier": Obj{"name": get(ip, "supplier")},
+			"license":  get(ip, "license"),
+			"source":   Obj{"uri": get(src, "repo"), "digest": Obj{"gitCommit": get(src, "commit")}},
+		})
+	}
+	return out
 }

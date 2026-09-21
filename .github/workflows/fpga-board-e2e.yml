@@ -1,0 +1,141 @@
+# End-to-end test of the FPGA board example (docs/fpga-board-example.md).
+#
+# "produce" plays the root of trust vendor, the board owner (FPGA design house
+# and firmware team) and the EMS: it builds the iCE40 bitstream with open
+# tools, signs every record, programs the boards, powers on the received ones
+# and runs the tamper tests while the keys still exist. "verify" is the buyer:
+# it gets only the board bundle and what the boards returned at boot, checks
+# the whole chain, signs VSAs and verifies them with slsa-verifier.
+#
+# Private by design, like the other examples: local ECDSA keys in DSSE
+# envelopes, no OIDC token, nothing sent to a transparency log. The boards are
+# simulated; a real board would run the boot step on the self-hosted runner.
+name: FPGA board end-to-end
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/hslsa/**"
+      - "e2e/fpga/**"
+      - "e2e/picorv32/**"
+      - "hbom/hbom-predicate-v0.1.schema.json"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/fpga-board-e2e.yml"
+  pull_request:
+    paths:
+      - "tools/hslsa/**"
+      - "e2e/fpga/**"
+      - "e2e/picorv32/**"
+      - "hbom/hbom-predicate-v0.1.schema.json"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/fpga-board-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: fpga-board-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SLSA_VERIFIER_VERSION: v2.7.1
+  # sha256 of slsa-verifier-linux-amd64 v2.7.1, from SHA256SUM.md in slsa-framework/slsa-verifier
+  SLSA_VERIFIER_SHA256: 946dbec729094195e88ef78e1734324a27869f03e2c6bd2f61cbc06bd5350339
+
+jobs:
+  produce:
+    name: Produce, program and boot the boards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install the open FPGA tools, Icarus Verilog and a RISC-V GCC
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends yosys nextpnr-ice40 fpga-icestorm fpga-icestorm-chipdb \
+            iverilog gcc-riscv64-unknown-elf
+      - name: Sign the root of trust's chain, the FPGA design, the flash image and the board chain
+        run: e2e/fpga/run.sh produce | tee produce.log
+      - name: Power on the received boards
+        run: e2e/fpga/run.sh boot | tee -a produce.log
+      - name: Tamper tests
+        run: go test -v -count=1 -run 'FPGA|RoT|Board|ASC|UART|FlashHex|SoC|Provisioning|Released|Unreadable|HBOMLists|NoRoT' ./tools/hslsa/ | tee tamper.log
+      - name: Remove private keys and the boards' secrets before upload
+        run: rm -rf out/fpga/keys out/fpga/rot-keys out/fpga/rot-devices out/fpga/boards
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## FPGA board: produce and boot"
+            echo '```'
+            cat produce.log 2>/dev/null || true
+            echo '```'
+            echo "### Tamper tests"
+            echo '```'
+            grep -E "^(--- |ok|FAIL)" tamper.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fpga-board-bundle
+          path: |
+            out/fpga/board
+            out/fpga/boots
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    name: Verify (buyer)
+    needs: produce
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: fpga-board-bundle
+          path: out/fpga
+      - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
+            "https://github.com/slsa-framework/slsa-verifier/releases/download/${SLSA_VERIFIER_VERSION}/slsa-verifier-linux-amd64"
+          echo "${SLSA_VERIFIER_SHA256}  $RUNNER_TEMP/slsa-verifier" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/slsa-verifier"
+          echo "SLSA_VERIFIER=$RUNNER_TEMP/slsa-verifier" >> "$GITHUB_ENV"
+      - name: Check the board chain and every booted board, sign VSAs, verify them with slsa-verifier
+        env:
+          HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
+        run: e2e/fpga/run.sh verify | tee verify.log
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## FPGA board: buyer's check"
+            echo '```'
+            cat verify.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fpga-board-vsa
+          path: out/fpga/vsa
+          if-no-files-found: error
+          retention-days: 14

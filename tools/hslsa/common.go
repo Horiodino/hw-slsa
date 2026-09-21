@@ -43,7 +43,7 @@ const (
 // the HBOM's design.flow[].step both use (spec: Design step names).
 var DesignStepNames = []string{
 	"source-freeze", "simulation", "synthesis", "floorplan", "place-cts", "routing",
-	"signoff", "rom-merge", "gds-stream-out", "release", "rebuild", "other",
+	"signoff", "rom-merge", "gds-stream-out", "bitstream", "release", "rebuild", "other",
 }
 
 func designStepType(step string) string { return NS + "/design-flow/step/" + step + "@v1" }

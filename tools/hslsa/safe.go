@@ -663,7 +663,7 @@ func jwsAlg(pub *ecdsa.PublicKey) (string, crypto.Hash, error) {
 }
 
 func signSFRJWS(report Obj, signer *Signer) ([]byte, error) {
-	alg, h, err := jwsAlg(&signer.priv.PublicKey)
+	alg, h, err := jwsAlg(signer.Key.Public)
 	if err != nil {
 		return nil, err
 	}
@@ -684,14 +684,10 @@ func signSFRJWS(report Obj, signer *Signer) ([]byte, error) {
 		s := sha512.Sum512([]byte(input))
 		sum = s[:]
 	}
-	rr, ss, err := ecdsa.Sign(rand.Reader, signer.priv, sum)
+	sig, err := signer.signRS(sum, h)
 	if err != nil {
 		return nil, err
 	}
-	size := (signer.priv.Curve.Params().BitSize + 7) / 8
-	sig := make([]byte, 2*size)
-	rr.FillBytes(sig[:size])
-	ss.FillBytes(sig[size:])
 	return []byte(input + "." + base64.RawURLEncoding.EncodeToString(sig) + "\n"), nil
 }
 
@@ -804,7 +800,7 @@ func signSFRCoRIM(report Obj, signer *Signer) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	alg, err := coseAlg(&signer.priv.PublicKey)
+	alg, err := coseAlg(signer.Key.Public)
 	if err != nil {
 		return nil, err
 	}

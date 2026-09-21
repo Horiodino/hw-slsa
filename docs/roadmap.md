@@ -77,6 +77,8 @@ Target: turn an unchanged supplier export into signed records. This is what make
 | Distributor importer | Certificates of conformance, packing lists, GS1 EPCIS shipping, receiving and storage events | Distribution records, with EPCIS events kept as supplemental evidence |
 | HSM signing | PKCS#11 | Site-key signatures at L3 |
 
+**HSM signing: done.** Every key the reference tool takes can be an HSM key named by a PKCS#11 URI, or a `<role>.pkcs11` file in place of `<role>.key.pem`; `hslsa hsm keygen` makes non-extractable site keys on a token, and the tool refuses a key the HSM would let out. CI signs the PicoRV32 release and lot with the sites' keys in SoftHSM2 and checks them. See [hsm-signing.md](hsm-signing.md). A real HSM, and the buyer's means of knowing a key is in one (accreditation, audit or the vendor's key attestation), come with a pilot site.
+
 The EDA wrapper needs a design-house partner with licenses. The rest can be built against sample data from phase 2.
 
 **Exit:** each adapter produces valid records from a real export without manual editing, and the reference verifier accepts them.

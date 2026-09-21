@@ -212,7 +212,7 @@ func coseAlg(pub *ecdsa.PublicKey) (cose.Algorithm, error) {
 // SignCoRIM wraps an unsigned CoRIM in COSE_Sign1, signed by signer, whose
 // DSSE keyid goes in the kid header and whose role name in corim-meta.
 func SignCoRIM(uc *corim.UnsignedCorim, signer *Signer, role string) ([]byte, error) {
-	alg, err := coseAlg(&signer.priv.PublicKey)
+	alg, err := coseAlg(signer.Key.Public)
 	if err != nil {
 		return nil, err
 	}

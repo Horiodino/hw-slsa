@@ -24,8 +24,9 @@ type command struct {
 
 var commands = map[string]command{
 	"keygen":        {"generate ECDSA P-256 keys, one per role", keygen},
-	"pubkey":        {"write the public key for an existing private key", pubkey},
+	"pubkey":        {"write the public key for a private key file or HSM key", pubkey},
 	"keyid":         {"print the DSSE keyid for a public or private key", keyid},
+	"hsm":           {"generate site keys in an HSM over PKCS#11", hsm},
 	"trust-root":    {"build a trust root from <role>.pub.pem files", trustRoot},
 	"design":        {"run and attest one design flow step", design},
 	"mfg":           {"emit signed F1 to F4 records for the scenario lot", mfg},
@@ -191,12 +192,20 @@ func keyid(args []string) error {
 	if err := f.parse(args); err != nil {
 		return err
 	}
+	if strings.HasPrefix(*key, "pkcs11:") {
+		s, err := hslsa.LoadSigner(*key)
+		if err != nil {
+			return err
+		}
+		fmt.Println(s.Key.ID)
+		return nil
+	}
 	text, err := os.ReadFile(*key)
 	if err != nil {
 		return err
 	}
 	var k hslsa.Key
-	if strings.Contains(string(text), "PRIVATE") {
+	if t := strings.TrimSpace(string(text)); strings.Contains(t, "PRIVATE") || strings.HasPrefix(t, "pkcs11:") {
 		s, err := hslsa.LoadSigner(*key)
 		if err != nil {
 			return err
@@ -206,6 +215,46 @@ func keyid(args []string) error {
 		return err
 	}
 	fmt.Println(k.ID)
+	return nil
+}
+
+func hsm(args []string) error {
+	act, rest, err := action(args, "keygen")
+	if err != nil {
+		return err
+	}
+	f := newFlags("hsm " + act)
+	module := f.str("module", "PKCS#11 module (default $"+hslsa.PKCS11ModuleEnv+")", false)
+	token := f.str("token", "label of the token to hold the keys", true)
+	pinSource := f.str("pin-source", "file holding the user PIN (default $"+hslsa.PKCS11PINEnv+")", false)
+	out := f.str("out", "directory for <role>.pkcs11 and <role>.pub.pem", true)
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	if f.NArg() == 0 {
+		return usageError{"at least one role is required"}
+	}
+	if *module == "" {
+		*module = os.Getenv(hslsa.PKCS11ModuleEnv)
+	}
+	if *module == "" {
+		return usageError{"needs --module or $" + hslsa.PKCS11ModuleEnv}
+	}
+	pin := os.Getenv(hslsa.PKCS11PINEnv)
+	if *pinSource != "" {
+		data, err := os.ReadFile(*pinSource)
+		if err != nil {
+			return err
+		}
+		pin = strings.TrimRight(string(data), "\r\n")
+	}
+	for _, role := range f.Args() {
+		s, err := hslsa.HSMKeygen(*module, *token, pin, *out, role)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s %s\n", role, s.Key.ID)
+	}
 	return nil
 }
 

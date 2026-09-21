@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/fxamacker/cbor/v2 v2.8.0
 	github.com/in-toto/attestation v1.2.0
+	github.com/miekg/pkcs11 v1.1.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1
 	github.com/veraison/corim v1.1.3-0.20260929172305-36e325e21bbe

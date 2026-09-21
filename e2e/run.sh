@@ -4,6 +4,7 @@
 #   e2e/run.sh produce   run the design flow and the simulated lot, sign every record
 #   e2e/run.sh verify    check the chain, emit VSAs, verify them with slsa-verifier
 #   e2e/run.sh proxy     after produce: the same lot with two suppliers that sign nothing
+#   e2e/run.sh hsm       after produce: the release and the lot again, signed with keys in an HSM
 #
 # Nothing here uploads to a transparency log: every signature is a DSSE
 # envelope made with a local ECDSA P-256 key.
@@ -126,10 +127,57 @@ proxy() {
   echo "ok: the L2 policy refuses the proxy-signed lot"
 }
 
+# The release and the lot again, with the tapeout authority's and every site's
+# key in an HSM (docs/hsm-signing.md). Each <role>.key.pem is replaced by a
+# <role>.pkcs11 file naming the key on the token, and nothing else changes: the
+# same commands sign and the same check passes. With no HSLSA_PKCS11_TOKEN set,
+# a throwaway SoftHSM2 token stands in for the HSM. Runs after produce.
+hsm() {
+  local hb=$OUT/hsm
+  local roles=(tapeout-authority fab-site sort-site osat-site test-site product-owner)
+  rm -rf "$hb" && mkdir -p "$hb"
+  cp -r "$BUNDLE" "$hb/bundle"
+  cp -r "$KEYS" "$hb/keys"
+  local b=$hb/bundle k=$hb/keys
+  if [[ -z "${HSLSA_PKCS11_TOKEN:-}" ]]; then
+    export HSLSA_PKCS11_TOKEN=hslsa-e2e
+    export HSLSA_PKCS11_MODULE=${HSLSA_PKCS11_MODULE:-$(ls /usr/lib/softhsm/libsofthsm2.so /usr/lib/*/softhsm/libsofthsm2.so 2>/dev/null | head -1)}
+    export HSLSA_PKCS11_PIN
+    HSLSA_PKCS11_PIN=$(od -An -N8 -tx8 /dev/urandom | tr -d ' ')
+    export SOFTHSM2_CONF=$hb/softhsm2.conf
+    mkdir -p "$hb/tokens"
+    printf 'directories.tokendir = %s\nobjectstore.backend = file\nlog.level = ERROR\n' "$hb/tokens" > "$SOFTHSM2_CONF"
+    softhsm2-util --init-token --free --label "$HSLSA_PKCS11_TOKEN" --pin "$HSLSA_PKCS11_PIN" \
+      --so-pin "$(od -An -N8 -tx8 /dev/urandom | tr -d ' ')" > /dev/null
+  fi
+  for r in "${roles[@]}"; do rm "$k/$r.key.pem"; done
+  hslsa hsm keygen --token "$HSLSA_PKCS11_TOKEN" --out "$k" "${roles[@]}" > /dev/null
+  cp "$k"/*.pub.pem "$k/pub/"
+  hslsa trust-root --keys "$k/pub" --out "$b/trust-root.json"
+
+  hslsa design release --bundle "$b" --lock "$E2E/inputs.lock.json" --key "$k/tapeout-authority.key.pem" \
+    --trust-root "$b/trust-root.json" --policy "$b/policy.json"
+  hslsa mfg  --bundle "$b" --scenario "$E2E/mfg-scenario.json" --keys "$k"
+  hslsa hbom --bundle "$b" --lock "$E2E/inputs.lock.json" --scenario "$E2E/mfg-scenario.json" --key "$k/product-owner.key.pem"
+  hslsa verify --bundle "$b" --trust-root "$b/trust-root.json" --policy "$b/policy.json" --units "$E2E/received-units.txt"
+
+  # The records must carry the HSM keys' signatures, not the file keys' from produce.
+  local r keyid
+  for r in tapeout-authority:design-release fab-site:mfg-f1-wafer-fab sort-site:mfg-f2-wafer-sort \
+           osat-site:mfg-f3-packaging test-site:mfg-f4-final-test product-owner:hbom; do
+    keyid=$(hslsa keyid --key "$k/${r%%:*}.pub.pem")
+    grep -q "\"keyid\": *\"$keyid\"" "$b/att/${r#*:}.intoto.json" \
+      || { echo "FAIL: ${r#*:} is not signed by ${r%%:*}'s HSM key" >&2; exit 1; }
+  done
+  echo "ok: release and lot signed with HSM-held keys, and the check passes"
+  rm -rf "$hb/keys" "$hb/tokens"
+}
+
 case "${1:-}" in
   produce) produce ;;
   verify) verify ;;
   proxy) proxy ;;
-  all) produce; verify; proxy ;;
-  *) echo "usage: $0 produce|verify|proxy|all" >&2; exit 2 ;;
+  hsm) hsm ;;
+  all) produce; verify; proxy; hsm ;;
+  *) echo "usage: $0 produce|verify|proxy|hsm|all" >&2; exit 2 ;;
 esac

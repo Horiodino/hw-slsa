@@ -25,6 +25,7 @@ package hslsa
 // runs the firmware, which does the board work (rot-fw/main.go).
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
@@ -71,7 +72,7 @@ const (
 
 func signBlob(payload []byte, s *Signer) (Obj, error) {
 	d := sha256.Sum256(payload)
-	sig, err := ecdsa.SignASN1(rand.Reader, s.priv, d[:])
+	sig, err := s.priv.Sign(rand.Reader, d[:], crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}

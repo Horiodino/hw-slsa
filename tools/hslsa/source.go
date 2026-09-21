@@ -13,6 +13,7 @@ package hslsa
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha1"
@@ -21,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"hash"
 	"os"
@@ -148,8 +150,8 @@ func sshsigData(namespace, hashAlg string, msg []byte) ([]byte, error) {
 }
 
 // sshSign makes an armored SSHSIG signature, as ssh-keygen -Y sign does.
-func sshSign(priv *ecdsa.PrivateKey, namespace string, msg []byte) (string, error) {
-	signer, err := ssh.NewSignerFromKey(priv)
+func sshSign(priv crypto.Signer, namespace string, msg []byte) (string, error) {
+	signer, err := ssh.NewSignerFromSigner(priv)
 	if err != nil {
 		return "", err
 	}
@@ -231,7 +233,7 @@ func splitSignedTag(raw []byte) (payload []byte, sig string, ok bool) {
 
 // SignTag replaces the signature on a tag object with one from priv; tests use
 // it to forge tags, and it shows git's format needs nothing but SSHSIG.
-func SignTag(payload []byte, priv *ecdsa.PrivateKey) ([]byte, error) {
+func SignTag(payload []byte, priv crypto.Signer) ([]byte, error) {
 	sig, err := sshSign(priv, "git", payload)
 	if err != nil {
 		return nil, err
@@ -374,6 +376,9 @@ func SourceTag(bundle, lockPath, key, cache string) error {
 	an, ae := splitIdent(S(fr, "author"))
 	tn, te := splitIdent(S(fr, "tagger"))
 	// OpenSSH reads the signing key from a file; write the same key in its format.
+	if _, inFile := signer.priv.(*ecdsa.PrivateKey); !inFile {
+		return errors.New("source-tag: git signs with a key file, so the source owner's key cannot be in an HSM here")
+	}
 	block, err := ssh.MarshalPrivateKey(signer.priv, "")
 	if err != nil {
 		return err

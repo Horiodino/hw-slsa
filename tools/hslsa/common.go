@@ -2,22 +2,25 @@
 // Framework: it signs design, manufacturing, firmware and HBOM records as
 // in-toto statements in DSSE envelopes, and walks the chain as a buyer would.
 //
-// Signing uses local ECDSA keys only. Nothing here requests an OIDC token or
-// talks to a transparency log.
+// Signing uses local ECDSA keys only, in files or in an HSM over PKCS#11.
+// Nothing here requests an OIDC token or talks to a transparency log.
 package hslsa
 
 import (
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -257,39 +260,92 @@ func privatePEM(key *ecdsa.PrivateKey) ([]byte, error) {
 	return pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), nil
 }
 
-// Signer signs DSSE envelopes with one ECDSA key.
+// Signer signs DSSE envelopes with one ECDSA key, held in a file or in an HSM.
 type Signer struct {
 	Key  Key
-	priv *ecdsa.PrivateKey
-	sv   *signerverifier.ECDSASignerVerifier
+	priv crypto.Signer
 }
 
-func newSigner(priv *ecdsa.PrivateKey) (*Signer, error) {
-	key, err := NewKey(&priv.PublicKey)
+func newSigner(priv crypto.Signer) (*Signer, error) {
+	pub, ok := priv.Public().(*ecdsa.PublicKey)
+	if !ok {
+		return nil, errors.New("not an ECDSA key")
+	}
+	key, err := NewKey(pub)
 	if err != nil {
 		return nil, err
 	}
-	privPEM, err := privatePEM(priv)
-	if err != nil {
-		return nil, err
-	}
-	sv, err := signerverifier.NewECDSASignerVerifierFromSSLibKey(&signerverifier.SSLibKey{
-		KeyID:   key.ID,
-		KeyType: "ecdsa",
-		Scheme:  key.Scheme,
-		KeyVal:  signerverifier.KeyVal{Public: key.PEM, Private: string(privPEM)},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &Signer{Key: key, priv: priv, sv: sv}, nil
+	return &Signer{Key: key, priv: priv}, nil
 }
 
-// LoadSigner reads a PEM private key (PKCS#8 or SEC 1).
-func LoadSigner(path string) (*Signer, error) {
+// KeyID and Sign make a Signer a DSSE signer. Sign hashes data as
+// securesystemslib does for the key's scheme and returns an ASN.1 signature.
+func (s *Signer) KeyID() (string, error) { return s.Key.ID, nil }
+
+func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
+	h, err := schemeHash(s.Key.Public)
+	if err != nil {
+		return nil, err
+	}
+	d := h.New()
+	d.Write(data)
+	return s.priv.Sign(rand.Reader, d.Sum(nil), h)
+}
+
+func schemeHash(pub *ecdsa.PublicKey) (crypto.Hash, error) {
+	switch pub.Curve {
+	case elliptic.P256():
+		return crypto.SHA256, nil
+	case elliptic.P384():
+		return crypto.SHA384, nil
+	case elliptic.P521():
+		return crypto.SHA512, nil
+	}
+	return 0, fmt.Errorf("unsupported curve %s", pub.Curve.Params().Name)
+}
+
+// signRS signs digest and returns the signature as fixed-width r||s, the form JWS and COSE use.
+func (s *Signer) signRS(digest []byte, h crypto.Hash) ([]byte, error) {
+	der, err := s.priv.Sign(rand.Reader, digest, h)
+	if err != nil {
+		return nil, err
+	}
+	var sig struct{ R, S *big.Int }
+	if rest, err := asn1.Unmarshal(der, &sig); err != nil || len(rest) > 0 {
+		return nil, errors.New("signer returned a malformed ECDSA signature")
+	}
+	size := (s.Key.Public.Curve.Params().BitSize + 7) / 8
+	out := make([]byte, 2*size)
+	sig.R.FillBytes(out[:size])
+	sig.S.FillBytes(out[size:])
+	return out, nil
+}
+
+// LoadSigner opens a signing key. key is a PEM private key file (PKCS#8 or
+// SEC 1), a PKCS#11 URI (RFC 7512) naming a key in an HSM, or a file holding
+// such a URI. Where key is a <role>.key.pem path that does not exist, a
+// <role>.pkcs11 file next to it is used instead, so a site whose key moved
+// into an HSM needs no change to the scenario or to the command line.
+func LoadSigner(key string) (*Signer, error) {
+	if isPKCS11URI(key) {
+		return loadPKCS11Signer(key)
+	}
+	path := key
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) && strings.HasSuffix(path, ".key.pem") {
+		if ref := strings.TrimSuffix(path, ".key.pem") + PKCS11RefSuffix; fileExists(ref) {
+			path = ref
+		}
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
+	}
+	if text := strings.TrimSpace(string(data)); isPKCS11URI(text) {
+		s, err := loadPKCS11Signer(text)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		return s, nil
 	}
 	priv, err := parsePrivatePEM(data)
 	if err != nil {
@@ -330,7 +386,7 @@ func Sign(stmt Obj, signer *Signer, path string) (Obj, error) {
 	if err := validateStatement(stmt); err != nil {
 		return nil, err
 	}
-	es, err := dsse.NewEnvelopeSigner(signer.sv)
+	es, err := dsse.NewEnvelopeSigner(signer)
 	if err != nil {
 		return nil, err
 	}

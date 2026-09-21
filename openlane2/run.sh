@@ -5,6 +5,9 @@
 #   openlane2/run.sh rebuild RELEASE             as a second builder with its own keys: rebuild the release in bundle RELEASE,
 #                                                compare every step, and sign the rebuild record
 #   openlane2/run.sh verify RELEASE REBUILD      the buyer's tapeout check, with the rebuild record in REBUILD as Design L4 evidence
+#   openlane2/run.sh eda-sta                     after produce: signoff STA in OpenROAD's Tcl shell, signed from the
+#                                                EDA Tcl hook (adapters/eda-tcl), into the same bundle
+#   openlane2/run.sh eda-verify RELEASE          the buyer's check of those records
 #
 # Needs docker, the pinned image and the SKY130 PDK enabled under $PDK_ROOT
 # (see .github/workflows/openlane2-flow.yml). Signing uses local ECDSA P-256
@@ -78,9 +81,48 @@ verify() {
     --rebuild-check "${REBUILD_CHECK:-gds-bit-exact}"
 }
 
+# Signoff STA on OpenLane's final views, run by a Tcl script in OpenROAD with
+# the HSLSA hook. The hook writes one event per step; `hslsa eda run` signs it
+# on the host, with the same flow-platform key, so the key stays out of the
+# container here too.
+eda_sta() {
+  local bundle=$OUT/bundle keys=$OUT/keys
+  : "${PDK_ROOT:?set PDK_ROOT to the directory ciel enabled the PDK in}"
+  local run_dir last state variant scl hook=$ROOT/adapters/eda-tcl/hslsa.tcl script=$ROOT/openlane2/eda-tcl/signoff-sta.tcl
+  run_dir=$(jq -r .runDir "$bundle/openlane/run.json")
+  last=$(ls "$run_dir" | grep -E '^[0-9]+-' | sort -n | tail -1)
+  state=$run_dir/$last/state_out.json
+  variant=$(jq -r .pdk.variant "$LOCK") scl=$(jq -r .pdk.scl "$LOCK")
+  export ODB SDC SPEF LIBS OUT_STA=$run_dir/eda-sta HSLSA_HOOK=$hook
+  ODB=$(jq -r .odb "$state")
+  SDC=$(jq -r .sdc "$state")
+  SPEF=$(jq -r '.spef | to_entries[] | select(.key | startswith("nom")) | .value' "$state" | head -n 1)
+  LIBS=$PDK_ROOT/$variant/libs.ref/$scl/lib/${scl}__tt_025C_1v80.lib
+  rm -rf "$OUT/eda-spool" "$OUT_STA" "$bundle/eda" && mkdir -p "$OUT_STA"
+  hslsa eda run --bundle "$bundle" --spool "$OUT/eda-spool" --key "$keys/flow-platform.key.pem" \
+    --root "$run_dir" --pdk "$PDK_ROOT/$variant" --image "$(jq -r .openlane.image "$LOCK")" -- \
+    docker run --rm --user "$(id -u):$(id -g)" -w /tmp \
+      -v "$OUT/work:$OUT/work" -v "$PDK_ROOT:$PDK_ROOT:ro" \
+      -v "$hook:$hook:ro" -v "$script:$script:ro" -v "$OUT/eda-spool:$OUT/eda-spool" \
+      -e HSLSA_SPOOL -e HSLSA_SYNC -e HSLSA_RUN_ID -e HSLSA_HOOK -e ODB -e SDC -e SPEF -e LIBS -e OUT="$OUT_STA" -e HOME=/tmp \
+      "$(jq -r .openlane.image "$LOCK")" openroad -exit -no_init "$script"
+  # The report travels with the bundle's copy of the run directory.
+  rm -rf "$bundle/run/eda-sta" && cp -a "$OUT_STA" "$bundle/run/eda-sta"
+  hslsa eda verify --bundle "$bundle" --trust-root "$bundle/trust-root.json" --root "$run_dir" \
+    --hook "$hook" --pdk "$PDK_ROOT/$variant" --require-steps signoff
+}
+
+eda_verify() {
+  local release=${1:?the released bundle}
+  hslsa eda verify --bundle "$release" --trust-root "$release/trust-root.json" --root "$release/run" \
+    --hook "$ROOT/adapters/eda-tcl/hslsa.tcl" --require-steps signoff
+}
+
 case "${1:-}" in
   produce) produce ;;
+  eda-sta) eda_sta ;;
+  eda-verify) shift; eda_verify "$@" ;;
   rebuild) shift; rebuild "$@" ;;
   verify) shift; verify "$@" ;;
-  *) echo "usage: $0 produce | rebuild <release-bundle> | verify <release-bundle> <rebuild-dir>" >&2; exit 2 ;;
+  *) echo "usage: $0 produce | rebuild <release-bundle> | verify <release-bundle> <rebuild-dir> | eda-sta | eda-verify <release-bundle>" >&2; exit 2 ;;
 esac

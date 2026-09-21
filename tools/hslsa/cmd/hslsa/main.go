@@ -35,6 +35,7 @@ var commands = map[string]command{
 	"escrow":        {"verifier escrow: the auditor's full check and VSAs, or the buyer's check of them", escrow},
 	"leaks":         {"measure what the signed records and the escrow VSAs reveal", leaks},
 	"openlane":      {"OpenLane 2 flow with a signed record per step", openlane},
+	"eda":           {"sign a record per step from the Tcl hook in an EDA tool, or check them", eda},
 	"caliptra":      {"the Caliptra example (e2e/caliptra)", caliptra},
 	"board":         {"board-level example: shipments, A1 and board HBOM, or the buyer's board check", board},
 	"fpga":          {"the FPGA board example with a board root of trust (e2e/fpga)", fpga},
@@ -518,6 +519,59 @@ func openlane(args []string) error {
 		}
 	}
 	fmt.Print(md)
+	return nil
+}
+
+func eda(args []string) error {
+	act, rest, err := action(args, "run", "verify")
+	if err != nil {
+		return err
+	}
+	f := newFlags("eda " + act)
+	bundle := f.str("bundle", "bundle for the records; its artifacts/source.tar, if present, is the frozen source", true)
+	root := f.str("root", "directory that subject and input names are relative to (run: default the working directory; verify: re-hash every subject under it)", false)
+	pdk := f.str("pdk", "PDK tree that pdk inputs come from (run: pinned by tree digest; verify: re-hash the tree and each PDK file)", false)
+	spool := f.str("spool", "run: new directory for the hook's events", false)
+	key := f.str("key", "run: the flow-platform signing key", false)
+	image := f.str("image", "run: the container image the tool runs in, pinned by digest", false)
+	trust := f.str("trust-root", "verify: the trust root", false)
+	hook := f.str("hook", "verify: require every record to name this hook file", false)
+	require := f.str("require-steps", "verify: comma-separated design steps that must each have a record", false)
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	if act == "run" {
+		if err := need(spool, "spool", "run"); err != nil {
+			return err
+		}
+		if err := need(key, "key", "run"); err != nil {
+			return err
+		}
+		if f.NArg() == 0 {
+			return usageError{"eda run: give the tool command after --"}
+		}
+		return hslsa.EDARun(hslsa.EDAOptions{Bundle: *bundle, Spool: *spool, Key: *key, Root: *root, PDK: *pdk, Image: *image, Cmd: f.Args()})
+	}
+	if err := need(trust, "trust-root", "verify"); err != nil {
+		return err
+	}
+	tr, err := hslsa.LoadTrustRoot(*trust)
+	if err != nil {
+		return err
+	}
+	var steps []string
+	if *require != "" {
+		steps = strings.Split(*require, ",")
+	}
+	records, err := hslsa.EDAVerify(hslsa.EDAVerifyOptions{Bundle: *bundle, Trust: tr, Root: *root, PDK: *pdk, RequireSteps: steps, Hook: *hook})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("eda check: PASSED, %d step record(s)\n", len(records))
+	for _, r := range records {
+		hw := r["predicate"].(map[string]any)["hwFlow"]
+		fmt.Printf("  %-14s %-24s %s\n", hslsa.S(hw, "step"), hslsa.S(hw, "toolStep"), hslsa.S(hslsa.Objs(hw, "tools")[0], "name"))
+	}
 	return nil
 }
 

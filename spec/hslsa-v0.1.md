@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 9 (2026-09-21). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 10 (2026-09-21). See the [changelog](#changelog).
 
 ## Overview
 
@@ -243,6 +243,17 @@ A flow tool usually runs many small steps for each spec step (OpenLane 2's Class
 - carries the step's resolved configuration by digest, and the metrics the step changed in `hwFlow.metrics`.
 
 The verifier requires every spec step from synthesis to stream-out to be covered by at least one record, the records to be linked in order, and the released GDS to be a subject of the last stream-out record. The mapping from OpenLane 2 step names to spec steps is in [`tools/hslsa/openlane.go`](../tools/hslsa/openlane.go).
+
+#### Records from a tool's Tcl shell
+
+Most design tools, open and commercial, are driven by Tcl scripts. A flow MAY mark its steps from inside the tool with a hook the script sources, and have the flow platform sign one record per marked step, with buildType `.../design-flow/step/eda-tcl@v1`. Such a record is a per-tool design step as above, with these rules:
+
+1. **The tool never signs.** The hook only declares each step's design step name, label, input and output files, metrics and checks. The platform, outside the tool's process, hashes the files and signs. A refusal from the platform stops the flow before the next step, so a step's outputs are hashed before a later step can change them.
+2. **What the record names.** `hwFlow.step` is the design step name the script gave (never `source-freeze`, `release` or `rebuild`, which have their own signers), `hwFlow.toolStep` the script's label for it, `hwFlow.ordinal` its place in the run across every tool session, and `hwFlow.adapter` the hook's name and version. `resolvedDependencies` carries the hook (`kind: adapter`) and the flow script (`kind: step-config`) by digest, besides the source, image and PDK pins and the inputs: design views (`kind: view`), files of the pinned PDK (`kind: pdk-file`, named relative to the PDK tree) and other configuration (`kind: step-config`).
+3. **Inputs link.** Every input view is an output of an earlier record, from this run or another the flow platform signed for the same design, or a file of the frozen source archive. Every record of one run names the same hook.
+4. **The record is as complete as the script.** The platform cannot see a file the script read without declaring it. A buyer who needs more checks the tool's own command log against the record.
+
+The reference implementation is [`adapters/eda-tcl`](../adapters/eda-tcl/README.md): the hook, `hslsa eda run`, which signs, and `hslsa eda verify`, which checks. It runs in Yosys's and OpenROAD's Tcl shells in CI. The same hook fits the Tcl shells of commercial tools; its README says where it goes in each, untried for lack of licenses.
 
 #### Network access and licensed tools
 
@@ -856,6 +867,8 @@ Five examples run in this repository's GitHub Actions and exercise the spec end 
 | FPGA board with a root of trust | PicoSoC for an iCE40UP5K built with Yosys, nextpnr and IceStorm (design steps 0 to 2, `routing`, `signoff`, `bitstream`, release), SoC firmware provenance and SBOM, a signed boot manifest and board CoRIM; a simulated root of trust with its own chip chain, firmware provenance, CoRIM and DICE identities; per-board provisioning, the board receipt, root of trust and at-boot checks, board VSAs | Design L2, Assembly L2, Firmware L2 for the board (the bare FPGA stays at Firmware L1) | [fpga-board-example.md](../docs/fpga-board-example.md) |
 | Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, firmware reference values as a signed CoRIM, the firmware review check on simulated S.A.F.E. reports, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
+The [EDA Tcl adapter](../adapters/eda-tcl/README.md) runs inside two of them. In the PicoRV32 workflow, a Yosys Tcl script lints and synthesizes PicoRV32 from the frozen source with the step hook, and the platform signs each step as it ends. In the OpenLane 2 workflow, an OpenROAD Tcl script runs signoff STA on the released `spm` layout, its inputs linked to OpenLane's own step records, and the buyer's job checks that record too. Tamper tests cover unlinked inputs, failed and unfinished steps, a changed hook and changed outputs.
+
 The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, renders them as CycloneDX 1.6 and SPDX 3.1-RC1 (`hslsa render`, which also checks a rendering against a signed HBOM), runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also accepts proxy-signed and evidence records under a policy that allows them, withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
 What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key and the firmware review provider are simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. The FPGA bitstream is built for a real part, but no FPGA loads it: its root of trust is a model, and its SoC boots in RTL simulation of the frozen design. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
@@ -916,6 +929,10 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 10 (2026-09-21)
+
+- **Records from a tool's Tcl shell.** New [Records from a tool's Tcl shell](#records-from-a-tools-tcl-shell): a flow script marks its steps with a hook, and the flow platform signs one `.../design-flow/step/eda-tcl@v1` record per step, outside the tool, refusing a step whose input views link to nothing. The records name the hook and flow script by digest, and number steps across every tool session of a run. The [EDA Tcl adapter](../adapters/eda-tcl/README.md) implements it for Yosys and OpenROAD in CI, and says where the hook goes in commercial Tcl shells.
 
 ### Revision 9 (2026-09-21)
 

@@ -20,9 +20,9 @@ name: OpenLane 2 attested flow
 on:
   push:
     branches: [main]
-    paths: [openlane2/**, tools/hslsa/**, go.mod, go.sum, .github/workflows/openlane2-flow.yml]
+    paths: [openlane2/**, adapters/eda-tcl/**, tools/hslsa/**, go.mod, go.sum, .github/workflows/openlane2-flow.yml]
   pull_request:
-    paths: [openlane2/**, tools/hslsa/**, go.mod, go.sum, .github/workflows/openlane2-flow.yml]
+    paths: [openlane2/**, adapters/eda-tcl/**, tools/hslsa/**, go.mod, go.sum, .github/workflows/openlane2-flow.yml]
   workflow_dispatch:
 
 permissions:
@@ -66,6 +66,10 @@ jobs:
             "$(jq -r .pdk.openPdksCommit openlane2/spm/flow.lock.json)"
       - name: Run OpenLane and sign every step
         run: openlane2/run.sh produce
+      # The EDA Tcl adapter (adapters/eda-tcl): a Tcl script in OpenROAD's own
+      # shell marks the step, and the signer outside the container signs it.
+      - name: Signoff STA in OpenROAD's Tcl shell, signed from the hook
+        run: openlane2/run.sh eda-sta
       - name: Remove private keys before upload
         if: always()
         run: rm -rf out/openlane2/keys
@@ -161,6 +165,8 @@ jobs:
           path: runs/rebuild
       - name: Verify the release and require a bit-exact rebuild from a separate trust root
         run: openlane2/run.sh verify runs/release runs/rebuild | tee verify.txt
+      - name: Check the signoff STA record from the EDA Tcl hook
+        run: openlane2/run.sh eda-verify runs/release | tee -a verify.txt
       - name: Summary
         if: always()
         run: |

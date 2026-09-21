@@ -156,6 +156,24 @@ operates a key, so the buyer has to establish that when it accepts the key.
 the chain checks, the classifier, the overlay check and each rebuild rejection
 on a synthetic run, so the lint job covers them without OpenLane.
 
+## Signoff STA from OpenROAD's Tcl shell
+
+After the release, the flow job runs one more step the way a design house
+with its own Tcl scripts would: `openlane2/run.sh eda-sta` starts OpenROAD in
+the same pinned image on [`openlane2/eda-tcl/signoff-sta.tcl`](../openlane2/eda-tcl/signoff-sta.tcl),
+which sources the [EDA Tcl adapter's](../adapters/eda-tcl/README.md) hook.
+The script reads the typical-corner Liberty file from the PDK and OpenLane's
+final ODB, SDC and nominal SPEF, reports setup and hold timing, and declares
+it all to the hook. `hslsa eda run` on the host signs the `signoff` record
+with the same `flow-platform` key, as `eda-01-openroad-sta.intoto.json`,
+after checking that the ODB, SDC and SPEF are subjects of OpenLane's own step
+records. The record's checks are `setup-slack` and `hold-slack`, and its
+metrics the worst slacks.
+
+The buyer job then runs `openlane2/run.sh eda-verify`, which checks the
+record, its links to the OpenLane records and the report's digest. The
+rebuild job ignores it: the rebuild compares OpenLane's steps only.
+
 ## Running it locally
 
 You need docker, Go, `pip install ciel==3.0.0` (the PDK manager), and the
@@ -168,6 +186,9 @@ mv out/openlane2/bundle release
 PDK_ROOT=$PWD/pdk openlane2/run.sh rebuild release
 openlane2/run.sh verify release out/openlane2/report
 ```
+
+`PDK_ROOT=$PWD/pdk openlane2/run.sh eda-sta`, run right after `produce`,
+adds the signoff STA record to the bundle.
 
 OpenLane writes absolute paths into its state and config files, so a rebuild
 matches every output only when it runs at the same checkout and `PDK_ROOT`

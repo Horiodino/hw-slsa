@@ -23,6 +23,7 @@ Status: working draft, version 0.1.
 | `hbom/*.cdx.json`, `hbom/*.spdx.json` | Each example HBOM rendered as CycloneDX 1.6 and SPDX 3.1-RC1 (`hslsa render`) |
 | [`hbom/formats/`](hbom/formats/README.md) | The official CycloneDX 1.6 and SPDX 3.1-RC1 JSON Schemas every rendering is checked against |
 | [`tools/hslsa/`](tools/hslsa) | Reference tooling in Go (`go run ./tools/hslsa/cmd/hslsa`): signs step records, builds the HBOM and renders it as CycloneDX and SPDX, and verifies the chain into SLSA VSAs |
+| [`adapters/eda-tcl/`](adapters/eda-tcl/README.md) | The EDA Tcl adapter: a hook for a tool's Tcl shell that marks each design step, signed per step by `hslsa eda run` outside the tool; runs in Yosys and OpenROAD, with notes for commercial tools |
 | [`docs/e2e-test.md`](docs/e2e-test.md) | The end-to-end test in GitHub Actions: a real RTL flow, a signed lot, and verification with slsa-verifier |
 | [`docs/caliptra-e2e.md`](docs/caliptra-e2e.md) | The Caliptra example: from pinned RTL, ROM and firmware to units that boot and prove their identity, checked back to the RTL |
 | [`docs/board-example.md`](docs/board-example.md) | The board-level example: signed shipments, A1 board assembly and the board HBOM, checked in the same workflow |

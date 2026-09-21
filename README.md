@@ -26,6 +26,7 @@ Status: working draft, version 0.1.
 | [`docs/e2e-test.md`](docs/e2e-test.md) | The end-to-end test in GitHub Actions: a real RTL flow, a signed lot, and verification with slsa-verifier |
 | [`docs/caliptra-e2e.md`](docs/caliptra-e2e.md) | The Caliptra example: from pinned RTL, ROM and firmware to units that boot and prove their identity, checked back to the RTL |
 | [`docs/board-example.md`](docs/board-example.md) | The board-level example: signed shipments, A1 board assembly and the board HBOM, checked in the same workflow |
+| [`docs/fpga-board-example.md`](docs/fpga-board-example.md) | The FPGA board example: an iCE40 design built with open tools, on a board whose attested root of trust verifies the flash before the FPGA runs, checked to Firmware L2 for the board |
 | [`docs/selective-disclosure.md`](docs/selective-disclosure.md) | Withheld fields and verifier escrow: an auditor checks the full records, the buyer sees only the auditor's VSAs, and a measurement of what each view reveals |
 | [`docs/roadmap.md`](docs/roadmap.md) | The roadmap from working draft to real-world use: phases, exit criteria and the decisions still open |
 

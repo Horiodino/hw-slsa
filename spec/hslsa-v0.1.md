@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 8 (2026-09-20). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 9 (2026-09-21). See the [changelog](#changelog).
 
 ## Overview
 
@@ -83,7 +83,7 @@ Four rules apply across tracks:
 3. **One check for the buyer.** At every level the buyer collects the attestations, confirms each subject matches the identity the device proves at boot, and compares the stated levels against policy. From Design L3, the tapeout check also requires the equivalence record.
 4. **Signing for a supplier, at L1 only.** When a supplier signs no record for a step, the party that received from it MAY sign one on its behalf as a [proxy](#proxy-signed-record): a full record built from the supplier's own data, or, when the supplier gives no data, an [evidence record](#evidence-record) that names a certificate, audit report or paper record by digest. A track with any record signed this way is at L1, and a buyer's policy MAY refuse such records altogether.
 
-**Firmware L2 through a board-level root of trust.** A part without a secure-boot ROM MAY reach Firmware L2 on a board whose root of trust verifies the external flash, but only when that root of trust is itself attested (its own HBOM entry, Firmware provenance and provisioning record at L2 or higher) and it verifies each image before the SoC is released from reset. The claim is made for the board, not the bare part: the bare part stays at Firmware L1, and the board's verification summary states Firmware L2. The board HBOM lists the root of trust in `parts[]` with its own chain, which the board receipt check verifies like any other chip's.
+**Firmware L2 through a board-level root of trust.** A part without a secure-boot ROM MAY reach Firmware L2 on a board whose root of trust verifies the external flash, but only when that root of trust is itself attested (its own HBOM entry, Firmware provenance and provisioning record at L2 or higher) and it verifies each image before the SoC is released from reset. The claim is made for the board, not the bare part: the bare part stays at Firmware L1, and the board's verification summary states Firmware L2. The board HBOM lists the root of trust in `parts[]` with its own chain, which the board receipt check verifies like any other chip's, and marks it with `rootOfTrust`. [Where the chain is checked](#where-the-chain-is-checked) lists what a verifier runs for this claim, at board receipt and at boot.
 
 ### L4 defense profile
 
@@ -368,15 +368,16 @@ A `fw-provisioning` record is SLSA Provenance v1 with buildType `.../fw-provisio
 | Field | Holds |
 | --- | --- |
 | `station`, `site` | The programming station and the site it sits in |
-| `unit`, `lot` | `urn:hslsa:unit:<serial>` and the shipped lot it belongs to |
+| `unit`, `lot` | `urn:hslsa:unit:<serial>` and the shipped lot it belongs to; for a board, `urn:hslsa:board:<manufacturer>:<serial>` and the board lot |
 | `designRef` | The released design and its release attestation |
 | `images[]` | Each image written: name, role, storage, digest, readback digest, and whether its provenance was verified before writing |
 | `fuses` | Every fuse value burned, except secrets |
 | `secrets[]` | Each secret by field, key id and origin (`generated-on-die`, or the injecting HSM), never its value |
 | `identity` | For a part with a device identity: scheme, UEID, IDevID public key digest, the endorsed certificate by digest, and the endorsing CA |
+| `rootOfTrust` | For a board with a root of trust: its reference designator, the unit placed there, and that unit's provisioning record by digest; `identity` is then the root of trust's |
 | `checks[]` | At least `image-provenance-verified`, `image-readback` and `fuse-readback`; `lifecycle-production` where the part has a lifecycle state |
 
-`resolvedDependencies` lists each image's provenance and the images, and for a part with an identity the exported CSR and the endorsed certificate. The subject is the unit, named as in [Naming subjects](#naming-subjects). The [Caliptra example](../docs/caliptra-e2e.md) signs one per unit.
+`resolvedDependencies` lists each image's provenance and the images, and for a part with an identity the exported CSR and the endorsed certificate. The subject is the unit, named as in [Naming subjects](#naming-subjects). The [Caliptra example](../docs/caliptra-e2e.md) signs one per unit, and the [FPGA board example](../docs/fpga-board-example.md) one per root of trust unit and one per board.
 
 #### Firmware review
 
@@ -464,7 +465,8 @@ Each arrow is a digest link. Where a shipment between two manufacturing sites is
 | 6. Signoff | Design | Routed layout, SPEF, DRC and LVS decks | Timing, DRC, LVS reports | STA met, DRC clean, LVS match, waivers digest |
 | 6a. ROM merge (mask ROM only) | Design, for Firmware | ROM image (by its SLSA provenance digest), ROM compiler, empty ROM macro | Programmed ROM macro GDS, merged layout | `rom-readback`: bits extracted from layout match the image digest; optional `rom-matches-frozen` (see [Mask ROM](#mask-rom)) |
 | 7. GDS stream-out | Design | Routed layout, cell, IP and ROM macro GDS | Final GDSII/OASIS | GDS vs DEF XOR clean |
-| Release | Design | Run summary over steps 0 to 7 | Final GDS | Tapeout policy check (below) |
+| 7. Bitstream (FPGA, instead of stream-out) | Design | Routed design | Bitstream | `bitstream-matches-routed-design` (see [FPGA designs](#fpga-designs)) |
+| Release | Design | Run summary over steps 0 to 7 | Final GDS, or the bitstream for an FPGA | Tapeout policy check (below) |
 | Rebuild (L4) | Design | Release attestation, the same pinned inputs | Final GDS of the release | `gds-bit-exact`, `gds-equal-ignoring-timestamps` |
 | F1. Wafer fabrication | Wafer | GDS release, mask set record | Wafer lot | Mask data vs GDS XOR; inline parametrics |
 | T. Transfer | The shipping site's track (Wafer or Package/Test) | The shipping step's record, the lot it ships | The packing list | Packing list matches the lot |
@@ -486,6 +488,12 @@ A mask ROM is firmware by build and silicon by delivery, and nothing on the runn
 
 When a third party has published a digest for the ROM image (the Caliptra TAC's frozen-image list, for example), step 6a MAY also record `rom-matches-frozen`, which passes when the image built from source equals that published digest. It is an independent rebuild of the ROM image by the party that froze it, so it counts toward the Firmware L4 rebuild requirement for the ROM, but not toward Design L4, which is about the layout.
 
+### FPGA designs
+
+An FPGA design runs the Design track like a chip, with three differences. Step 7 is `bitstream`: the routed design is packed into the bitstream the part loads, and the release names the bitstream as its final artifact. Open FPGA tools often pack, place and route in one run, which is recorded as `routing`; the policy then does not require `floorplan` or `place-cts`. Signoff is the timing check of the routed design at the board's clock, on the FPGA vendor's timing model, since an FPGA design has no DRC or LVS decks. The `bitstream` record's gate `bitstream-matches-routed-design` unpacks the bitstream and requires the routed design back, apart from what the bitstream format does not store (comments, net names and unused RAM).
+
+A bitstream is also firmware: it sits in flash, and the FPGA runs whatever it finds there. A board HBOM lists it in `firmware[]` with role `configuration` and storage `external-flash`, and its `provenanceRef` points at the design release, which plays the part of its build provenance. An FPGA that does not authenticate its own bitstream against a key in its fuses stays at Firmware L1 on its own, like any part without a secure-boot ROM, and so does the soft CPU firmware it runs from the same flash. Both reach Firmware L2 only on a board whose [root of trust](#core-requirements) verifies them and holds the FPGA in reset until it has.
+
 ### Provisioning
 
 The programming station is the firmware's last builder. For every part it writes it MUST verify each image's provenance before writing, read back every image and fuse field and record the readback digest, name secrets only by key id and origin (`generated-on-die`, or the injecting HSM), record the IDevID public key digest and endorsing CA for DICE or Caliptra parts, and sign with its site's key. The record's shape is defined under [Firmware provisioning record](#firmware-provisioning-record). One record MAY cover a lot programmed in one pass for a part without a device identity; a part with one gets a record per unit, whose subject is that unit's IDevID public key digest, because the at-boot check starts from it.
@@ -494,7 +502,9 @@ The programming station is the firmware's last builder. For every part it writes
 | --- | --- | --- |
 | Wafer sort | Fab or test house | Identity seed (UDS), lifecycle state, trim and calibration fuses |
 | Final test | OSAT | Remaining fuses, on-die flash images, IDevID CSR export for endorsement |
-| Board assembly | EMS | External flash images, board-level keys, platform certificate inputs |
+| Board assembly | EMS | External flash images, board-level keys, the owner fuses of a board root of trust, platform certificate inputs |
+
+On a board with a root of trust, the EMS signs one record per board. It burns the board owner's fuses into the root of trust (the hash of the key that signs the board's boot manifest, the manifest's offset and the anti-rollback value), writes the flash, powers the board once, and records the root of trust unit it placed with that unit's IDevID certificate and its vendor's provisioning record. The record's subject is the board's URN with the root of trust's IDevID public key digest, so the board's identity is its root of trust's.
 
 ### Where the chain is checked
 
@@ -531,6 +541,22 @@ Whoever runs this check MAY sign a [receipt record](#receipt-record) for the uni
 6. The board lot is the set of boards that passed test, A1's yield accounts for the rest, every board in the lot is an A1 subject, and every received board is in the lot.
 
 The [board example](../docs/board-example.md) runs these checks and breaks each one in its tamper tests.
+
+**On a board with a root of trust**, for a Firmware L2 claim on the board, after the board receipt check:
+
+1. Exactly one `parts[]` entry carries `rootOfTrust`, the policy accepts its part number, and it has an `hbomRef`, so step 4 above ran its chain. It guards every part the policy says it must hold in reset, and its `images` are exactly the board's `firmware[]` entries in external flash.
+2. The root of trust reaches Firmware L2 itself: its firmware has provenance from an allowed build platform with an SBOM and a CoRIM holding exactly that image's reference value, the image is signed by its vendor's code signer, and its HBOM lists the image.
+3. Each image in the board's flash has its record: a bitstream is the design release of an FPGA design that passes the tapeout check, other firmware has provenance and an SBOM. The boot manifest is signed by the board owner's code signer, lists exactly those images, and is what the flash image holds at the offset its provenance states. The flash image's provenance consumes the release and each image, the board CoRIM holds the reference values the manifest implies, and each `firmware[]` entry names its image's digest and points at its record and the CoRIM.
+4. Every board in the board lot has a provisioning record signed by an allowed EMS station, with every gate passed, that wrote the checked flash image and burned the board owner's code signer as owner key. It names the root of trust unit A1 placed on that board, and its subject is that unit's IDevID key digest. That unit's own provisioning record is signed by its vendor's station, with every gate passed, the vendor's code signer in its key fuse, the image with provenance written, and an IDevID certificate endorsed by its vendor's identity CA.
+
+**At boot, on a board with a root of trust**, each board returns the root of trust's DICE alias certificate and a platform certificate the alias key signed:
+
+1. The alias certificate is signed by the IDevID key of the root of trust unit the board's provisioning record names, and both certificates carry that unit's UEID.
+2. The alias certificate's measurement of the root of trust's firmware matches the reference value in the root of trust's CoRIM.
+3. The platform certificate reports one TcbInfo per image the root of trust verified and released, each matching a reference value in the board CoRIM, and none missing.
+4. If the policy asks, the system then booted: the [FPGA board example](../docs/fpga-board-example.md) requires the SoC's boot banner.
+
+A verifier that passes these MAY sign a board VSA whose subject is the board's URN with the sha256 of its root of trust's IDevID certificate.
 
 **At boot**, on every unit with a device identity (required for a Firmware L3 claim, and available from Firmware L2):
 
@@ -569,8 +595,8 @@ The HBOM is the one document a buyer starts from: it lists what the product is m
 | `renderings[]` | CycloneDX and SPDX renderings of this HBOM (format `CycloneDX-1.6`, `SPDX-3.1-RC1`, or `SPDX-3.1` once final) | Each by digest |
 | `design` | IP blocks (kind, supplier, license, IEEE 1735 flag), RTL sources by commit, PDK, flow steps and tools, final layout | Each flow step's `design-flow` attestation via `provenanceRef` |
 | `manufacturing` | Foundry, process node, mask set, shuttle, wafer lots, OSAT and package, test stages and programs; for boards, the EMS and board lot in `boardAssembly` | F1 via `fab.attestationRef`, F3 via `assembly.attestationRef`, F2 and F4 results via `test[].resultsRef`, A1 via `boardAssembly.attestationRef` |
-| `firmware[]` | Each image's name, role, storage (mask-rom, otp, on-die-flash, external-flash) and digest | Its SBOM via `sbomRef`; for an image the device measures, the [firmware reference values](#firmware-reference-values) via `referenceValuesRef` |
-| `parts[]` | For boards: reference designators, manufacturer, MPN, date code, lot, distributor, authorized channel | The part's own HBOM via `hbomRef`; the shipment via `distributionRef` |
+| `firmware[]` | Each image's name, role, storage (mask-rom, otp, on-die-flash, external-flash) and digest | Its SBOM via `sbomRef`; for an image the device measures, the [firmware reference values](#firmware-reference-values) via `referenceValuesRef`; its build provenance, or the design release for a bitstream, via `provenanceRef` |
+| `parts[]` | For boards: reference designators, manufacturer, MPN, date code, lot, distributor, authorized channel; for the board's root of trust, `rootOfTrust` with the parts it holds in reset and the images it verifies | The part's own HBOM via `hbomRef`; the shipment via `distributionRef` |
 | `redactions[]` | JSON Pointers to withheld fields and their salted digests | Nothing |
 
 **Changes from the HBOM draft.** This spec makes these changes to the draft schema so it fits the rest of the chain:
@@ -583,10 +609,11 @@ The HBOM is the one document a buyer starts from: it lists what the product is m
 6. New `manufacturing.boardAssembly` block: `ems`, `boardLot`, and `attestationRef` to A1.
 7. New `parts[].distributionRef`: the signed distribution record for that part's lot.
 8. `renderings[].format` adds `SPDX-3.1-RC1`, and each rendering is derived from the HBOM as defined in [Renderings](#renderings).
+9. New `firmware[].provenanceRef` and `parts[].rootOfTrust`, and `flowStep.step` adds `bitstream`, for boards with a root of trust and for [FPGA designs](#fpga-designs).
 
 The JSON Schema and the worked examples are in this repository at [`hbom/hbom-predicate-v0.1.schema.json`](../hbom/hbom-predicate-v0.1.schema.json), [`hbom/picosoc-sky130.hbom.intoto.json`](../hbom/picosoc-sky130.hbom.intoto.json) and [`hbom/picosoc-devboard.hbom.intoto.json`](../hbom/picosoc-devboard.hbom.intoto.json), all current with these changes. [`hbom/picosoc-sky130.shipped-lot.txt`](../hbom/picosoc-sky130.shipped-lot.txt) and [`hbom/picosoc-devboard.board-lot.txt`](../hbom/picosoc-devboard.board-lot.txt) are their canonical unit and board lists, so both lot digests can be recomputed. Each example's CycloneDX and SPDX renderings sit next to it (`hbom/picosoc-sky130.cdx.json`, `hbom/picosoc-sky130.spdx.json`, `hbom/picosoc-devboard.cdx.json`, `hbom/picosoc-devboard.spdx.json`), listed in its `renderings[]`.
 
-**Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L2: the flow platform signs every step, the source freeze is an SSH-signed git tag with a source review by someone other than the author, and PicoRV32 arrives with IP provenance signed by a key standing in for its vendor. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1.
+**Worked example.** The PicoRV32-based PicoSoC on SkyWater SKY130, packaged in QFN-64, uses serial identities, so it can claim at most Package/Test L2. Its test verifies Design L2: the flow platform signs every step, the source freeze is an SSH-signed git tag with a source review by someone other than the author, and PicoRV32 arrives with IP provenance signed by a key standing in for its vendor. It stops at Firmware L1: both images live in external SPI flash and the silicon has no secure-boot ROM, so a provisioning record for it would carry empty `fuses`, `secrets` and `identity` fields, showing a buyer that nothing in the part anchors the firmware. Under the board-level root of trust rule, a board carrying it could reach Firmware L2; the example board has no root of trust, so it stays at Firmware L1. The [FPGA board example](../docs/fpga-board-example.md) runs the same SoC on an FPGA, on a board that has one.
 
 ### Renderings
 
@@ -819,18 +846,19 @@ HSLSA is written up as the semiconductor profile of [NIST IR 8536](https://doi.o
 
 ## Worked examples and reference implementation
 
-Four examples run in this repository's GitHub Actions and exercise the spec end to end. Each signs every record, checks the chain the way a buyer would, and hands the resulting verification summaries to the official slsa-verifier. Each also runs tamper tests that forge or break a link and require the check to fail for the stated reason.
+Five examples run in this repository's GitHub Actions and exercise the spec end to end. Each signs every record, checks the chain the way a buyer would, and hands the resulting verification summaries to the official slsa-verifier. Each also runs tamper tests that forge or break a link and require the check to fail for the stated reason.
 
 | Example | Exercises | Levels verified | Docs |
 | --- | --- | --- | --- |
 | PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM with its CycloneDX and SPDX renderings, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs; the same lot again with wafer sort covered by an evidence record and final test proxy-signed | Design L2, Wafer L2, Package/Test L2; with proxies, Wafer L1 and Package/Test L1 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md), [proxy-signing.md](../docs/proxy-signing.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]` and its renderings, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
+| FPGA board with a root of trust | PicoSoC for an iCE40UP5K built with Yosys, nextpnr and IceStorm (design steps 0 to 2, `routing`, `signoff`, `bitstream`, release), SoC firmware provenance and SBOM, a signed boot manifest and board CoRIM; a simulated root of trust with its own chip chain, firmware provenance, CoRIM and DICE identities; per-board provisioning, the board receipt, root of trust and at-boot checks, board VSAs | Design L2, Assembly L2, Firmware L2 for the board (the bare FPGA stays at Firmware L1) | [fpga-board-example.md](../docs/fpga-board-example.md) |
 | Caliptra | ROM merge with `rom-readback` and `rom-matches-frozen`, firmware provenance and SBOMs, firmware reference values as a signed CoRIM, the firmware review check on simulated S.A.F.E. reports, per-unit `fw-provisioning`, the at-boot check on emulated units, unit VSAs, and on demand the IDevID key and a boot to runtime on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](../docs/caliptra-e2e.md) |
 
 The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, renders them as CycloneDX 1.6 and SPDX 3.1-RC1 (`hslsa render`, which also checks a rendering against a signed HBOM), runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also accepts proxy-signed and evidence records under a policy that allows them, withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
-What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key and the firmware review provider are simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
+What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key and the firmware review provider are simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. The FPGA bitstream is built for a real part, but no FPGA loads it: its root of trust is a model, and its SoC boots in RTL simulation of the frozen design. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
 
 ## Decisions and open questions
 
@@ -858,7 +886,7 @@ The source drafts were not edited; this spec settles each difference as follows.
 - [ ] Can analog and mixed-signal flows, mostly manual layout, reach Design L3?
 - [ ] What sampling rate makes an L4 claim meaningful for a given lot size, and who accredits the inspection labs?
 - [ ] Should the HBOM carry claimed levels per track, so one document states them, or should levels live only in verification summaries?
-- [ ] Should HBOM `firmware[]` entries also carry a provenance reference? Revision 5 answered the rest of this question: reference values are published as a signed CoRIM, and `referenceValuesRef` points at it.
+- [x] Should HBOM `firmware[]` entries also carry a provenance reference? Yes, since revision 9: `provenanceRef`, which for a bitstream points at the design release. Revision 5 answered the rest of this question: reference values are published as a signed CoRIM, and `referenceValuesRef` points at it.
 - [ ] Who endorses IDevID certificates when the OSAT, not the chip vendor, holds the provisioning station?
 - [ ] Should the foundry verify provenance at GDS intake, or only the design house before release? (Wafer L3 already asks the fab to verify the release.)
 - [x] Are salted digests enough to keep manufacturing data from the next party, or is verifier escrow needed? Answered in [Selective disclosure](#selective-disclosure): withheld fields hide values, but at Package/Test L2 the lot digests give away lot sizes and yield, and names and timing stay visible; escrow hides all of them.
@@ -869,7 +897,7 @@ The source drafts were not edited; this spec settles each difference as follows.
 - [ ] Track SPDX 3.1 from release candidate to final, then move the SPDX rendering to the final schema and format `SPDX-3.1`; track CoRIM from Internet-Draft to RFC.
 - [ ] Should Design L4 accept `gds-equal-ignoring-timestamps` by default, or only `gds-bit-exact`? This spec requires bit-exact unless the policy says otherwise.
 - [ ] How should a verifier treat post-quantum identity chains (Caliptra 2.x also issues ML-DSA-87 certificates) until common X.509 libraries can verify them?
-- [ ] What identity should a board carry once it has one: a platform certificate, a board-level DICE identity, or the identity of its root of trust?
+- [ ] What identity should a board carry once it has one: a platform certificate, a board-level DICE identity, or the identity of its root of trust? Revision 9 uses its root of trust's identity when it has one; the platform certificate of Assembly L3 is still open.
 - [ ] How should events after the first buyer be recorded: a firmware update in the field, board rework, a return? NIST IR 8536 also leaves these to future work. The roadmap takes it up once a real board boots in phase 2.
 
 ### Next steps
@@ -888,6 +916,13 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 9 (2026-09-21)
+
+- **FPGA designs.** New [FPGA designs](#fpga-designs) section and design step name `bitstream`, in the spec's table, the HBOM schema and the reference tool. A bitstream is released like a GDS and listed in the board HBOM as `configuration` firmware.
+- **Board root of trust, checked.** [Where the chain is checked](#where-the-chain-is-checked) now lists what a verifier runs for a Firmware L2 claim on a board through its root of trust, at board receipt and at boot. The HBOM adds `parts[].rootOfTrust` and `firmware[].provenanceRef`, which answers the open question about provenance references. The EMS signs one provisioning record per board, whose subject carries the root of trust's IDevID key digest, so the board's identity is its root of trust's.
+- **FPGA board example.** An [example](../docs/fpga-board-example.md) builds PicoSoC for a Lattice iCE40UP5K with open tools, signs every step, the SoC firmware and a flash image with a signed boot manifest, and puts it on a board with a simulated root of trust that has its own chip chain. It verifies Design L2, Assembly L2 and Firmware L2 for the board. Its tamper tests include the root of trust holding the FPGA in reset for a changed bitstream, a manifest from another signer, swapped root of trust firmware and an image below the anti-rollback fuse.
+- **Reference tool.** The signed source tag check walks subdirectories of the tagged tree, so a design whose sources sit in folders can reach Design L2.
 
 ### Revision 8 (2026-09-20)
 

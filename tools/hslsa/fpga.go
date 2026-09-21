@@ -638,7 +638,7 @@ func FPGABitstream(bundle, lockPath, key string) error {
 		[]Obj{ascRD, envRD(bundle, AttName("routing"))}, tools,
 		[]Obj{
 			check("bitstream-written", pack.Code == 0, fmt.Sprintf("icepack exit %d", pack.Code)),
-			check("bitstream-matches-routed-design", same, "iceunpack gives back the routed design, comments aside"),
+			check("bitstream-matches-routed-design", same, "iceunpack gives back the routed design, apart from comments, net names and unused RAM"),
 		}, nil)
 }
 

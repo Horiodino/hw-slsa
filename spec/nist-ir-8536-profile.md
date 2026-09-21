@@ -96,6 +96,7 @@ Most HSLSA steps are run by a different company from the step before them, so th
 | 6. Signoff | Make | Internal | |
 | 6a. ROM merge (mask ROM only) | Assemble | Internal | A firmware image is combined into the layout |
 | 7. GDS stream-out | Make | Internal | |
+| 7. Bitstream (FPGA, instead of stream-out) | Make | Internal | For an FPGA design; the released bitstream is the design as a digital object |
 | Release | Make | Shared | The design as a digital object; every manufacturing step links to it |
 | Rebuild (L4) | None | Supplemental evidence | An independent check of the release, not a transformation |
 | F1. Wafer fabrication | Make | Shared | Includes mask making, which HSLSA does not record separately |

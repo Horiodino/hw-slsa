@@ -1,0 +1,15 @@
+{
+  "design": {
+    "requiredSteps": ["source-freeze", "simulation", "synthesis"],
+    "consumes": {"simulation": ["source-freeze"], "synthesis": ["source-freeze"]},
+    "finalArtifactFrom": "synthesis",
+    "allowedTools": ["iverilog", "vvp", "yosys"],
+    "source": {"tagSigner": "source-owner", "reviewer": "source-reviewer"},
+    "thirdPartyIP": [{"name": "picorv32", "signer": "ip-vendor", "files": ["picorv32.v"]}]
+  },
+  "manufacturing": {"requireTransfers": true, "acceptOnBehalf": ["proxy"], "requireExports": true},
+  "claims": {
+    "design": ["HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_2"],
+    "lot": ["HSLSA_WAFER_LEVEL_1", "HSLSA_PACKAGE_TEST_LEVEL_1", "HSLSA_DESIGN_LEVEL_2"]
+  }
+}

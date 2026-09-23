@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 10 (2026-09-21). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 11 (2026-09-23). See the [changelog](#changelog).
 
 ## Overview
 
@@ -372,6 +372,17 @@ An evidence record can stand in only for a step whose subjects no later record b
 
 A step covered by an evidence record holds its track at L1, whatever the other steps reach, because the record shows only that its signer held the documents. A verifier accepts it under the same rules as a proxy-signed record, with the policy accepting evidence records, and checks that it covers the step it stands in for and that its subjects are exactly its documents.
 
+#### Record made from supplier exports
+
+A site's MES and testers already export what a manufacturing record says: lot histories, unit genealogies, STDF test results and SEMI E142 wafer maps. A record MAY be made from those exports by an adapter and carry them, so a verifier can read them again. It is the step's ordinary record, signed by the site or by its proxy, with two additions:
+
+| Field | Holds |
+| --- | --- |
+| `resolvedDependencies` | Each export the record was made from, by file digest |
+| `hwMfg.adapter` | `id`, the adapter that read the exports; `sources[]`, each export's `name` and `format`; and `settings`, anything the adapter needs to read them the same way again, such as which MES operation stands for which check |
+
+A verifier that knows the adapter reads each export from the bundle, checks its digest against `resolvedDependencies`, and checks that the record's lot, parameters, checks and data files (wafer maps, genealogy, per-unit results) are exactly what the exports say. A record whose adapter the verifier does not run is checked as an ordinary record. A policy MAY set `manufacturing.requireExports`, and then every chip manufacturing step must carry exports that the verifier reads again and that pass this check. The exports carry every value the supplier recorded, so a record that carries them cannot also withhold fields. Agreement with the exports does not raise a track's level: it shows that the record says what the supplier's own files say, not that they are true. The reference tool's MES and STDF adapter is described in [mes-stdf-adapter.md](../docs/mes-stdf-adapter.md).
+
 #### Firmware provisioning record
 
 A `fw-provisioning` record is SLSA Provenance v1 with buildType `.../fw-provisioning/step/provision@v1` and one extra block, `hwProvision`:
@@ -534,7 +545,7 @@ On a board with a root of trust, the EMS signs one record per board. It burns th
 **At lot receipt**, by the buyer, OEM or EMS:
 
 1. The HBOM's lot subject equals the F4 shipped lot digest, and every received unit is in it (at L3, each unit answers a challenge with a certificate whose digest is in the lot).
-2. F1 to F4 are all present, signed by allowed sites, and linked by digest; a record signed on a supplier's behalf is accepted only as a [proxy-signed record](#proxy-signed-record) or an [evidence record](#evidence-record) under a policy that accepts it, and holds its track at L1. Every [transfer](#transfers-between-manufacturing-sites) present is signed by the site that shipped, links the record it follows, ships exactly the lot it names between the sites that signed the steps on either side, and is linked by the next step; from Wafer L3 and Package/Test L3, or when the policy asks, every transfer between two companies is present.
+2. F1 to F4 are all present, signed by allowed sites, and linked by digest; a record signed on a supplier's behalf is accepted only as a [proxy-signed record](#proxy-signed-record) or an [evidence record](#evidence-record) under a policy that accepts it, and holds its track at L1. Every [transfer](#transfers-between-manufacturing-sites) present is signed by the site that shipped, links the record it follows, ships exactly the lot it names between the sites that signed the steps on either side, and is linked by the next step; from Wafer L3 and Package/Test L3, or when the policy asks, every transfer between two companies is present. A record that carries its supplier's exports [matches them](#record-made-from-supplier-exports), and when the policy asks, every record carries them.
 3. Every step's `designRef` names the same GDS, and its release attestation verifies at the buyer's minimum Design level.
 4. Genealogy is complete and yields reconcile from F2 to F4.
 5. Every required gate passed and every deviation or rework is signed.
@@ -861,7 +872,7 @@ Five examples run in this repository's GitHub Actions and exercise the spec end 
 
 | Example | Exercises | Levels verified | Docs |
 | --- | --- | --- | --- |
-| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM with its CycloneDX and SPDX renderings, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs; the same lot again with wafer sort covered by an evidence record and final test proxy-signed | Design L2, Wafer L2, Package/Test L2; with proxies, Wafer L1 and Package/Test L1 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md), [proxy-signing.md](../docs/proxy-signing.md) |
+| PicoRV32 on SKY130 | Signed source tag, source review and IP provenance, design steps 0 to 2, release, F1 to F4, chip HBOM with its CycloneDX and SPDX renderings, tapeout and lot receipt checks; the same lot with fields withheld, checked by an escrow auditor for a buyer who holds only VSAs; the same lot again with wafer sort covered by an evidence record and final test proxy-signed; the same lot made from sample MES, STDF and SEMI E142 exports, checked against them | Design L2, Wafer L2, Package/Test L2; with proxies, Wafer L1 and Package/Test L1 | [e2e-test.md](../docs/e2e-test.md), [selective-disclosure.md](../docs/selective-disclosure.md), [proxy-signing.md](../docs/proxy-signing.md), [mes-stdf-adapter.md](../docs/mes-stdf-adapter.md) |
 | Board with the PicoSoC | Distribution records, A1, board HBOM with `parts[]` and its renderings, board receipt check | Assembly L2 | [board-example.md](../docs/board-example.md) |
 | OpenLane 2 `spm` on SKY130 | Per-tool records for design steps 1 to 7, image, PDK tree and script overlay pins, release of a real GDS, a bit-exact `rebuild` record from a second builder under its own trust root, checked at tapeout | Design L4 rebuild evidence from the same operator, not an L4 claim | [openlane2-flow.md](../docs/openlane2-flow.md) |
 | FPGA board with a root of trust | PicoSoC for an iCE40UP5K built with Yosys, nextpnr and IceStorm (design steps 0 to 2, `routing`, `signoff`, `bitstream`, release), SoC firmware provenance and SBOM, a signed boot manifest and board CoRIM; a simulated root of trust with its own chip chain, firmware provenance, CoRIM and DICE identities; per-board provisioning, the board receipt, root of trust and at-boot checks, board VSAs | Design L2, Assembly L2, Firmware L2 for the board (the bare FPGA stays at Firmware L1) | [fpga-board-example.md](../docs/fpga-board-example.md) |
@@ -869,7 +880,7 @@ Five examples run in this repository's GitHub Actions and exercise the spec end 
 
 The [EDA Tcl adapter](../adapters/eda-tcl/README.md) runs inside two of them. In the PicoRV32 workflow, a Yosys Tcl script lints and synthesizes PicoRV32 from the frozen source with the step hook, and the platform signs each step as it ends. In the OpenLane 2 workflow, an OpenROAD Tcl script runs signoff STA on the released `spm` layout, its inputs linked to OpenLane's own step records, and the buyer's job checks that record too. Tamper tests cover unlinked inputs, failed and unfinished steps, a changed hook and changed outputs.
 
-The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, renders them as CycloneDX 1.6 and SPDX 3.1-RC1 (`hslsa render`, which also checks a rendering against a signed HBOM), runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also accepts proxy-signed and evidence records under a policy that allows them, withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
+The reference tool is written in Go, in [`tools/hslsa/`](../tools/hslsa), and runs as `go run ./tools/hslsa/cmd/hslsa`. It signs step records, builds and validates HBOMs against the schema, renders them as CycloneDX 1.6 and SPDX 3.1-RC1 (`hslsa render`, which also checks a rendering against a signed HBOM), runs the tapeout, lot receipt, board receipt and at-boot checks, signs and appraises firmware reference values as CoRIM, checks S.A.F.E. reports in both forms, and signs VSAs. It also turns MES, STDF and SEMI E142 exports into manufacturing records and checks records against the exports they carry, accepts proxy-signed and evidence records under a policy that allows them, withholds fields and restores them from disclosures, runs the escrow auditor's and buyer's checks, and measures what a bundle's records and VSAs reveal. It uses the in-toto attestation library to validate every statement and parses every step predicate as SLSA Provenance v1. Where this spec and the tool disagree, the disagreement is a bug to fix in one of them.
 
 What the examples do not show yet: no example reaches Design L3 or above, the IP vendor's key and the firmware review provider are simulated, and the OpenLane 2 rebuild comes from a second builder under the same GitHub account, not an independent operator. Nothing runs on silicon: fab, sort, package and test data are simulated. The FPGA bitstream is built for a real part, but no FPGA loads it: its root of trust is a model, and its SoC boots in RTL simulation of the frozen design. Caliptra units boot on its emulator in every run; a boot on the Verilated RTL takes hours (about 36 million cycles), so it runs on demand on a self-hosted runner, where one unit has booted to runtime and passed the same checks.
 
@@ -929,6 +940,11 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 11 (2026-09-23)
+
+- **Records made from supplier exports.** A manufacturing record may carry the MES and tester exports it was made from, by digest, and name them in `hwMfg.adapter` ([Record made from supplier exports](#record-made-from-supplier-exports)). The lot receipt check reads them again and requires the record to match, and a policy's `manufacturing.requireExports` requires every chip step to carry them. The level a track reaches does not change.
+- **MES and STDF adapter.** The reference tool's `adapt` command reads MES lot histories and a unit genealogy, STDF V4 results from wafer sort and final test, and SEMI E142 wafer maps, and writes the scenario `mfg` signs F1 to F4 from. The [PicoRV32 example](../docs/mes-stdf-adapter.md) makes its lot from sample exports and gets the same 37 units and lot digest, then again with final test proxy-signed from the test house's STDF file.
 
 ### Revision 10 (2026-09-21)
 

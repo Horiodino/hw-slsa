@@ -228,6 +228,7 @@ type LotResult struct {
 	Inputs      []Obj    // the manufacturing envelopes and the HBOM
 	NotRecorded []string // optional records the bundle does not have
 	OnBehalf    []string // records signed on a supplier's behalf, which hold their track at L1
+	Exports     []string // records checked against the supplier exports they carry
 }
 
 // LotCheck verifies F1 to F4, any transfers between them (all of them when
@@ -305,6 +306,11 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 		}
 		stmts[step] = stmt
 		prev = envRD(bundle, MfgAtt[step])
+	}
+
+	exports, err := exportsCheck(bundle, policy, stmts)
+	if err != nil {
+		return nil, err
 	}
 
 	// Genealogy: every packaged unit came from a passing die of this wafer lot,
@@ -447,7 +453,7 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	}
 	inputs = append(inputs, transfers...)
 	inputs = append(inputs, envRD(bundle, "hbom.intoto.json"))
-	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded, OnBehalf: onBehalf}, nil
+	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded, OnBehalf: onBehalf, Exports: exports}, nil
 }
 
 // signVSA signs a SLSA Verification Summary Attestation for one subject.
@@ -513,6 +519,12 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 	if len(lot.OnBehalf) > 0 {
 		fmt.Println("signed on a supplier's behalf, so their tracks are held at L1:")
 		for _, line := range lot.OnBehalf {
+			fmt.Printf("  %s\n", line)
+		}
+	}
+	if len(lot.Exports) > 0 {
+		fmt.Println("read again from the supplier exports the records carry:")
+		for _, line := range lot.Exports {
 			fmt.Printf("  %s\n", line)
 		}
 	}

@@ -4,6 +4,7 @@
 #   e2e/run.sh produce   run the design flow and the simulated lot, sign every record
 #   e2e/run.sh verify    check the chain, emit VSAs, verify them with slsa-verifier
 #   e2e/run.sh proxy     after produce: the same lot with two suppliers that sign nothing
+#   e2e/run.sh adapt     after produce: the same lot made from the suppliers' MES and STDF exports
 #   e2e/run.sh hsm       after produce: the release and the lot again, signed with keys in an HSM
 #
 # Nothing here uploads to a transparency log: every signature is a DSSE
@@ -127,6 +128,37 @@ proxy() {
   echo "ok: the L2 policy refuses the proxy-signed lot"
 }
 
+# The lot again, made from what each site's MES and testers export
+# (docs/mes-stdf-adapter.md): lot histories, a unit genealogy, STDF V4 test
+# results and SEMI E142 wafer maps. The verifier reads the exports again from
+# the bundle. Then the test house signs nothing and the product owner
+# proxy-signs final test from its STDF file. Runs after produce, in the same job.
+adapt() {
+  local ex=$E2E/supplier-exports ab=$OUT/adapted
+  for variant in adapter adapter-proxy; do
+    local policy=$ex/policy.json
+    [[ $variant == adapter-proxy ]] && policy=$ex/policy-proxy.json
+    echo "== $variant"
+    rm -rf "$ab" && cp -r "$BUNDLE" "$ab"
+    cp "$policy" "$ab/policy.json"
+    hslsa adapt --config "$ex/$variant.json" --out "$ab/scenario.json"
+    hslsa mfg  --bundle "$ab" --scenario "$ab/scenario.json" --keys "$KEYS"
+    hslsa hbom --bundle "$ab" --lock "$E2E/inputs.lock.json" --scenario "$ab/scenario.json" --key "$KEYS/product-owner.key.pem"
+    hslsa verify --bundle "$ab" --trust-root "$ab/trust-root.json" --policy "$ab/policy.json" --units "$E2E/received-units.txt"
+    if ! cmp -s "$ab/artifacts/shipped-lot.txt" "$BUNDLE/artifacts/shipped-lot.txt"; then
+      echo "FAIL: the lot made from the exports is not the scenario's lot" >&2
+      exit 1
+    fi
+    echo "ok: the exports make the same shipped lot as the scenario"
+  done
+  # The main bundle's records carry no exports, so a policy that requires them refuses it.
+  if hslsa verify --bundle "$BUNDLE" --trust-root "$BUNDLE/trust-root.json" --policy "$ex/policy.json" >/dev/null 2>&1; then
+    echo "FAIL: a policy that requires exports accepted records without them" >&2
+    exit 1
+  fi
+  echo "ok: a policy that requires exports refuses records without them"
+}
+
 # The release and the lot again, with the tapeout authority's and every site's
 # key in an HSM (docs/hsm-signing.md). Each <role>.key.pem is replaced by a
 # <role>.pkcs11 file naming the key on the token, and nothing else changes: the
@@ -177,7 +209,8 @@ case "${1:-}" in
   produce) produce ;;
   verify) verify ;;
   proxy) proxy ;;
+  adapt) adapt ;;
   hsm) hsm ;;
-  all) produce; verify; proxy; hsm ;;
-  *) echo "usage: $0 produce|verify|proxy|hsm|all" >&2; exit 2 ;;
+  all) produce; verify; proxy; adapt; hsm ;;
+  *) echo "usage: $0 produce|verify|proxy|adapt|hsm|all" >&2; exit 2 ;;
 esac

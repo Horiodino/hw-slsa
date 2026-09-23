@@ -193,6 +193,10 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 	if err != nil {
 		return err
 	}
+	scenarioDir := filepath.Dir(scenarioPath)
+	if O(sc, "adapter") != nil && w != nil && (len(w.Fields) > 0 || len(w.SaltFiles) > 0) {
+		return fmt.Errorf("a lot made from supplier exports cannot withhold fields yet: the exports it carries hold every value")
+	}
 	releasePath := filepath.Join(bundle, "att", "design-release.intoto.json")
 	release, err := DecodeEnvelope(releasePath)
 	if err != nil {
@@ -223,11 +227,14 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 		return err
 	}
 	waferLot := rd(fmt.Sprintf("urn:hslsa:wafer-lot:%s:%s", S(fab, "id"), S(lot, "lotId")), waferDigest)
+	f1HW := Obj{"site": O(fab, "site"), "designRef": designRef, "checks": stepChecks(fab, "mask-vs-gds-xor", "inline-parametrics")}
+	f1Deps, err := attachExports(bundle, scenarioDir, sc, "wafer-fab", []Obj{releaseRD}, f1HW)
+	if err != nil {
+		return err
+	}
 	f1, err := mfgRecord(bundle, "wafer-fab", []Obj{waferLot},
 		Obj{"lotId": S(lot, "lotId"), "maskSetId": S(fab, "maskSetId"), "processNode": S(fab, "processNode")},
-		[]Obj{releaseRD},
-		Obj{"site": O(fab, "site"), "designRef": designRef, "checks": passed("mask-vs-gds-xor", "inline-parametrics")},
-		keys, w, by["wafer-fab"])
+		f1Deps, f1HW, keys, w, by["wafer-fab"])
 	if err != nil {
 		return err
 	}
@@ -239,33 +246,14 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 	}
 
 	// F2: wafer sort, one map entry per die
-	failedDies := map[string]bool{}
-	for _, d := range A(sort, "failedDies") {
-		t, _ := d.([]any)
-		if len(t) == 3 {
-			failedDies[dieKey(t[0], t[1], t[2])] = true
-		}
+	dies, err := sortDies(sort, wafers)
+	if err != nil {
+		return err
 	}
-	grid := A(sort, "grid")
-	if len(grid) != 2 {
-		return fmt.Errorf("scenario sort.grid must be [columns, rows]")
-	}
-	gx, _ := Int(grid[0])
-	gy, _ := Int(grid[1])
-	var dies, good []Obj
-	for _, w := range wafers {
-		for y := int64(0); y < gy; y++ {
-			for x := int64(0); x < gx; x++ {
-				bin := "pass"
-				if failedDies[dieKey(w, x, y)] {
-					bin = "fail"
-				}
-				d := Obj{"wafer": w, "x": x, "y": y, "bin": bin}
-				dies = append(dies, d)
-				if bin == "pass" {
-					good = append(good, d)
-				}
-			}
+	var good []Obj
+	for _, d := range dies {
+		if d["bin"] == "pass" {
+			good = append(good, d)
 		}
 	}
 	var f2, mapsRD Obj
@@ -294,16 +282,19 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 		if mapsRD, err = fileRD(filepath.Join(art, "wafer-maps.json"), ""); err != nil {
 			return err
 		}
+		f2HW := Obj{
+			"site":      O(sort, "site"),
+			"designRef": designRef,
+			"yield":     Obj{"in": len(dies), "passed": len(good), "failed": len(dies) - len(good)},
+			"checks":    passed("probe"),
+		}
+		f2Deps, err := attachExports(bundle, scenarioDir, sc, "wafer-sort", []Obj{t1, waferLot}, f2HW)
+		if err != nil {
+			return err
+		}
 		f2, err = mfgRecord(bundle, "wafer-sort", []Obj{mapsRD},
 			Obj{"lotId": S(lot, "lotId"), "probeProgram": get(sort, "program")},
-			[]Obj{t1, waferLot},
-			Obj{
-				"site":      O(sort, "site"),
-				"designRef": designRef,
-				"yield":     Obj{"in": len(dies), "passed": len(good), "failed": len(dies) - len(good)},
-				"checks":    passed("probe"),
-			},
-			keys, w, by["wafer-sort"])
+			f2Deps, f2HW, keys, w, by["wafer-sort"])
 		if err != nil {
 			return err
 		}
@@ -316,16 +307,9 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 	}
 
 	// F3: packaging, with die-to-unit genealogy
-	units, _ := Int(pkg, "units")
-	genealogy := Obj{}
-	var packagedUnits []string
-	for i, d := range good {
-		if int64(i) >= units {
-			break
-		}
-		serial := fmt.Sprintf("%s%05d", S(pkg, "serialPrefix"), i+1)
-		genealogy[serial] = Obj{"waferLot": S(waferLot, "name"), "wafer": d["wafer"], "x": d["x"], "y": d["y"]}
-		packagedUnits = append(packagedUnits, serial)
+	genealogy, packagedUnits, err := packageDies(pkg, good, S(waferLot, "name"))
+	if err != nil {
+		return err
 	}
 	if err := writeData(filepath.Join(art, "genealogy.json"), Obj{"units": genealogy}, w); err != nil {
 		return err
@@ -346,15 +330,17 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 	if mapsRD != nil {
 		f3Deps = append(f3Deps, mapsRD)
 	}
+	f3HW := Obj{
+		"site":      O(pkg, "site"),
+		"designRef": designRef,
+		"checks":    stepChecks(pkg, "die-attach", "wire-bond", "x-ray-sample", "marking"),
+	}
+	if f3Deps, err = attachExports(bundle, scenarioDir, sc, "packaging", f3Deps, f3HW); err != nil {
+		return err
+	}
 	f3, err := mfgRecord(bundle, "packaging", []Obj{packaged, genRD},
 		Obj{"lotId": S(pkg, "assemblyLot"), "packageType": S(pkg, "packageType")},
-		f3Deps,
-		Obj{
-			"site":      O(pkg, "site"),
-			"designRef": designRef,
-			"checks":    passed("die-attach", "wire-bond", "x-ray-sample", "marking"),
-		},
-		keys, w, by["packaging"])
+		f3Deps, f3HW, keys, w, by["packaging"])
 	if err != nil {
 		return err
 	}
@@ -390,19 +376,114 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 	if err != nil {
 		return err
 	}
+	f4HW := Obj{
+		"site":      O(ft, "site"),
+		"designRef": designRef,
+		"yield":     Obj{"in": len(packagedUnits), "passed": len(shipped), "failed": anyStrings(sortedCopy(failedUnits))},
+		"checks":    passed("final-test-per-unit", "yield-within-limits"),
+	}
+	f4Deps, err := attachExports(bundle, scenarioDir, sc, "final-test", []Obj{t3, packaged}, f4HW)
+	if err != nil {
+		return err
+	}
 	_, err = mfgRecord(bundle, "final-test", []Obj{shippedLot, resultsRD},
 		Obj{"lotId": S(ft, "lotId"), "testProgram": get(ft, "program")},
-		[]Obj{t3, packaged},
-		Obj{
-			"site":      O(ft, "site"),
-			"designRef": designRef,
-			"yield":     Obj{"in": len(packagedUnits), "passed": len(shipped), "failed": anyStrings(sortedCopy(failedUnits))},
-			"checks":    passed("final-test-per-unit", "yield-within-limits"),
-		},
-		keys, w, by["final-test"])
+		f4Deps, f4HW, keys, w, by["final-test"])
 	if err != nil {
 		return err
 	}
 	fmt.Printf("shipped lot %s: %d units, digest %s\n", S(shippedLot, "name"), len(shipped), shippedDigest)
 	return nil
+}
+
+// stepChecks is a step's checks as the scenario gives them (the adapter
+// reads them from the MES), or the named checks, passed.
+func stepChecks(block Obj, names ...string) []Obj {
+	if c := Objs(block, "checks"); len(c) > 0 {
+		return c
+	}
+	return passed(names...)
+}
+
+// sortDies is the wafer map: the scenario's sort.dies as the adapter read
+// them from the tester, or a sort.grid of dies on every wafer with
+// sort.failedDies failing.
+func sortDies(sort Obj, wafers []string) ([]Obj, error) {
+	var dies []Obj
+	if Has(sort, "dies") {
+		inLot := setOf(wafers)
+		for _, d := range Objs(sort, "dies") {
+			x, okX := Int(d, "x")
+			y, okY := Int(d, "y")
+			bin := S(d, "bin")
+			if !inLot[S(d, "wafer")] || !okX || !okY || (bin != "pass" && bin != "fail") {
+				return nil, fmt.Errorf("scenario sort.dies: each needs a wafer of the lot, integer x and y, and a bin of pass or fail")
+			}
+			dies = append(dies, Obj{"wafer": S(d, "wafer"), "x": x, "y": y, "bin": bin})
+		}
+		return dies, nil
+	}
+	failedDies := map[string]bool{}
+	for _, d := range A(sort, "failedDies") {
+		t, _ := d.([]any)
+		if len(t) == 3 {
+			failedDies[dieKey(t[0], t[1], t[2])] = true
+		}
+	}
+	grid := A(sort, "grid")
+	if len(grid) != 2 {
+		return nil, fmt.Errorf("scenario sort.grid must be [columns, rows]")
+	}
+	gx, _ := Int(grid[0])
+	gy, _ := Int(grid[1])
+	for _, w := range wafers {
+		for y := int64(0); y < gy; y++ {
+			for x := int64(0); x < gx; x++ {
+				bin := "pass"
+				if failedDies[dieKey(w, x, y)] {
+					bin = "fail"
+				}
+				dies = append(dies, Obj{"wafer": w, "x": x, "y": y, "bin": bin})
+			}
+		}
+	}
+	return dies, nil
+}
+
+// packageDies is the die-to-unit genealogy: the scenario's
+// packaging.genealogy as the adapter read it from the OSAT's MES, each unit
+// on a passing die no other unit holds, or packaging.units serials on the
+// first passing dies.
+func packageDies(pkg Obj, good []Obj, waferLot string) (Obj, []string, error) {
+	genealogy := Obj{}
+	var units []string
+	if g := O(pkg, "genealogy"); g != nil {
+		passing, used := map[string]bool{}, map[string]bool{}
+		for _, d := range good {
+			passing[dieKey(d["wafer"], d["x"], d["y"])] = true
+		}
+		for _, serial := range sortedKeys(g) {
+			e := O(g, serial)
+			x, _ := Int(e, "x")
+			y, _ := Int(e, "y")
+			k := dieKey(S(e, "wafer"), x, y)
+			if !passing[k] || used[k] {
+				return nil, nil, fmt.Errorf("scenario packaging.genealogy: %s is not on a passing die no other unit holds", serial)
+			}
+			used[k] = true
+			genealogy[serial] = Obj{"waferLot": waferLot, "wafer": S(e, "wafer"), "x": x, "y": y}
+			units = append(units, serial)
+		}
+		return genealogy, units, nil
+	}
+	n, _ := Int(pkg, "units")
+	for i, d := range good {
+		if int64(i) >= n {
+			break
+		}
+		serial := fmt.Sprintf("%s%05d", S(pkg, "serialPrefix"), i+1)
+		genealogy[serial] = Obj{"waferLot": waferLot, "wafer": d["wafer"], "x": d["x"], "y": d["y"]}
+		units = append(units, serial)
+	}
+	return genealogy, units, nil
 }

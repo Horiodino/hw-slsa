@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MapData xmlns="urn:semi-org:xsd.E142-1.V1005.SubstrateMap">
+  <Layouts>
+    <Layout LayoutId="WaferLayout" DefaultUnits="mm" TopLevel="true">
+      <Dimension X="1" Y="1"/>
+      <ChildLayouts>
+        <ChildLayout LayoutId="Devices"/>
+      </ChildLayouts>
+    </Layout>
+    <Layout LayoutId="Devices" DefaultUnits="mm">
+      <Dimension X="5" Y="5"/>
+    </Layout>
+  </Layouts>
+  <Substrates>
+    <Substrate SubstrateType="Wafer" SubstrateId="W02">
+      <LotId>LOT-EXAMPLE-A</LotId>
+    </Substrate>
+  </Substrates>
+  <SubstrateMaps>
+    <SubstrateMap SubstrateType="Wafer" SubstrateId="W02" Orientation="0" OriginLocation="UpperLeft" AxisDirection="DownRight" LayoutSpecifier="WaferLayout/Devices">
+      <Overlay MapName="SortGrade" MapVersion="1">
+        <BinCodeMap BinType="HexaDecimal" NullBin="FF">
+          <BinDefinitions>
+            <BinDefinition BinCode="01" BinCount="23" BinQuality="Pass" BinDescription="Good die"/>
+            <BinDefinition BinCode="07" BinCount="2" BinQuality="Fail" BinDescription="IDDQ over limit"/>
+          </BinDefinitions>
+          <BinCode>0101010101</BinCode>
+          <BinCode>0701010101</BinCode>
+          <BinCode>0101010101</BinCode>
+          <BinCode>0101010101</BinCode>
+          <BinCode>0101010701</BinCode>
+        </BinCodeMap>
+      </Overlay>
+    </SubstrateMap>
+  </SubstrateMaps>
+</MapData>

@@ -29,6 +29,7 @@ var commands = map[string]command{
 	"hsm":           {"generate site keys in an HSM over PKCS#11", hsm},
 	"trust-root":    {"build a trust root from <role>.pub.pem files", trustRoot},
 	"design":        {"run and attest one design flow step", design},
+	"adapt":         {"turn MES, STDF and SEMI E142 exports into a scenario for mfg and hbom", adapt},
 	"mfg":           {"emit signed F1 to F4 records for the scenario lot", mfg},
 	"hbom":          {"build, validate and sign the HBOM", hbomCmd},
 	"verify":        {"tapeout and lot receipt checks, then VSAs", verify},
@@ -317,6 +318,16 @@ func design(args []string) error {
 		return err
 	}
 	return hslsa.DesignRelease(*bundle, *lock, *key, *trust, *policy)
+}
+
+func adapt(args []string) error {
+	f := newFlags("adapt")
+	config := f.str("config", "adapter configuration (JSON): each site and the exports it hands over", true)
+	out := f.str("out", "the scenario to write", true)
+	if err := f.parse(args); err != nil {
+		return err
+	}
+	return hslsa.Adapt(*config, *out)
 }
 
 func mfg(args []string) error {

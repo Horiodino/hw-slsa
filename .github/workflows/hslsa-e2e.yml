@@ -75,6 +75,8 @@ jobs:
         run: e2e/run.sh produce
       - name: The same lot with suppliers that sign nothing, proxy-signed and checked
         run: e2e/run.sh proxy
+      - name: The same lot made from the suppliers' MES and STDF exports, and checked against them
+        run: e2e/run.sh adapt
       - name: HSM signing tests against SoftHSM2
         env:
           HSLSA_REQUIRE_PKCS11: "1"

@@ -1,0 +1,46 @@
+{
+  "product": {
+    "name": "picorv32-hslsa-e2e",
+    "level": "package",
+    "partNumber": "PSOC130-QFN64",
+    "revision": "A0",
+    "manufacturer": {"name": "Example Open Silicon Group", "country": "US"},
+    "deviceIdentity": {"scheme": "serial", "serial": "per unit; the shipped lot lists every serial"}
+  },
+  "fab": {
+    "id": "skywater",
+    "site": {"name": "Example Wafer Fab", "country": "US"},
+    "sources": [{"path": "fab-mes-lot-history.csv", "format": "mes-lot-history"}],
+    "checks": [
+      {"operation": "MASK GDS XOR", "check": "mask-vs-gds-xor"},
+      {"operation": "INLINE PARAMETRICS", "check": "inline-parametrics"}
+    ]
+  },
+  "sort": {
+    "site": {"name": "Example Sort House", "country": "US"},
+    "sources": [
+      {"path": "sort-LOT-EXAMPLE-A.stdf", "format": "stdf-v4"},
+      {"path": "sort-LOT-EXAMPLE-A-W01.xml", "format": "semi-e142"},
+      {"path": "sort-LOT-EXAMPLE-A-W02.xml", "format": "semi-e142"}
+    ]
+  },
+  "packaging": {
+    "site": {"name": "Example OSAT", "country": "US"},
+    "sources": [
+      {"path": "osat-mes-lot-history.csv", "format": "mes-lot-history"},
+      {"path": "osat-mes-genealogy.csv", "format": "mes-genealogy"}
+    ],
+    "checks": [
+      {"operation": "DIE ATTACH", "check": "die-attach"},
+      {"operation": "WIRE BOND", "check": "wire-bond"},
+      {"operation": "XRAY SAMPLE", "check": "x-ray-sample"},
+      {"operation": "MARK", "check": "marking"}
+    ]
+  },
+  "transfers": true,
+  "unsigned": {"final-test": {"cover": "proxy"}},
+  "finalTest": {
+    "site": {"name": "Example Test House", "country": "US"},
+    "sources": [{"path": "ft-ASM-EXAMPLE-17.stdf", "format": "stdf-v4"}]
+  }
+}

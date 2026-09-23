@@ -52,6 +52,13 @@ hslsa::step signoff -label sta {
 
 `source-freeze`, `release` and `rebuild` are refused: each has its own signer.
 
+The hook records its own digest and the flow script's, finding both with
+`[info script]`. Shells built on OpenSTA, OpenROAD among them, run their main
+script themselves and replace `source`, so `[info script]` is empty there:
+set `HSLSA_HOOK` to the hook's path (flows source it from there anyway) and
+`HSLSA_FLOW_SCRIPT` to the flow script's. Both take precedence when set. The
+signer refuses a step whose reported hook path is not the hook.
+
 Without `HSLSA_SPOOL` in the environment the hook does nothing, so the same
 script runs unchanged outside a signed run. The hook is plain Tcl 8.5 with no
 packages.

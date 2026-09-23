@@ -28,7 +28,14 @@
 
 namespace eval ::hslsa {
     variable version 0.1
-    variable hook [file normalize [info script]]
+    # Where this file is. Shells built on OpenSTA (OpenROAD, and others with
+    # their own `source`) do not set [info script], so HSLSA_HOOK, the path
+    # the flow sources the hook from, comes first.
+    variable hook [info script]
+    if {[info exists ::env(HSLSA_HOOK)] && $::env(HSLSA_HOOK) ne ""} {
+        set hook $::env(HSLSA_HOOK)
+    }
+    if {$hook ne ""} {set hook [file normalize $hook]}
     variable tool ""
     variable toolVersion ""
     variable ordinal 0
@@ -104,7 +111,12 @@ proc ::hslsa::step_begin {step args} {
     } else {
         incr ordinal
     }
+    # The flow script, by the same rule: HSLSA_FLOW_SCRIPT for shells that
+    # run their main script without setting [info script].
     set script [info script]
+    if {[info exists ::env(HSLSA_FLOW_SCRIPT)] && $::env(HSLSA_FLOW_SCRIPT) ne ""} {
+        set script $::env(HSLSA_FLOW_SCRIPT)
+    }
     if {$script ne ""} {set script [file normalize $script]}
     set current [dict create step $step label $label started [now] script $script \
         inputs {} outputs {} metrics {} checks {}]

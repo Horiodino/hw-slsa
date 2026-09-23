@@ -81,7 +81,7 @@ Target: turn an unchanged supplier export into signed records. This is what make
 
 The EDA wrapper needs a design-house partner with licenses. The rest can be built against sample data from phase 2.
 
-The EDA wrapper's open-tool half is done in spec revision 10: [`adapters/eda-tcl`](../adapters/eda-tcl/README.md) is a hook a flow's Tcl script sources to mark each step, and `hslsa eda run` signs one `design-flow` record per step from outside the tool, refusing a step whose inputs link to nothing. It runs in Yosys's Tcl shell for PicoRV32 and in OpenROAD's for signoff STA on the OpenLane 2 release, in CI. Its README says where the same hook goes in Innovus, Genus, ICC2, Fusion Compiler, PrimeTime and Calibre; trying it there, and adding the license-server `network` block from the platform, still waits on a partner with licenses.
+**EDA wrapper: done for open tools.** In spec revision 10, [`adapters/eda-tcl`](../adapters/eda-tcl/README.md) is a hook a flow's Tcl script sources to mark each step, and `hslsa eda run` signs one `design-flow` record per step from outside the tool, refusing a step whose inputs link to nothing. It runs in Yosys's Tcl shell for PicoRV32 and in OpenROAD's for signoff STA on the OpenLane 2 release, in CI. Its README says where the same hook goes in Innovus, Genus, ICC2, Fusion Compiler, PrimeTime and Calibre; trying it there, and adding the license-server `network` block from the platform, still waits on a partner with licenses.
 
 **Exit:** each adapter produces valid records from a real export without manual editing, and the reference verifier accepts them.
 

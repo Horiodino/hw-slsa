@@ -69,12 +69,18 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Install Yosys and Icarus Verilog
-        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends yosys iverilog
+      - name: Install Yosys, Icarus Verilog and SoftHSM2
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends yosys iverilog softhsm2
       - name: Run the flow and sign every step
         run: e2e/run.sh produce
       - name: The same lot with suppliers that sign nothing, proxy-signed and checked
         run: e2e/run.sh proxy
+      - name: HSM signing tests against SoftHSM2
+        env:
+          HSLSA_REQUIRE_PKCS11: "1"
+        run: go test -count=1 -run 'HSM|PKCS11' ./tools/hslsa/
+      - name: The release and the lot again, signed with site keys held in SoftHSM2, and checked
+        run: e2e/run.sh hsm
       - name: Lint and synthesis in Yosys's Tcl shell, signed from the EDA Tcl hook
         run: |
           e2e/eda-tcl/run.sh

@@ -84,7 +84,9 @@ verify() {
 # Signoff STA on OpenLane's final views, run by a Tcl script in OpenROAD with
 # the HSLSA hook. The hook writes one event per step; `hslsa eda run` signs it
 # on the host, with the same flow-platform key, so the key stays out of the
-# container here too.
+# container here too. OpenROAD runs its main script itself and replaces Tcl's
+# `source`, so neither script can find its own path: HSLSA_HOOK and
+# HSLSA_FLOW_SCRIPT name them.
 eda_sta() {
   local bundle=$OUT/bundle keys=$OUT/keys
   : "${PDK_ROOT:?set PDK_ROOT to the directory ciel enabled the PDK in}"
@@ -104,7 +106,7 @@ eda_sta() {
     docker run --rm --user "$(id -u):$(id -g)" -w /tmp \
       -v "$OUT/work:$OUT/work" -v "$PDK_ROOT:$PDK_ROOT:ro" \
       -v "$hook:$hook:ro" -v "$script:$script:ro" -v "$OUT/eda-spool:$OUT/eda-spool" \
-      -e HSLSA_SPOOL -e HSLSA_SYNC -e HSLSA_RUN_ID -e HSLSA_HOOK -e ODB -e SDC -e SPEF -e LIBS -e OUT="$OUT_STA" -e HOME=/tmp \
+      -e HSLSA_SPOOL -e HSLSA_SYNC -e HSLSA_RUN_ID -e HSLSA_HOOK -e HSLSA_FLOW_SCRIPT="$script" -e ODB -e SDC -e SPEF -e LIBS -e OUT="$OUT_STA" -e HOME=/tmp \
       "$(jq -r .openlane.image "$LOCK")" openroad -exit -no_init "$script"
   # The report travels with the bundle's copy of the run directory.
   rm -rf "$bundle/run/eda-sta" && cp -a "$OUT_STA" "$bundle/run/eda-sta"

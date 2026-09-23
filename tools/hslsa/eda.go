@@ -359,11 +359,18 @@ func (r *edaRun) sign(ordinal int, path string) (string, error) {
 	}
 
 	deps := append([]Obj{}, r.common...)
+	if S(ev, "hook") == "" {
+		return "", fmt.Errorf("the hook did not report its own path; set HSLSA_HOOK to the file the flow sources")
+	}
 	hook := filepath.Clean(S(ev, "hook"))
-	hd, err := fileRD(hook, EDAHook)
+	hookText, err := os.ReadFile(hook)
 	if err != nil {
 		return "", fmt.Errorf("the hook %s: %v", hook, err)
 	}
+	if !strings.Contains(string(hookText), "namespace eval ::hslsa") {
+		return "", fmt.Errorf("%s, which the hook reported as its own path, is not the hook; set HSLSA_HOOK to the file the flow sources", hook)
+	}
+	hd := rd(EDAHook, sha256Bytes(hookText))
 	hd["annotations"] = Obj{"kind": "adapter", "version": S(ev, "hookVersion")}
 	deps = append(deps, hd)
 	if script := S(ev, "script"); script != "" {

@@ -178,6 +178,59 @@ func TestEDAOneSequenceAcrossSessions(t *testing.T) {
 	}
 }
 
+// OpenROAD runs its main script itself and replaces `source`, so [info script]
+// is empty for the flow and the hook; HSLSA_HOOK and HSLSA_FLOW_SCRIPT name them.
+func TestEDAShellWithoutInfoScript(t *testing.T) {
+	if _, err := exec.LookPath("tclsh"); err != nil {
+		t.Skip("needs tclsh")
+	}
+	f := newEDAFixture(t)
+	// Like OpenSTA's: evaluate the file's text, leaving [info script] alone. Calls with
+	// options (Tcl's own library loading, such as clock's) go to the original.
+	override := "rename source tcl_source\n" +
+		"proc source {args} { if {[llength $args] != 1} { return [uplevel 1 tcl_source $args] }\n" +
+		"  set f [open [lindex $args 0]]; set body [read $f]; close $f; uplevel #0 $body }\n"
+	path := filepath.Join(f.dir, "flow.tcl")
+	must(t, os.WriteFile(path, []byte(override+edaFlow), 0o644))
+	t.Setenv("HSLSA_HOOK", edaHook)
+	t.Setenv("WORK", f.work)
+	t.Setenv("HSLSA_FLOW_SCRIPT", path)
+	must(t, EDARun(EDAOptions{
+		Bundle: f.bundle, Spool: filepath.Join(f.dir, "spool"), Key: filepath.Join(f.keys, "flow-platform.key.pem"),
+		Root: f.work, PDK: f.pdk, Cmd: []string{"sh", "-c", "tclsh < " + path},
+	}))
+	records, err := f.verify()
+	must(t, err)
+	for _, d := range Objs(records[0], "predicate", "buildDefinition", "resolvedDependencies") {
+		if S(d, "annotations", "role") == "flow-script" && S(d, "digest", "sha256") != S(ok(fileRD(path, "")), "digest", "sha256") {
+			t.Errorf("flow script recorded as %v", d)
+		}
+	}
+}
+
+// The hook must name itself, not whatever script happens to be running.
+func TestEDARefusesWrongHookPath(t *testing.T) {
+	if _, err := exec.LookPath("tclsh"); err != nil {
+		t.Skip("needs tclsh")
+	}
+	f := newEDAFixture(t)
+	path := filepath.Join(f.dir, "flow.tcl")
+	// Load the hook with a plain eval of its text, so [info script] is the flow itself.
+	flow := strings.Replace(edaFlow, "source $::env(HSLSA_HOOK)",
+		"set hf [open $::env(HOOK_FILE)]; eval [read $hf]; close $hf", 1)
+	must(t, os.WriteFile(path, []byte(flow), 0o644))
+	t.Setenv("HSLSA_HOOK", "")
+	t.Setenv("HOOK_FILE", edaHook)
+	t.Setenv("WORK", f.work)
+	err := EDARun(EDAOptions{
+		Bundle: f.bundle, Spool: filepath.Join(f.dir, "spool"), Key: filepath.Join(f.keys, "flow-platform.key.pem"),
+		Root: f.work, PDK: f.pdk, Cmd: []string{"tclsh", path},
+	})
+	if err == nil || !strings.Contains(err.Error(), "is not the hook") {
+		t.Fatalf("got %v, want the wrong hook path refused", err)
+	}
+}
+
 func TestEDAHookIsInertWithoutSigner(t *testing.T) {
 	f := newEDAFixture(t)
 	path := filepath.Join(f.dir, "flow.tcl")

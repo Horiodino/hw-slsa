@@ -3,7 +3,8 @@
 #
 #   openroad -exit -no_init signoff-sta.tcl
 #
-# Environment: HSLSA_HOOK (the hook), ODB, SDC, SPEF (views from OpenLane's
+# Environment: HSLSA_HOOK (the hook) and HSLSA_FLOW_SCRIPT (this file), which
+# OpenROAD's Tcl cannot find on its own; ODB, SDC, SPEF (views from OpenLane's
 # final state), LIBS (Liberty files from the PDK) and OUT (report directory).
 # openlane2/run.sh eda-sta sets them and runs this under `hslsa eda run`.
 
@@ -13,6 +14,14 @@ hslsa::configure -tool openroad -version $version
 
 set out $::env(OUT)
 file mkdir $out
+
+# Worst slack in ns, from OpenSTA's Tcl command or, failing that, its SWIG one.
+proc flow_worst_slack {min_max} {
+    if {[catch {sta::worst_slack -$min_max} ws]} {
+        set ws [sta::worst_slack_cmd $min_max]
+    }
+    return $ws
+}
 
 hslsa::step signoff -label openroad-sta {
     foreach lib $::env(LIBS) {
@@ -32,8 +41,8 @@ hslsa::step signoff -label openroad-sta {
     report_check_types -max_slew -max_capacitance -max_fanout -violators
     sta::redirect_file_end
 
-    set setup [sta::worst_slack -max]
-    set hold [sta::worst_slack -min]
+    set setup [flow_worst_slack max]
+    set hold [flow_worst_slack min]
     set f [open $out/sta-summary.txt w]
     puts $f "setup worst slack (ns): $setup"
     puts $f "hold worst slack (ns): $hold"

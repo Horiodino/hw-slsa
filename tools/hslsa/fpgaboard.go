@@ -231,7 +231,11 @@ func FPGAProvision(bundle, devices, boards, scenarioPath, keys string) error {
 
 		// The root of trust on the board is the unit its vendor provisioned:
 		// its ROM's IDevID key is the one the vendor's certificate endorses.
-		certRel := rotRel + "/artifacts/rot-" + unit + ".idevid.der"
+		rotRec, err := DecodeEnvelope(filepath.Join(bundle, rotRel, "att", RoTProvAtt(unit)))
+		if err != nil {
+			return fmt.Errorf("board %s: root of trust %s has no provisioning record: %v", serial, unit, err)
+		}
+		certRel := rotRel + "/artifacts/" + S(rotRec, "predicate", "hwProvision", "identity", "certificate", "name")
 		cert, err := loadCert(filepath.Join(bundle, certRel))
 		if err != nil {
 			return fmt.Errorf("board %s: root of trust %s has no IDevID certificate: %v", serial, unit, err)
@@ -439,6 +443,7 @@ type RoTResult struct {
 	Design    *DesignResult
 	RefValues []RefValue
 	Image     Obj
+	Signature Obj // the firmware's signature, which its ROM checks
 	Inputs    []Obj
 }
 
@@ -580,7 +585,7 @@ func RoTCheck(bundle string, hb Obj, policy Obj) (*RoTResult, error) {
 	}
 	return &RoTResult{
 		Part: part, Bundle: rotBundle, Trust: trust, Policy: rotPolicy, Design: design,
-		RefValues: rim.RefValues, Image: image,
+		RefValues: rim.RefValues, Image: image, Signature: sigRD,
 		Inputs: []Obj{relRD(bundle, filepath.Join(rel)), relRD(bundle, filepath.ToSlash(filepath.Join(filepath.Dir(filepath.Dir(rel)), "att", RoTFWAtt)))},
 	}, nil
 }
@@ -611,8 +616,23 @@ func rotUnitCheck(r *RoTResult, unit string) (Obj, *x509.Certificate, error) {
 	if !jsonEqual(get(hp, "designRef", "digest"), get(r.Design.Final, "digest")) {
 		return nil, nil, failf("%s: provisioning record names a different design release", label)
 	}
-	written := Objs(hp, "images")
-	if len(written) != 1 || !jsonEqual(get(written[0], "digest"), get(r.Image, "digest")) {
+	// The station writes the firmware and the signature beside it, both
+	// subjects of the firmware's provenance, and nothing else.
+	withProvenance := map[string]Obj{RoTFWImage: r.Image, RoTFWSig: r.Signature}
+	var fw Obj
+	for _, w := range Objs(hp, "images") {
+		want := withProvenance[S(w, "name")]
+		if want == nil || !jsonEqual(get(w, "digest"), get(want, "digest")) {
+			return nil, nil, failf("%s: provisioning record wrote other firmware than the image with provenance", label)
+		}
+		if !Truthy(w["provenanceVerified"]) {
+			return nil, nil, failf("%s: provisioning record wrote %s without checking its provenance", label, S(w, "name"))
+		}
+		if S(w, "name") == RoTFWImage {
+			fw = w
+		}
+	}
+	if fw == nil {
 		return nil, nil, failf("%s: provisioning record wrote other firmware than the image with provenance", label)
 	}
 	var codeSigner string

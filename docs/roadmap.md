@@ -77,13 +77,9 @@ Target: turn an unchanged supplier export into signed records. This is what make
 | Distributor importer | Certificates of conformance, packing lists, GS1 EPCIS shipping, receiving and storage events | Distribution records, with EPCIS events kept as supplemental evidence |
 | HSM signing | PKCS#11 | Site-key signatures at L3 |
 
-**HSM signing: done.** Every key the reference tool takes can be an HSM key named by a PKCS#11 URI, or a `<role>.pkcs11` file in place of `<role>.key.pem`; `hslsa hsm keygen` makes non-extractable site keys on a token, and the tool refuses a key the HSM would let out. CI signs the PicoRV32 release and lot with the sites' keys in SoftHSM2 and checks them. See [hsm-signing.md](hsm-signing.md). A real HSM, and the buyer's means of knowing a key is in one (accreditation, audit or the vendor's key attestation), come with a pilot site.
-
-**MES and test sidecar: built on sample data.** `hslsa adapt` reads MES lot histories and a unit genealogy, STDF V4 results and SEMI E142 wafer maps, the records carry those exports by digest, and the verifier reads them again and checks the records against them (spec revision 11). It runs on sample exports for the PicoRV32 lot, so its exit still needs a real site's files. SEMI E142 is read only as far as a sort map uses it, and lot events are not yet turned into transfers. See [mes-stdf-adapter.md](mes-stdf-adapter.md).
-
 The EDA wrapper needs a design-house partner with licenses. The rest can be built against sample data from phase 2.
 
-**EDA wrapper: done for open tools.** In spec revision 10, [`adapters/eda-tcl`](../adapters/eda-tcl/README.md) is a hook a flow's Tcl script sources to mark each step, and `hslsa eda run` signs one `design-flow` record per step from outside the tool, refusing a step whose inputs link to nothing. It runs in Yosys's Tcl shell for PicoRV32 and in OpenROAD's for signoff STA on the OpenLane 2 release, in CI. Its README says where the same hook goes in Innovus, Genus, ICC2, Fusion Compiler, PrimeTime and Calibre; trying it there, and adding the license-server `network` block from the platform, still waits on a partner with licenses.
+**Provisioning station adapter:** built against a simulated station in spec revision 10. `hslsa provision gate` checks a job's images against their provenance before the job runs, and `hslsa provision adapt` reads the station's own export (job file, log, readback dumps, identity files) through a per-model profile and signs one record per unit. The FPGA example's root of trust vendor uses it, and its records pass the board receipt and at-boot checks. Waiting on a real station's export to meet the exit criterion ([provisioning-adapter.md](provisioning-adapter.md)).
 
 **Exit:** each adapter produces valid records from a real export without manual editing, and the reference verifier accepts them.
 

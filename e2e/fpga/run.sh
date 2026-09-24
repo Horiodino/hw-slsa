@@ -33,7 +33,7 @@ hslsa() { "$HSLSA" "$@"; }
 # firmware, its per-unit provisioning and a chip HBOM with the firmware listed.
 produce_rot() {
   local lock=$ROOT/e2e/picorv32/inputs.lock.json
-  rm -rf "$ROT" "$ROT_KEYS" "$OUT/rot-devices"
+  rm -rf "$ROT" "$ROT_KEYS" "$OUT/rot-devices" "$OUT/rot-station"
   mkdir -p "$ROT" "$ROT_KEYS/pub"
   hslsa keygen --out "$ROT_KEYS" ip-vendor source-owner source-reviewer flow-platform tapeout-authority \
     fab-site sort-site osat-site test-site product-owner firmware-platform code-signer
@@ -53,7 +53,14 @@ produce_rot() {
   hslsa mfg --bundle "$ROT" --scenario "$HERE/rot/mfg-scenario.json" --keys "$ROT_KEYS"
   hslsa fpga rot-firmware  --bundle "$ROT" --src "$HERE/rot/firmware" --key "$ROT_KEYS/firmware-platform.key.pem" \
     --code-signer "$ROT_KEYS/code-signer.key.pem" --svn 1
-  hslsa fpga rot-provision --bundle "$ROT" --devices "$OUT/rot-devices" --keys "$ROT_KEYS" --scenario "$HERE/rot/mfg-scenario.json"
+  # Final test: the test house's station runs a job and writes its own export;
+  # the provisioning adapter clears the job's images before it runs and signs
+  # one record per unit from the export afterwards.
+  local station=(--profile "$HERE/rot/station/xg8-profile.json" --station "$HERE/rot/station/ps-02.json" --export "$OUT/rot-station")
+  hslsa fpga rot-job       --bundle "$ROT" --scenario "$HERE/rot/mfg-scenario.json" --export "$OUT/rot-station"
+  hslsa provision gate     --bundle "$ROT" "${station[@]}"
+  hslsa fpga rot-station   --bundle "$ROT" --devices "$OUT/rot-devices" --keys "$ROT_KEYS" --export "$OUT/rot-station"
+  hslsa provision adapt    --bundle "$ROT" "${station[@]}" --key "$ROT_KEYS/test-site.key.pem"
   hslsa fpga rot-hbom      --bundle "$ROT" --lock "$lock" --scenario "$HERE/rot/mfg-scenario.json" --key "$ROT_KEYS/product-owner.key.pem"
   # The identity CA's private key stays with the vendor.
   rm -f "$ROT_KEYS/identity-ca.key.pem"

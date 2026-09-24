@@ -1,0 +1,39 @@
+{
+  "note": "How to read the export of the Example XG-8, the simulated gang programmer at the root of trust vendor's test house (tools/hslsa/rot.go). A real station model needs its own profile; the station file (ps-02.json) stays the same.",
+  "model": "Example XG-8 gang programmer",
+  "job": {
+    "file": "job.ini",
+    "id": "job.id",
+    "lot": "job.lot",
+    "imageSection": "image",
+    "imageFile": "file",
+    "imageRegion": "region",
+    "imageSha256": "checksum"
+  },
+  "log": {
+    "file": "log.csv",
+    "delimiter": ",",
+    "timeLayout": "2006-01-02T15:04:05Z07:00",
+    "pass": "PASS",
+    "columns": {
+      "time": "timestamp",
+      "unit": "serial",
+      "op": "operation",
+      "target": "target",
+      "value": "value",
+      "result": "result"
+    }
+  },
+  "ops": {
+    "begin": "BEGIN",
+    "end": "END",
+    "program": "PROGRAM",
+    "verify": "VERIFY",
+    "fuseWrite": "FUSE_WRITE",
+    "fuseRead": "FUSE_READ",
+    "keyInject": "KEY_INJECT",
+    "keyGenerate": "KEY_GEN",
+    "csr": "CSR_EXPORT",
+    "certificate": "CERT_IMPORT"
+  }
+}

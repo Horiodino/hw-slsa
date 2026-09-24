@@ -1,0 +1,15 @@
+{
+  "note": "Station ps-02 at the root of trust vendor's test house, programming EXR-01 at final test. What the adapter needs that the station does not know: where each image's provenance is, the fuse types, which fields are secrets, and the identity scheme.",
+  "station": "urn:hslsa:station:example-test-house:ps-02",
+  "site": {"name": "Example Test House", "country": "US"},
+  "stage": "final-test",
+  "lotId": "ASM-EXR-01",
+  "images": {
+    "rot-fw": {"role": "runtime", "storage": "on-die-flash", "provenance": "fw-rot.intoto.json", "signer": "firmware-platform"},
+    "rot-fw.sig.json": {"role": "runtime signature, checked by the ROM", "storage": "on-die-flash", "provenance": "fw-rot.intoto.json", "signer": "firmware-platform"}
+  },
+  "fuseTypes": {"ueid": "hex", "vendor_key_hash": "hex", "lifecycle": "string", "debug_locked": "bool", "min_svn": "int"},
+  "secrets": ["uds"],
+  "lifecycle": {"fuse": "lifecycle", "production": "production", "debugLock": "debug_locked"},
+  "identity": {"scheme": "DICE", "ueidFuse": "ueid", "caRole": "identity-ca"}
+}

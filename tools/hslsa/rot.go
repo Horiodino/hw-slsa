@@ -35,6 +35,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
@@ -45,6 +46,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -385,29 +387,102 @@ func RoTCSR(devDir string) ([]byte, error) {
 // RoTProvAtt is the RoT vendor's provisioning record for one unit.
 func RoTProvAtt(unit string) string { return ProvAtt(unit) }
 
-// RoTProvision programs every shipped unit at the final test station: fuses,
-// firmware and an endorsed IDevID, then signs one record per unit.
-func RoTProvision(bundle, devices, keysDir, scenarioPath string) error {
-	art := filepath.Join(bundle, "artifacts")
+// The vendor's test station, ps-02, is a simulated gang programmer, the
+// "Example XG-8". Like a real one it knows nothing about HSLSA: it runs a job
+// file and writes its own export (job.ini, log.csv, readback/, identity/),
+// and the provisioning adapter (provadapter.go) turns that export into the
+// records. Its profile is e2e/fpga/rot/station/xg8-profile.json.
+
+const (
+	xg8Sockets = 8
+	xg8Regions = "FLASH"
+)
+
+// RoTJob writes the station's job file for the shipped lot, with the images it loads.
+func RoTJob(bundle, scenarioPath, export string) error {
 	sc, err := ReadObj(scenarioPath)
 	if err != nil {
 		return err
 	}
-	station := O(sc, "provisioning")
-	trust, err := LoadTrustRoot(filepath.Join(bundle, "trust-root.json"))
+	art := filepath.Join(bundle, "artifacts")
+	if err := os.RemoveAll(export); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(export, "images"), 0o755); err != nil {
+		return err
+	}
+	lotID := S(sc, "finalTest", "lotId")
+	var b strings.Builder
+	fmt.Fprintf(&b, "; Example XG-8 job file\n[job]\nid = FT-%s\nproduct = %s %s\nlot = %s\nsockets = %d\n",
+		lotID, S(sc, "product", "partNumber"), S(sc, "product", "revision"), lotID, xg8Sockets)
+	for i, f := range []string{RoTFWImage, RoTFWSig} {
+		if err := copyFile(filepath.Join(art, f), filepath.Join(export, "images", f)); err != nil {
+			return err
+		}
+		d, err := sha256File(filepath.Join(export, "images", f))
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(&b, "\n[image %d]\nfile = images/%s\nregion = %s%d\nchecksum = SHA256:%s\n", i+1, f, xg8Regions, i, strings.ToUpper(d))
+	}
+	if err := os.WriteFile(filepath.Join(export, "job.ini"), []byte(b.String()), 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("station job: FT-%s loads %s and %s\n", lotID, RoTFWImage, RoTFWSig)
+	return nil
+}
+
+// xg8Log is the station's log as it writes it.
+type xg8Log struct {
+	w    *csv.Writer
+	last time.Time
+}
+
+func (l *xg8Log) row(socket int, unit, op, target, value string, ok bool) error {
+	t := time.Now().UTC().Truncate(time.Second)
+	if t.Before(l.last) {
+		t = l.last
+	}
+	l.last = t
+	result := "PASS"
+	if !ok {
+		result = "FAIL"
+	}
+	return l.w.Write([]string{t.Format(time.RFC3339), strconv.Itoa(socket), unit, op, target, value, result})
+}
+
+func xg8Value(v any) string {
+	switch x := v.(type) {
+	case bool:
+		if x {
+			return "1"
+		}
+		return "0"
+	case string:
+		return x
+	}
+	return num(v)
+}
+
+// RoTStation runs the job on every shipped unit: it generates the UDS on the
+// die, burns the public fuses, writes the images, reads everything back,
+// exports the IDevID CSR from the part's ROM and stores the certificate the
+// vendor's identity CA returns. devices gets each unit's state; export gets
+// what the station writes.
+func RoTStation(bundle, devices, keysDir, export string) error {
+	art := filepath.Join(bundle, "artifacts")
+	jobData, err := os.ReadFile(filepath.Join(export, "job.ini"))
 	if err != nil {
 		return err
 	}
-	final, err := releasedSubject(bundle)
+	job, err := parseINI(jobData)
 	if err != nil {
 		return err
 	}
-	relEnv := envRD(bundle, AttName("release"))
 	shipped, err := ReadUnits(filepath.Join(art, "shipped-lot.txt"))
 	if err != nil {
 		return err
 	}
-	lotID := S(sc, "finalTest", "lotId")
 	caKey, err := loadECKey(filepath.Join(keysDir, "identity-ca.key.pem"))
 	if err != nil {
 		return err
@@ -420,49 +495,104 @@ func RoTProvision(bundle, devices, keysDir, scenarioPath string) error {
 	if err != nil {
 		return err
 	}
-	signer, err := LoadSigner(filepath.Join(keysDir, S(station, "signer")+".key.pem"))
+	for _, d := range []string{"readback", "identity"} {
+		if err := os.MkdirAll(filepath.Join(export, d), 0o755); err != nil {
+			return err
+		}
+	}
+	f, err := os.Create(filepath.Join(export, "log.csv"))
 	if err != nil {
 		return err
 	}
-	// The station checks the image's provenance before it writes the image anywhere.
-	image := filepath.Join(art, RoTFWImage)
-	imageRD, err := fileRD(image, "")
-	if err != nil {
+	defer f.Close()
+	log := &xg8Log{w: csv.NewWriter(f)}
+	if err := log.w.Write([]string{"timestamp", "socket", "serial", "operation", "target", "value", "result"}); err != nil {
 		return err
 	}
-	fwEnv := envRD(bundle, RoTFWAtt)
-	prov, provErr := trust.Open(filepath.Join(bundle, "att", RoTFWAtt), "firmware-platform", SLSAProvenance)
-	provOK := provErr == nil && sha256Set(Objs(prov, "subject"))[S(imageRD, "digest", "sha256")]
 
-	for _, unit := range shipped {
+	for i, unit := range shipped {
+		socket := i%xg8Sockets + 1
 		dev := filepath.Join(devices, unit)
 		if err := os.MkdirAll(filepath.Join(dev, "flash"), 0o755); err != nil {
 			return err
 		}
+		if err := log.row(socket, unit, "BEGIN", "", job.values["job"]["id"], true); err != nil {
+			return err
+		}
+		// The die's TRNG fills the UDS fuses; the station never sees the value.
 		uds, err := randomHex(32)
 		if err != nil {
 			return err
 		}
-		ueid := rotUEID(unit)
+		if err := WriteJSON(filepath.Join(dev, "fuses.json"), Obj{"serial": unit, "uds": uds}); err != nil {
+			return err
+		}
+		if err := log.row(socket, unit, "KEY_GEN", "uds", "uds:"+unit, true); err != nil {
+			return err
+		}
 		public := Obj{
-			"ueid":            hex.EncodeToString(ueid),
+			"ueid":            hex.EncodeToString(rotUEID(unit)),
 			"vendor_key_hash": vendorHash,
 			"lifecycle":       "production",
 			"debug_locked":    true,
 			"min_svn":         0,
 		}
-		fuses := Obj{"serial": unit, "uds": uds}
-		for k, v := range public {
-			fuses[k] = v
+		fuses, err := ReadObj(filepath.Join(dev, "fuses.json"))
+		if err != nil {
+			return err
+		}
+		for _, k := range sortedKeys(public) {
+			fuses[k] = public[k]
+			if err := log.row(socket, unit, "FUSE_WRITE", k, xg8Value(public[k]), true); err != nil {
+				return err
+			}
 		}
 		if err := WriteJSON(filepath.Join(dev, "fuses.json"), fuses); err != nil {
 			return err
 		}
-		for _, f := range []string{RoTFWImage, RoTFWSig} {
-			if err := copyFile(filepath.Join(art, f), filepath.Join(dev, "flash", f)); err != nil {
+		for _, sec := range job.sections {
+			if !strings.HasPrefix(sec, "image ") {
+				continue
+			}
+			img := job.values[sec]
+			data, err := os.ReadFile(filepath.Join(export, filepath.FromSlash(img["file"])))
+			if err != nil {
+				return err
+			}
+			name := filepath.Base(img["file"])
+			if err := os.WriteFile(filepath.Join(dev, "flash", name), data, 0o644); err != nil {
+				return err
+			}
+			if err := log.row(socket, unit, "PROGRAM", img["region"], img["file"], true); err != nil {
+				return err
+			}
+			back, err := os.ReadFile(filepath.Join(dev, "flash", name))
+			if err != nil {
+				return err
+			}
+			dump := "readback/" + unit + "/" + img["region"] + ".bin"
+			if err := os.MkdirAll(filepath.Join(export, "readback", unit), 0o755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(export, filepath.FromSlash(dump)), back, 0o644); err != nil {
+				return err
+			}
+			want := strings.TrimPrefix(img["checksum"], "SHA256:")
+			if err := log.row(socket, unit, "VERIFY", img["region"], dump, strings.EqualFold(sha256Bytes(back), want)); err != nil {
 				return err
 			}
 		}
+		burned, err := ReadObj(filepath.Join(dev, "fuses.json"))
+		if err != nil {
+			return err
+		}
+		for _, k := range sortedKeys(public) {
+			if err := log.row(socket, unit, "FUSE_READ", k, xg8Value(burned[k]), true); err != nil {
+				return err
+			}
+		}
+		// The part's ROM derives its IDevID key from the UDS and answers with a
+		// CSR; the vendor's identity CA endorses it and the station stores the certificate.
 		csrDER, err := RoTCSR(dev)
 		if err != nil {
 			return err
@@ -475,88 +605,28 @@ func RoTProvision(bundle, devices, keysDir, scenarioPath string) error {
 		if err != nil {
 			return err
 		}
-		csrName, certName := "rot-"+unit+".csr.der", "rot-"+unit+".idevid.der"
-		if err := os.WriteFile(filepath.Join(art, csrName), csrDER, 0o644); err != nil {
+		csrFile, certFile := "identity/"+unit+".csr.der", "identity/"+unit+".crt.der"
+		if err := os.WriteFile(filepath.Join(export, csrFile), csrDER, 0o644); err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(art, certName), certDER, 0o644); err != nil {
+		if err := log.row(socket, unit, "CSR_EXPORT", "IDEVID", csrFile, true); err != nil {
 			return err
 		}
-		idevidDigest, err := spkiDigest(csr.PublicKey)
-		if err != nil {
+		if err := os.WriteFile(filepath.Join(export, certFile), certDER, 0o644); err != nil {
 			return err
 		}
-
-		// Read back what the unit now holds.
-		readback, err := sha256File(filepath.Join(dev, "flash", RoTFWImage))
-		if err != nil {
+		if err := log.row(socket, unit, "CERT_IMPORT", "IDEVID", certFile, true); err != nil {
 			return err
 		}
-		burned, err := ReadObj(filepath.Join(dev, "fuses.json"))
-		if err != nil {
+		if err := log.row(socket, unit, "END", "", "", true); err != nil {
 			return err
-		}
-		delete(burned, "uds")
-		delete(burned, "serial")
-		checks := []Obj{
-			check("image-provenance-verified", provOK, errDetail(provErr, "fw-rot provenance signed by the firmware platform names this image")),
-			check("image-readback", readback == S(imageRD, "digest", "sha256"), ""),
-			check("fuse-readback", canonicalDigest(burned) == canonicalDigest(public), ""),
-			check("csr-self-signature", csr.CheckSignature() == nil, ""),
-			check("lifecycle-production", true, "production, debug locked"),
-		}
-		csrRD, err := fileRD(filepath.Join(art, csrName), csrName)
-		if err != nil {
-			return err
-		}
-		certRD, err := fileRD(filepath.Join(art, certName), certName)
-		if err != nil {
-			return err
-		}
-		pred := Obj{
-			"buildDefinition": Obj{
-				"buildType":            ProvisionType,
-				"externalParameters":   Obj{"unit": unit, "lotId": lotID, "stage": "final-test"},
-				"resolvedDependencies": []Obj{fwEnv, imageRD, csrRD, certRD},
-			},
-			"runDetails": Obj{
-				"builder":  Obj{"id": "urn:hslsa:site:" + slug(S(station, "site", "name"))},
-				"metadata": Obj{"invocationId": "provision:" + unit, "finishedOn": Now()},
-			},
-			"hwProvision": Obj{
-				"station":   get(station, "id"),
-				"site":      get(station, "site"),
-				"unit":      "urn:hslsa:unit:" + unit,
-				"lot":       "urn:hslsa:lot:" + lotID,
-				"designRef": Obj{"name": final["name"], "digest": final["digest"], "release": relEnv},
-				"images": []Obj{{
-					"name": RoTFWImage, "role": "runtime", "storage": "on-die-flash",
-					"digest": get(imageRD, "digest"), "readback": Obj{"sha256": readback}, "provenanceVerified": provOK,
-				}},
-				"fuses":   public,
-				"secrets": []Obj{{"field": "uds", "keyId": "uds:" + unit, "origin": "generated-on-die"}},
-				"identity": Obj{
-					"scheme":          "DICE",
-					"ueid":            hex.EncodeToString(ueid),
-					"idevidPublicKey": Obj{"sha256": idevidDigest},
-					"certificate":     certRD,
-					"endorsingCa":     strings.TrimSpace(string(caName)),
-				},
-				"checks": checks,
-			},
-		}
-		stmt, err := statement([]Obj{rd("urn:hslsa:unit:"+unit, idevidDigest)}, FWProvisioning, pred)
-		if err != nil {
-			return err
-		}
-		if _, err := Sign(stmt, signer, filepath.Join(bundle, "att", RoTProvAtt(unit))); err != nil {
-			return err
-		}
-		if failed := failedChecks(checks); len(failed) > 0 {
-			return fmt.Errorf("provisioning %s: %s failed (recorded in the attestation)", unit, strings.Join(failed, ", "))
 		}
 	}
-	fmt.Printf("rot provisioning: %d units programmed, each with an endorsed IDevID\n", len(shipped))
+	log.w.Flush()
+	if err := log.w.Error(); err != nil {
+		return err
+	}
+	fmt.Printf("station ps-02: %d units programmed, export in %s\n", len(shipped), export)
 	return nil
 }
 

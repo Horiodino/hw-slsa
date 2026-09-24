@@ -40,6 +40,7 @@ var commands = map[string]command{
 	"caliptra":      {"the Caliptra example (e2e/caliptra)", caliptra},
 	"board":         {"board-level example: shipments, A1 and board HBOM, or the buyer's board check", board},
 	"fpga":          {"the FPGA board example with a board root of trust (e2e/fpga)", fpga},
+	"provision":     {"provisioning station adapter: clear a job's images, then sign records from the station's export", provision},
 	"lot-digest":    {"compute the lot digest of a unit list", lotDigest},
 	"subject":       {"print the name and sha256 of an envelope's first subject", subject},
 	"validate-hbom": {"validate HBOM statements or envelopes against the schema", validateHBOM},
@@ -719,7 +720,7 @@ func board(args []string) error {
 }
 
 func fpga(args []string) error {
-	act, rest, err := action(args, "rot-firmware", "rot-provision", "rot-hbom", "firmware", "design", "image",
+	act, rest, err := action(args, "rot-firmware", "rot-job", "rot-station", "rot-hbom", "firmware", "design", "image",
 		"produce", "provision", "boot", "verify")
 	if err != nil {
 		return err
@@ -740,13 +741,20 @@ func fpga(args []string) error {
 			return err
 		}
 		return hslsa.RoTFirmware(*bundle, *src, *key, *cs, *svn)
-	case "rot-provision":
-		bundle, devices := f.str("bundle", "", true), f.str("devices", "directory for the root of trust units", true)
-		keys, scenario := f.str("keys", "", true), f.str("scenario", "", true)
+	case "rot-job":
+		bundle, scenario := f.str("bundle", "", true), f.str("scenario", "", true)
+		export := f.str("export", "the station's export directory, where its job file goes", true)
 		if err := f.parse(rest); err != nil {
 			return err
 		}
-		return hslsa.RoTProvision(*bundle, *devices, *keys, *scenario)
+		return hslsa.RoTJob(*bundle, *scenario, *export)
+	case "rot-station":
+		bundle, devices := f.str("bundle", "", true), f.str("devices", "directory for the root of trust units", true)
+		keys, export := f.str("keys", "", true), f.str("export", "the station's export directory, with its job file", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.RoTStation(*bundle, *devices, *keys, *export)
 	case "rot-hbom":
 		bundle, lock := f.str("bundle", "", true), f.str("lock", "", true)
 		scenario, key := f.str("scenario", "", true), f.str("key", "", true)
@@ -1094,4 +1102,27 @@ func sortedRoles(t *hslsa.TrustRoot) []string {
 	}
 	sort.Strings(roles)
 	return roles
+}
+
+func provision(args []string) error {
+	act, rest, err := action(args, "gate", "adapt")
+	if err != nil {
+		return err
+	}
+	f := newFlags("provision " + act)
+	bundle := f.str("bundle", "the bundle with the release, the image provenance and the trust root", true)
+	profile := f.str("profile", "the station model's profile: how to read its export", true)
+	station := f.str("station", "the site's station file: id, site, images, fuses, identity", true)
+	export := f.str("export", "the station's export directory", true)
+	var key *string
+	if act == "adapt" {
+		key = f.str("key", "the site key that signs the records", true)
+	}
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	if act == "gate" {
+		return hslsa.ProvisionGate(*bundle, *profile, *station, *export)
+	}
+	return hslsa.ProvisionAdapt(*bundle, *profile, *station, *export, *key)
 }

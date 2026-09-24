@@ -365,3 +365,25 @@ func TestUnreadablePlatformCertificate(t *testing.T) {
 	must(t, os.WriteFile(filepath.Join(work, "boots", serial, "platform.der"), []byte("x"), 0o644))
 	fpgaRejects(t, work, "no platform certificate from the board")
 }
+
+func TestRoTUnitWroteImageWithoutProvenance(t *testing.T) {
+	// The vendor's station wrote a third image into the unit that no provenance names.
+	work := fpgaWork(t)
+	unit := ok(rotUnitOn(filepath.Join(work, "board"), fpgaReceived(t)[0], "U5"))
+	path := filepath.Join(work, "board", "parts", "rot", "att", RoTProvAtt(unit))
+	resign(t, path, filepath.Join(work, "rot-keys"), "test-site", func(s Obj) {
+		hp := O(s, "predicate", "hwProvision")
+		hp["images"] = append(A(hp, "images"), Obj{"name": "debug-patch.bin", "digest": Obj{"sha256": strings.Repeat("ee", 32)}, "provenanceVerified": true})
+	})
+	fpgaRejects(t, work, "root of trust "+unit+": provisioning record wrote other firmware than the image with provenance")
+}
+
+func TestRoTUnitImageProvenanceUnchecked(t *testing.T) {
+	work := fpgaWork(t)
+	unit := ok(rotUnitOn(filepath.Join(work, "board"), fpgaReceived(t)[0], "U5"))
+	path := filepath.Join(work, "board", "parts", "rot", "att", RoTProvAtt(unit))
+	resign(t, path, filepath.Join(work, "rot-keys"), "test-site", func(s Obj) {
+		find(Objs(s, "predicate", "hwProvision", "images"), "name", RoTFWSig)["provenanceVerified"] = false
+	})
+	fpgaRejects(t, work, "wrote "+RoTFWSig+" without checking its provenance")
+}

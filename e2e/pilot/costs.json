@@ -1,0 +1,8 @@
+{
+  "note": "Sample entries in the shape each party reports; the rehearsal's figures are placeholders, not measurements.",
+  "entries": [
+    {"party": "Example OSAT Group", "hours": 0, "note": "placeholder: running the adapter and signing at sort, assembly and test"},
+    {"party": "Example Open Silicon Group", "hours": 0, "note": "placeholder: design records and the HBOM"},
+    {"party": "Example Hyperscaler", "hours": 0, "note": "placeholder: enrollment, trust root and the receipt check"}
+  ]
+}

@@ -47,6 +47,7 @@ var commands = map[string]command{
 	"render":        {"render an HBOM as CycloneDX 1.6 or SPDX 3.1-RC1, or check a rendering", render},
 	"corim":         {"show a signed CoRIM, or appraise DICE certificates against it", corimCmd},
 	"safe":          {"sign, show or check an OCP S.A.F.E. short-form report", safeCmd},
+	"pilot":         {"a buyer-run pilot: enroll or revoke site keys, build the trust root from them, measure a lot", pilot},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -337,6 +338,7 @@ func mfg(args []string) error {
 	scenario := f.str("scenario", "", true)
 	keys := f.str("keys", "directory of <role>.key.pem", true)
 	hold := f.str("withhold", "fields and files to withhold (JSON); disclosures go to the bundle's disclosures directory", false)
+	sign := f.str("sign", "comma-separated roles to sign for; records of other roles must already be in the bundle (default: every role)", false)
 	if err := f.parse(args); err != nil {
 		return err
 	}
@@ -344,7 +346,7 @@ func mfg(args []string) error {
 	if err != nil {
 		return err
 	}
-	return hslsa.Mfg(*bundle, *scenario, *keys, w)
+	return hslsa.MfgAs(*bundle, *scenario, *keys, w, splitList(*sign))
 }
 
 func hbomCmd(args []string) error {
@@ -1125,4 +1127,117 @@ func provision(args []string) error {
 		return hslsa.ProvisionGate(*bundle, *profile, *station, *export)
 	}
 	return hslsa.ProvisionAdapt(*bundle, *profile, *station, *export, *key)
+}
+
+// splitList splits a comma-separated flag value, dropping empty items.
+func splitList(v string) []string {
+	var out []string
+	for _, s := range strings.Split(v, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func parseFlagTime(v, name string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, v); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse("2006-01-02", v); err == nil {
+		return t, nil
+	}
+	return time.Time{}, usageError{fmt.Sprintf("--%s: %q is not a date (2026-12-31) or an RFC 3339 time", name, v)}
+}
+
+func pilot(args []string) error {
+	act, rest, err := action(args, "enroll", "revoke", "trust-root", "measure")
+	if err != nil {
+		return err
+	}
+	f := newFlags("pilot " + act)
+	switch act {
+	case "enroll":
+		buyerKey := f.str("buyer-key", "the buyer's root key", true)
+		pub := f.str("pub", "the site's public key, as the site handed it over", true)
+		out := f.str("out", "enrollment record to write", true)
+		role := f.str("role", "the role the key signs for, such as osat-site", true)
+		orgName := f.str("org-name", "the company that holds the key", true)
+		orgID := f.str("org-id", "its identifier: lei:, duns:, cage:, uei: or gln:", true)
+		site := f.str("site", "the site name its records give", true)
+		country := f.str("country", "the site's country (ISO 3166 alpha-2)", false)
+		custody := f.str("custody", "how the key is held: hsm or file", true)
+		notBefore := f.str("not-before", "start of the enrollment (default now)", false)
+		notAfter := f.str("not-after", "end of the enrollment", true)
+		note := f.str("note", "how the buyer checked the key with the site", false)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		nb := time.Now().UTC()
+		if *notBefore != "" {
+			if nb, err = parseFlagTime(*notBefore, "not-before"); err != nil {
+				return err
+			}
+		}
+		na, err := parseFlagTime(*notAfter, "not-after")
+		if err != nil {
+			return err
+		}
+		return hslsa.Enroll(*buyerKey, *pub, hslsa.Enrollment{Role: *role, OrgName: *orgName, OrgID: *orgID, Site: *site,
+			Country: *country, Custody: *custody, NotBefore: nb, NotAfter: na, Note: *note}, *out)
+	case "revoke":
+		buyerKey := f.str("buyer-key", "the buyer's root key", true)
+		pub := f.str("pub", "the public key to revoke", true)
+		reason := f.str("reason", "why", true)
+		out := f.str("out", "revocation record to write", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.Revoke(*buyerKey, *pub, *reason, *out)
+	case "trust-root":
+		buyerPub := f.str("buyer-pub", "the buyer's root public key", true)
+		dir := f.str("enrollments", "directory of enrollment and revocation records", true)
+		out := f.str("out", "trust root to write", true)
+		at := f.str("at", "time the trust root is for (default now)", false)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		t := time.Now().UTC()
+		if *at != "" {
+			if t, err = parseFlagTime(*at, "at"); err != nil {
+				return err
+			}
+		}
+		_, err := hslsa.BuildPilotTrustRoot(*buyerPub, *dir, t, *out)
+		return err
+	}
+	bundle := f.str("bundle", "the lot's bundle", true)
+	trust := f.str("trust-root", "the buyer-run trust root", true)
+	policy := f.str("policy", "the buyer's policy", true)
+	units := f.str("units", "file with the serials of the units received", false)
+	costs := f.str("costs", "what each party reports the lot cost it (JSON)", false)
+	out := f.str("out", "directory for the lot's report and the pilot summary", true)
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	rep, err := hslsa.PilotMeasure(*bundle, *trust, *policy, *units, *costs)
+	if err != nil {
+		return err
+	}
+	name := strings.NewReplacer(":", "-", "/", "-").Replace(hslsa.S(rep, "lot"))
+	if err := hslsa.WriteJSON(filepath.Join(*out, name+".json"), rep); err != nil {
+		return err
+	}
+	md := hslsa.PilotMeasurementMarkdown(rep)
+	if err := os.WriteFile(filepath.Join(*out, name+".md"), []byte(md), 0o644); err != nil {
+		return err
+	}
+	fmt.Print(md)
+	if _, err := hslsa.PilotSummary(*out); err != nil {
+		return err
+	}
+	if hslsa.S(rep, "check", "result") != "pass" {
+		return fmt.Errorf("the lot failed its receipt check; the report says why")
+	}
+	return nil
 }

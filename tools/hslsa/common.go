@@ -439,6 +439,9 @@ func LoadTrustRoot(path string) (*TrustRoot, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := checkTrustRootValid(path, data); err != nil {
+		return nil, err
+	}
 	t := &TrustRoot{Roles: map[string][]Key{}}
 	for role := range O(data, "roles") {
 		for _, p := range Strs(data, "roles", role) {

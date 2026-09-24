@@ -30,6 +30,7 @@ Status: working draft, version 0.1.
 | [`docs/fpga-board-example.md`](docs/fpga-board-example.md) | The FPGA board example: an iCE40 design built with open tools, on a board whose attested root of trust verifies the flash before the FPGA runs, checked to Firmware L2 for the board |
 | [`docs/selective-disclosure.md`](docs/selective-disclosure.md) | Withheld fields and verifier escrow: an auditor checks the full records, the buyer sees only the auditor's VSAs, and a measurement of what each view reveals |
 | [`docs/mes-stdf-adapter.md`](docs/mes-stdf-adapter.md) | The MES and STDF adapter: the PicoRV32 lot made from sample MES, STDF and SEMI E142 exports, and checked against them |
+| [`pilot/`](pilot/README.md) | The pilot kit for one buyer (roadmap phase 4): a buyer-run trust root, the buyer's and suppliers' steps, a policy for one root of trust part, lot measurement, and a rehearsal in CI |
 | [`docs/roadmap.md`](docs/roadmap.md) | The roadmap from working draft to real-world use: phases, exit criteria and the decisions still open |
 
 ## Identifiers

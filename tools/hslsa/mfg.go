@@ -11,7 +11,9 @@ package hslsa
 // into designRef.
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -57,13 +59,60 @@ func mfgNames(step string) (att, role, buildType, hwStep string) {
 	return MfgAtt[step], MfgSigner[step], mfgStepType(step), step
 }
 
+// mfgKeys is where a run of mfg finds its signing keys, and which roles'
+// records it signs (all of them when only is nil).
+type mfgKeys struct {
+	dir  string
+	only map[string]bool
+}
+
+func (k *mfgKeys) signs(role string) bool { return k.only == nil || k.only[role] }
+
+// waitingFor stops a run of mfg at a record another party has not signed yet.
+type waitingFor struct{ step, role string }
+
+func (e *waitingFor) Error() string { return e.step + ": waiting for " + e.role }
+
+// reuse returns the record another party already signed for step, after
+// checking it names the subjects this run computed, so a later site's
+// records link to exactly what the earlier site signed.
+func (k *mfgKeys) reuse(bundle, step, att, role string, subjects []Obj) (Obj, error) {
+	path := filepath.Join(bundle, "att", att)
+	if _, err := os.Stat(path); err != nil {
+		return nil, &waitingFor{step, role}
+	}
+	stmt, err := DecodeEnvelope(path)
+	if err != nil {
+		return nil, err
+	}
+	if !jsonEqual(A(stmt, "subject"), anyObjs(subjects)) {
+		return nil, fmt.Errorf("%s: the record %s signed names other subjects than this scenario gives; was it signed from another scenario?", step, role)
+	}
+	fmt.Printf("%s: kept the record %s signed\n", step, role)
+	return fileRD(path, "att/"+att)
+}
+
+func anyObjs(list []Obj) []any {
+	out := make([]any, len(list))
+	for i, o := range list {
+		out[i] = o
+	}
+	return out
+}
+
 func slug(name string) string { return strings.ReplaceAll(strings.ToLower(name), " ", "-") }
 
 // mfgRecord signs one manufacturing record with the site's own key, or,
 // when by is set (see onBehalf), with the key of the party signing on the
 // supplier's behalf.
-func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw Obj, keys string, w *Withholding, by Obj) (Obj, error) {
+func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw Obj, keys *mfgKeys, w *Withholding, by Obj) (Obj, error) {
 	att, role, bt, hwStep := mfgNames(step)
+	if by != nil {
+		role = S(by, "role")
+	}
+	if !keys.signs(role) {
+		return keys.reuse(bundle, step, att, role, subjects)
+	}
 	builderID := "urn:hslsa:site:" + slug(S(hw, "site", "name"))
 	hwMfg := Obj{"step": hwStep, "confidential": []any{}}
 	for k, v := range hw {
@@ -107,7 +156,7 @@ func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", step, err)
 	}
-	signer, err := LoadSigner(filepath.Join(keys, role+".key.pem"))
+	signer, err := LoadSigner(filepath.Join(keys.dir, role+".key.pem"))
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +188,7 @@ func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw
 // the transfer, or prev itself when there is none. The packing list names
 // what was shipped (wafer ids or unit serials), the lot they belong to and
 // the receiving site.
-func transfer(bundle, from string, enabled bool, prev, lot Obj, items []string, fromSite, toSite, designRef Obj, keys string, w *Withholding, by Obj) (Obj, error) {
+func transfer(bundle, from string, enabled bool, prev, lot Obj, items []string, fromSite, toSite, designRef Obj, keys *mfgKeys, w *Withholding, by Obj) (Obj, error) {
 	if !enabled {
 		return prev, removeStale(filepath.Join(bundle, "att", TransferAtt(from)), filepath.Join(bundle, "artifacts", TransferList(from)),
 			disclosurePath(filepath.Join(bundle, "att", TransferAtt(from))), filepath.Join(bundle, "artifacts", ExportName("transfer-"+from)))
@@ -188,6 +237,33 @@ func dieKey(wafer, x, y any) string { return fmt.Sprintf("%v\x00%v\x00%v", num(w
 // withholds the fields w names and writes their disclosures to the bundle's
 // disclosures directory.
 func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
+	return MfgAs(bundle, scenarioPath, keys, w, nil)
+}
+
+// MfgAs is Mfg for a party that holds only some of the lot's keys: it signs
+// the records of the roles it names and reuses the records already in the
+// bundle for the others, so each site signs its own steps with a key no
+// other party holds. It stops, without error, at the first step whose
+// record is neither its own nor in the bundle yet, and says whose it is.
+// No roles means every role, with every key in keys.
+func MfgAs(bundle, scenarioPath, keysDir string, w *Withholding, roles []string) error {
+	keys := &mfgKeys{dir: keysDir}
+	if len(roles) > 0 {
+		if w != nil && (len(w.Fields) > 0 || len(w.SaltFiles) > 0) {
+			return fmt.Errorf("signing only some roles' records cannot withhold fields yet: each run rewrites the data files")
+		}
+		keys.only = setOf(roles)
+	}
+	err := mfg(bundle, scenarioPath, keys, w)
+	var wait *waitingFor
+	if errors.As(err, &wait) {
+		fmt.Printf("stopped before %s: its record is signed by %s, whose key is not in this run\n", wait.step, wait.role)
+		return nil
+	}
+	return err
+}
+
+func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 	art := filepath.Join(bundle, "artifacts")
 	sc, err := ReadObj(scenarioPath)
 	if err != nil {

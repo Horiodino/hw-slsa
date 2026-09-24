@@ -1,0 +1,16 @@
+{
+  "note": "The pilot buyer's policy for one root of trust part: Package/Test L2 from the OSAT's own signatures, the fab's record accepted when the sort site signs it on the fab's behalf (Wafer capped at L1), and every record checked against the export it was made from. The design section is the PicoRV32 example's.",
+  "design": {
+    "requiredSteps": ["source-freeze", "simulation", "synthesis"],
+    "consumes": {"simulation": ["source-freeze"], "synthesis": ["source-freeze"]},
+    "finalArtifactFrom": "synthesis",
+    "allowedTools": ["iverilog", "vvp", "yosys"],
+    "source": {"tagSigner": "source-owner", "reviewer": "source-reviewer"},
+    "thirdPartyIP": [{"name": "picorv32", "signer": "ip-vendor", "files": ["picorv32.v"]}]
+  },
+  "manufacturing": {"requireTransfers": true, "acceptOnBehalf": ["proxy"], "requireExports": true},
+  "claims": {
+    "design": ["HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_2"],
+    "lot": ["HSLSA_WAFER_LEVEL_1", "HSLSA_PACKAGE_TEST_LEVEL_2", "HSLSA_DESIGN_LEVEL_2"]
+  }
+}

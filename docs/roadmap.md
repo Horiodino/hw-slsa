@@ -108,6 +108,8 @@ In the pilot:
 
 **Exit:** one external supplier signs one record type for a real product, and one buyer verifies it before accepting parts.
 
+**Pilot kit: ready to hand to a buyer.** Spec revision 13. The [pilot kit](../pilot/README.md) is aimed at the first row, an OCP hyperscaler, for one root of trust part: Package/Test L2 signed by one OSAT group with its own keys, Firmware L2 for the part, and the at-boot check. For step 1, `hslsa pilot enroll`, `revoke` and `trust-root` let the buyer run the trust root from its own signed enrollments ([Buyer-run trust roots](../spec/hslsa-v0.1.md#buyer-run-trust-roots)). For step 2, `hslsa mfg --sign` lets each site sign only its own records into a lot, with keys no other party holds. For step 3, `hslsa pilot measure` records each lot's check result, who signed what and which fields the buyer holds, and each party's reported cost, with a summary across lots. `e2e/pilot/run.sh` rehearses all of it in CI on the PicoRV32 lot and the FPGA board. Still needed, and only the owner can start it: a buyer and its OSAT willing to run it on a real part, and the decisions below.
+
 ## Phase 5: A neutral home and v1.0
 
 1. **Choose a home.** OpenSSF (where SLSA lives), CHIPS Alliance (where Caliptra lives), or the OCP security project. Present the IR 8536 profile and pilot results at NIST's traceability work as well.
@@ -131,5 +133,6 @@ L4 is expensive and mostly matters to defense and root-of-trust buyers, so it ru
 | Decision | Needed by |
 | --- | --- |
 | Whether to accept proxy-signed records at L1 | Phase 2 |
-| Whether to make the repository and spec public | Phase 4 |
+| Which buyer to offer the pilot kit to first, and whether by tarball (`pilot/make-kit.sh`) or a private invitation | Phase 4 |
+| Whether to make the repository and spec public | Phase 5 (the pilot kit works while it stays private) |
 | Which neutral home to approach first | Phase 5 |

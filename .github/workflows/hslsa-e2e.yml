@@ -77,6 +77,8 @@ jobs:
         run: e2e/run.sh proxy
       - name: The same lot made from the suppliers' MES and STDF exports, and checked against them
         run: e2e/run.sh adapt
+      - name: Pilot rehearsal, the lot signed by the OSAT under a buyer-run trust root, checked and measured
+        run: e2e/pilot/run.sh chip
       - name: HSM signing tests against SoftHSM2
         env:
           HSLSA_REQUIRE_PKCS11: "1"

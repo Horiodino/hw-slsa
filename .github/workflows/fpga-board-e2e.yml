@@ -19,6 +19,7 @@ on:
       - "tools/hslsa/**"
       - "e2e/fpga/**"
       - "e2e/picorv32/**"
+      - "e2e/pilot/**"
       - "hbom/hbom-predicate-v0.1.schema.json"
       - "go.mod"
       - "go.sum"
@@ -28,6 +29,7 @@ on:
       - "tools/hslsa/**"
       - "e2e/fpga/**"
       - "e2e/picorv32/**"
+      - "e2e/pilot/**"
       - "hbom/hbom-predicate-v0.1.schema.json"
       - "go.mod"
       - "go.sum"
@@ -124,6 +126,8 @@ jobs:
         env:
           HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
         run: e2e/fpga/run.sh verify | tee verify.log
+      - name: The same checks under the buyer's own trust roots (pilot rehearsal)
+        run: e2e/pilot/run.sh board | tee -a verify.log
       - name: Summary
         if: always()
         run: |

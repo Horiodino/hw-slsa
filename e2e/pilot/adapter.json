@@ -1,0 +1,112 @@
+{
+  "note": "The pilot lot: the PicoRV32 example's exports, with the OSAT Group's three sites (sort, assembly, test) signing their own records and the foundry signing nothing, so the sort site proxy-signs the fab's record from the fab's MES export.",
+  "product": {
+    "name": "picorv32-hslsa-e2e",
+    "level": "package",
+    "partNumber": "PSOC130-QFN64",
+    "revision": "A0",
+    "manufacturer": {
+      "name": "Example Open Silicon Group",
+      "country": "US"
+    },
+    "deviceIdentity": {
+      "scheme": "serial",
+      "serial": "per unit; the shipped lot lists every serial"
+    }
+  },
+  "fab": {
+    "id": "skywater",
+    "site": {
+      "name": "Example Wafer Fab",
+      "country": "US"
+    },
+    "sources": [
+      {
+        "path": "../picorv32/supplier-exports/fab-mes-lot-history.csv",
+        "format": "mes-lot-history"
+      }
+    ],
+    "checks": [
+      {
+        "operation": "MASK GDS XOR",
+        "check": "mask-vs-gds-xor"
+      },
+      {
+        "operation": "INLINE PARAMETRICS",
+        "check": "inline-parametrics"
+      }
+    ]
+  },
+  "sort": {
+    "site": {
+      "name": "Example Sort House",
+      "country": "US"
+    },
+    "sources": [
+      {
+        "path": "../picorv32/supplier-exports/sort-LOT-EXAMPLE-A.stdf",
+        "format": "stdf-v4"
+      },
+      {
+        "path": "../picorv32/supplier-exports/sort-LOT-EXAMPLE-A-W01.xml",
+        "format": "semi-e142"
+      },
+      {
+        "path": "../picorv32/supplier-exports/sort-LOT-EXAMPLE-A-W02.xml",
+        "format": "semi-e142"
+      }
+    ]
+  },
+  "packaging": {
+    "site": {
+      "name": "Example OSAT",
+      "country": "US"
+    },
+    "sources": [
+      {
+        "path": "../picorv32/supplier-exports/osat-mes-lot-history.csv",
+        "format": "mes-lot-history"
+      },
+      {
+        "path": "../picorv32/supplier-exports/osat-mes-genealogy.csv",
+        "format": "mes-genealogy"
+      }
+    ],
+    "checks": [
+      {
+        "operation": "DIE ATTACH",
+        "check": "die-attach"
+      },
+      {
+        "operation": "WIRE BOND",
+        "check": "wire-bond"
+      },
+      {
+        "operation": "XRAY SAMPLE",
+        "check": "x-ray-sample"
+      },
+      {
+        "operation": "MARK",
+        "check": "marking"
+      }
+    ]
+  },
+  "transfers": true,
+  "finalTest": {
+    "site": {
+      "name": "Example Test House",
+      "country": "US"
+    },
+    "sources": [
+      {
+        "path": "../picorv32/supplier-exports/ft-ASM-EXAMPLE-17.stdf",
+        "format": "stdf-v4"
+      }
+    ]
+  },
+  "unsigned": {
+    "wafer-fab": {
+      "cover": "proxy"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 12 (2026-09-24). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 13 (2026-09-24). See the [changelog](#changelog).
 
 ## Overview
 
@@ -124,6 +124,7 @@ Every record in HSLSA is an [in-toto Statement v1](https://github.com/in-toto/at
 | Firmware review | None of its own: the OCP S.A.F.E. short-form report, used as published (see [Firmware review](#firmware-review)) | none | Review provider | Image digest, inside the report |
 | Firmware reference values | Not an in-toto predicate: a signed CoRIM with profile `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` (see [Firmware reference values](#firmware-reference-values)) | none | Firmware build platform | Each measured image's digest, as the reference value for the device layer that measures it |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | none | Product owner | Design (final GDS or board design) and lot (shipped lot or board lot) |
+| Site key enrollment, key revocation | `https://github.com/Horiodino/hw-slsa/site-enrollment/v0.1`, `https://github.com/Horiodino/hw-slsa/key-revocation/v0.1` | none | A buyer running its own trust root ([Buyer-run trust roots](#buyer-run-trust-roots)) | The enrolled or revoked public key |
 | Verification summary | `https://slsa.dev/verification_summary/v1` | none | Vendor or buyer verifier, an [escrow auditor](#verifier-escrow), or a receiver signing a [receipt record](#receipt-record) | Any subject above, or the units one receiver got |
 
 Step types are named `https://github.com/Horiodino/hw-slsa/design-flow/step/<step>@v1` and `https://github.com/Horiodino/hw-slsa/mfg/step/<step>@v1`. A flow platform MAY instead name the tool that ran the step, as in `.../design-flow/step/openlane2@v1`, when it also states the spec step in `hwFlow.step` (see [Per-tool design steps](#per-tool-design-steps)). A verification summary reports levels as `HSLSA_<TRACK>_LEVEL_<n>` (for example `HSLSA_WAFER_LEVEL_3`); SLSA allows custom `verifiedLevels` values that do not start with `SLSA_`.
@@ -205,6 +206,24 @@ Platforms and sites sign step records; people sign only decisions.
 | Escrow auditor | Design and receipt VSAs for the buyers it checks for ([Verifier escrow](#verifier-escrow)) | Its own key, listed in each buyer's trust root as `auditor` |
 
 None of these key models requires a public transparency log. The reference tool signs every record as a DSSE envelope with a local ECDSA P-256 key, publishes nothing, and hands the buyer a trust root of public keys by role; that meets every requirement up to L2, and L3 logs may be private (see the rules under [Core requirements](#core-requirements)).
+
+#### Buyer-run trust roots
+
+Until accreditors issue site keys, a buyer MAY run its own trust root, as the [pilot kit](../pilot/README.md) does. The buyer holds one root key and signs a record for each key it accepts, after checking that key with the company that holds it (a key ceremony it attends, a fingerprint read back over a second channel, or an HSM vendor's key attestation):
+
+| Record | Predicate type | Subject | Predicate |
+| --- | --- | --- | --- |
+| Enrollment | `https://github.com/Horiodino/hw-slsa/site-enrollment/v0.1` | `urn:hslsa:key:<keyid>`, with the sha256 of the key's SubjectPublicKeyInfo | `role`; `organization` (`name`, and an `id` in the forms the HBOM takes: `lei:`, `duns:`, `cage:`, `uei:`, `gln:`); `site` (`name`, `country`); `publicKey` (PEM); `keyCustody` (`hsm` or `file`, as the site showed it); `validity` (`notBefore`, `notAfter`); `enrolledOn`; `note` on how the key was checked |
+| Revocation | `https://github.com/Horiodino/hw-slsa/key-revocation/v0.1` | The same key subject | `publicKey`, `reason`, `revokedOn` |
+
+The trust root the verifier reads is built from these records at a stated time, and only from them:
+
+1. Every record MUST be signed by the buyer's root key, and its `publicKey` MUST be the key its subject names. A record that fails either check stops the build: the directory of records is the buyer's own, and a file it did not sign there means someone else wrote to it.
+2. One key is enrolled for one role and one company. Two enrollments of one key for different roles or companies stop the build.
+3. A key is trusted when an enrollment's validity covers the build time and no revocation names it. A revoked key is dropped for every record it signed, earlier ones included, because a record's own time is whatever its signer wrote. Lots the buyer already accepted keep their receipt VSAs.
+4. The trust root states when it was built and is valid until the earliest `notAfter` among the keys it lists; a verifier MUST refuse it after that and the buyer rebuilds it, so an expired key leaves at the next receipt.
+
+A buyer-run trust root decides only whose keys a buyer accepts. It does not show that a site follows the level's requirements, which the buyer establishes before enrolling the key, as with any trust root. A record's `hwMfg.site` should name the site the key is enrolled for; the pilot measurement reports any that does not.
 
 ### Fetching records
 
@@ -760,7 +779,7 @@ Some threats are outside HSLSA altogether: changes made after the buyer's checks
 ### What the verifier trusts
 
 1. **The trust root.** Its list of keys by role decides which platforms, sites, shippers and labs are allowed. Whoever writes it decides what an allowed site is.
-2. **Key custody.** Each key is used only by the party it names. At L2 a site key may sit on an ordinary server, and whoever takes it can sign anything that site could. At L3 an HSM stops the key from being copied, not from being misused by the people allowed to use it. This spec does not define key revocation yet (see [Open questions](#open-questions) on trust roots).
+2. **Key custody.** Each key is used only by the party it names. At L2 a site key may sit on an ordinary server, and whoever takes it can sign anything that site could. At L3 an HSM stops the key from being copied, not from being misused by the people allowed to use it. A buyer-run trust root can revoke a key ([Buyer-run trust roots](#buyer-run-trust-roots)); a common revocation service across buyers is still open (see [Open questions](#open-questions) on trust roots).
 3. **Hardware roots of trust.** A unit's identity key stays inside it, and the ROM that measures its firmware does what its design says. Fault injection, side channels or invasive extraction that recover a device key let a clone answer the identity challenge.
 4. **The cryptography.** SHA-256, SHA-384 and ECDSA.
 5. **The verifier and its policy.** The policy decides which sites, checks and levels are acceptable.
@@ -909,7 +928,7 @@ The source drafts were not edited; this spec settles each difference as follows.
 
 ### Open questions
 
-- [ ] Where do IP, PDK and site signing keys live, and who runs the trust roots: each buyer, an industry body, or the accreditors (DMEA, The Open Group)?
+- [ ] Where do IP, PDK and site signing keys live, and who runs the trust roots: each buyer, an industry body, or the accreditors (DMEA, The Open Group)? Revision 13 lets a buyer run its own, with enrollment and revocation records, which serves a one-buyer pilot; a supplier selling to many buyers still enrolls with each.
 - [ ] Should source integrity (reviewed RTL) and dependency integrity (IP, PDK, cell libraries) become their own tracks, as SLSA did with Source? Today they sit inside Design L2 and L3.
 - [ ] Can analog and mixed-signal flows, mostly manual layout, reach Design L3?
 - [ ] What sampling rate makes an L4 claim meaningful for a given lot size, and who accredits the inspection labs?
@@ -944,6 +963,11 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 13 (2026-09-24)
+
+- **Buyer-run trust roots.** New [Buyer-run trust roots](#buyer-run-trust-roots): a buyer's root key signs an enrollment record for each site key it accepts (role, company, site, key custody, validity) and a revocation record to withdraw one, and the trust root the verifier reads is built from those records alone at a stated time. A trust root built this way carries `validUntil`, and the verifier refuses it after then. The reference tool's `hslsa pilot enroll`, `revoke` and `trust-root` implement it.
+- **Pilot kit.** The [pilot kit](../pilot/README.md) is what the owner hands one buyer for roadmap phase 4: the buyer's and supplier's steps, a policy for one root of trust part, `hslsa pilot measure` for what each lot cost and revealed, and a rehearsal of the whole pilot in CI. The reference tool's `mfg --sign` lets each site sign only its own records into a lot, with keys no other party holds, and refuses an earlier site's record that names other subjects than the lot it is building.
 
 ### Revision 12 (2026-09-24)
 

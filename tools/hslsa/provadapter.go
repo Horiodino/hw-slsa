@@ -39,10 +39,11 @@ import (
 	"time"
 )
 
-// stationSigner opens the key a site signs its provisioning records with.
-// Today ref is a PEM file. The HSM signing adapter resolves a PKCS#11 key
-// reference here instead; nothing else in the adapter depends on where the
-// key lives.
+// stationSigner opens the key a site signs its provisioning records with:
+// a PEM file, or a key in the site's HSM by PKCS#11 URI or <role>.pkcs11
+// file, as LoadSigner takes them. It is the one place to change if a
+// station needs more; nothing else in the adapter depends on where the key
+// lives.
 var stationSigner = func(ref string) (*Signer, error) { return LoadSigner(ref) }
 
 // ProvisioningDir holds what the adapter keeps in the bundle: the job file,

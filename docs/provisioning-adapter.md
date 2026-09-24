@@ -67,7 +67,7 @@ A unit in the log that is not in the shipped lot, such as one that failed final 
 
 ## Where the signing key comes from
 
-The adapter signs through one function, `stationSigner`, which today opens a PEM key file. The HSM signing adapter (also in phase 3) replaces it with a PKCS#11 key, so the station's site key can stay in the HSM the spec requires from L3; nothing else in the adapter changes.
+The adapter signs through one function, `stationSigner`, which opens the key with `LoadSigner`. Since the [HSM signing adapter](hsm-signing.md), that takes a PEM file, a PKCS#11 URI or a `<role>.pkcs11` file, so `--key` can name a key in the HSM the spec requires for a site from L3. `stationSigner` is the one place to change if a station needs anything more; nothing else in the adapter depends on where the key lives.
 
 ## Limits
 

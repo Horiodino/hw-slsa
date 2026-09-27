@@ -77,11 +77,12 @@ hslsa verify --bundle lot --trust-root trust-root.json --policy policy.json --un
 For the board with the root of trust on it, the board check runs the part's own chain, its Firmware L2 check and each unit's provisioning record, then the at-boot check on the boards you power on ([FPGA board example](../docs/fpga-board-example.md#what-the-buyer-checks)):
 
 ```sh
-hslsa fpga verify --bundle board --trust-root trust-root.json --policy policy.json \
+hslsa fpga verify --bundle board --trust-root board-trust-root.json --policy policy.json \
+  --part-trust-root rot=rot-trust-root.json --part-policy rot=rot-policy.json \
   --boards received-boards.txt --boots boots --vsa-key verifier.key.pem --vsa-out vsa
 ```
 
-The board check reads the root of trust part's trust root from inside the bundle (`parts/<part>/trust-root.json`), and the board's from `trust-root.json` and `design/trust-root.json`. Replace all of them with trust roots you built from your own enrollments before you run it, as `e2e/pilot/run.sh board` does: a trust root that arrives in the supplier's bundle is the supplier's word about whose keys to trust, not yours.
+Which keys you trust is your decision, not your suppliers'. `--trust-root` is the trust root for the board's own signers, and `--part-trust-root <part>=<file>` the one for a part whose chain ships in the bundle under `parts/<part>/`, each built with `hslsa pilot trust-root` from your enrollments. `--part-policy <part>=<file>` is your policy for that part. The bundle may carry trust roots and policies of its own; they are the supplier's word about whose keys to trust, and the check ignores them for any part you pass yours for. For a part you pass none for, it falls back to the bundle's and prints a line saying so: treat that line as a gap in your setup. `hslsa board verify` takes the same flags. `e2e/pilot/run.sh board` runs this with the buyer's files kept outside the bundle.
 
 For a Caliptra part, the at-boot check reads each unit's DICE certificates and appraises its measurements against the vendor's CoRIM ([Caliptra example](../docs/caliptra-e2e.md#the-at-boot-check)). In your fleet, the same appraisal runs in whatever RATS verifier you already have: `hslsa corim appraise` shows what it checks.
 

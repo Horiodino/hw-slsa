@@ -11,7 +11,7 @@ The image's `klayout/stream_out.py` differs from the tag in its first line
 only: the image's Nix build rewrote `#!/usr/bin/env python3` to the store path
 of its own Python, and OpenLane runs the script with its own interpreter, so
 the line is not used. The overlay keeps the image's line, so each patched file
-differs from the file it replaces only by the change below. `hslsa openlane run` bind-mounts each one read-only
+differs from the file it replaces only by the change below and a comment after its license header that names the change, as the Apache License 2.0 asks of a modified file. `hslsa openlane run` bind-mounts each one read-only
 over the image's copy, after checking that the image's copy is the file the
 patch was made from (`reproducibility.overlay.replaces` in
 [`../spm/flow.lock.json`](../spm/flow.lock.json) pins the image's copy of each

@@ -380,3 +380,57 @@ func TestBoardHBOMOmitsAPart(t *testing.T) {
 	})
 	boardRejects(t, work, "board design R1 (RC0402FR-0710KL) has no matching part in the HBOM")
 }
+
+// A part on a board is checked under the buyer's own trust root and policy
+// when the buyer passes them, and under its bundle's only when it does not.
+func TestPartTrustPrefersTheBuyers(t *testing.T) {
+	dir := t.TempDir()
+	chip := filepath.Join(dir, "parts", "rot")
+	for _, d := range []string{filepath.Join(dir, "supplier"), filepath.Join(dir, "buyer"), chip} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	supplier, err := Keygen(filepath.Join(dir, "supplier"), "test-site")
+	if err != nil {
+		t.Fatal(err)
+	}
+	buyer, err := Keygen(filepath.Join(dir, "buyer"), "test-site")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := BuildTrustRoot(filepath.Join(dir, "supplier"), filepath.Join(chip, "trust-root.json")); err != nil {
+		t.Fatal(err)
+	}
+	buyerTrust := filepath.Join(dir, "buyer-trust-root.json")
+	if err := BuildTrustRoot(filepath.Join(dir, "buyer"), buyerTrust); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteJSON(filepath.Join(chip, "policy.json"), Obj{"from": "supplier"}); err != nil {
+		t.Fatal(err)
+	}
+	buyerPolicy := filepath.Join(dir, "buyer-policy.json")
+	if err := WriteJSON(buyerPolicy, Obj{"from": "buyer"}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { PartRoots = map[string]PartRoot{} })
+
+	check := func(why string, wantKey *Signer, wantPolicy string) {
+		t.Helper()
+		trust, policy, err := partTrust(chip)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if keys := trust.Roles["test-site"]; len(keys) != 1 || keys[0].ID != wantKey.Key.ID {
+			t.Fatalf("%s: trusted %v, want only %s", why, keys, wantKey.Key.ID)
+		}
+		if S(policy, "from") != wantPolicy {
+			t.Fatalf("%s: policy from %s, want %s", why, S(policy, "from"), wantPolicy)
+		}
+	}
+	check("nothing passed", supplier, "supplier")
+	PartRoots["rot"] = PartRoot{TrustRoot: buyerTrust, Policy: buyerPolicy}
+	check("the buyer's passed", buyer, "buyer")
+	PartRoots["rot"] = PartRoot{TrustRoot: buyerTrust}
+	check("only the buyer's trust root passed", buyer, "supplier")
+}

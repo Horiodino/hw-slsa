@@ -2,6 +2,8 @@ module github.com/Horiodino/hw-slsa
 
 go 1.25.0
 
+toolchain go1.25.14
+
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/fxamacker/cbor/v2 v2.8.0

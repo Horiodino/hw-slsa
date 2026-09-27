@@ -48,6 +48,7 @@ var commands = map[string]command{
 	"corim":         {"show a signed CoRIM, or appraise DICE certificates against it", corimCmd},
 	"safe":          {"sign, show or check an OCP S.A.F.E. short-form report", safeCmd},
 	"pilot":         {"a buyer-run pilot: enroll or revoke site keys, build the trust root from them, measure a lot", pilot},
+	"kit":           {"sign the pilot kit's provenance, or check a kit against it", kit},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -699,7 +700,11 @@ func board(args []string) error {
 	boards := f.str("boards", "verify: file with the serials of the boards received", false)
 	vsaKey := f.str("vsa-key", "", false)
 	vsaOut := f.str("vsa-out", "", false)
+	setPartRoots := partRootFlags(f)
 	if err := f.parse(rest); err != nil {
+		return err
+	}
+	if err := setPartRoots(); err != nil {
 		return err
 	}
 	if act == "produce" {
@@ -818,7 +823,11 @@ func fpga(args []string) error {
 	bundle, trust, policy := f.str("bundle", "", true), f.str("trust-root", "", true), f.str("policy", "", true)
 	boards, boots := f.str("boards", "file with the serials of the boards received", false), f.str("boots", "what each received board returned at boot", false)
 	vsaKey, vsaOut := f.str("vsa-key", "", false), f.str("vsa-out", "", false)
+	setPartRoots := partRootFlags(f)
 	if err := f.parse(rest); err != nil {
+		return err
+	}
+	if err := setPartRoots(); err != nil {
 		return err
 	}
 	tr, err := hslsa.LoadTrustRoot(*trust)
@@ -1148,6 +1157,102 @@ func parseFlagTime(v, name string) (time.Time, error) {
 		return t, nil
 	}
 	return time.Time{}, usageError{fmt.Sprintf("--%s: %q is not a date (2026-12-31) or an RFC 3339 time", name, v)}
+}
+
+// partRootFlags adds --part-trust-root and --part-policy, each repeatable as
+// <part>=<file>, and returns a function that stores them in hslsa.PartRoots.
+func partRootFlags(f *flags) func() error {
+	var trusts, policies multiFlag
+	f.Var(&trusts, "part-trust-root", "verify: <part>=<file>, your trust root for a part under parts/ (repeatable)")
+	f.Var(&policies, "part-policy", "verify: <part>=<file>, your policy for a part under parts/ (repeatable)")
+	return func() error {
+		for _, set := range []struct {
+			vals multiFlag
+			flag string
+			put  func(*hslsa.PartRoot, string)
+		}{
+			{trusts, "--part-trust-root", func(r *hslsa.PartRoot, v string) { r.TrustRoot = v }},
+			{policies, "--part-policy", func(r *hslsa.PartRoot, v string) { r.Policy = v }},
+		} {
+			for _, v := range set.vals {
+				part, file, ok := strings.Cut(v, "=")
+				if !ok || part == "" || file == "" || strings.ContainsAny(part, `/\`) {
+					return usageError{fmt.Sprintf("%s %q: want <part>=<file>, the part's directory under parts/", set.flag, v)}
+				}
+				r := hslsa.PartRoots[part]
+				set.put(&r, file)
+				hslsa.PartRoots[part] = r
+			}
+		}
+		return nil
+	}
+}
+
+type multiFlag []string
+
+func (m *multiFlag) String() string     { return strings.Join(*m, ",") }
+func (m *multiFlag) Set(v string) error { *m = append(*m, v); return nil }
+
+// kitFiles reads name=path arguments; a bare path is named by its base name.
+func kitFiles(args []string) ([]hslsa.KitFile, error) {
+	if len(args) == 0 {
+		return nil, usageError{"at least one file is required"}
+	}
+	var files []hslsa.KitFile
+	for _, a := range args {
+		name, path, ok := strings.Cut(a, "=")
+		if !ok {
+			name, path = filepath.Base(a), a
+		}
+		if name == "" || path == "" {
+			return nil, usageError{fmt.Sprintf("%q: want name=path or a path", a)}
+		}
+		files = append(files, hslsa.KitFile{Name: name, Path: path})
+	}
+	return files, nil
+}
+
+func kit(args []string) error {
+	act, rest, err := action(args, "sign", "verify")
+	if err != nil {
+		return err
+	}
+	f := newFlags("kit " + act)
+	switch act {
+	case "sign":
+		key := f.str("key", "the kit owner's private key file or PKCS#11 URI", true)
+		commit := f.str("commit", "the full git commit the kit was built from", true)
+		prov := f.str("provenance", "provenance envelope to write", true)
+		sig := f.str("sig", "detached signature over the first file to write, for openssl", false)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		files, err := kitFiles(f.Args())
+		if err != nil {
+			return err
+		}
+		s, err := hslsa.LoadSigner(*key)
+		if err != nil {
+			return err
+		}
+		return hslsa.SignKit(s, *commit, files, *prov, *sig)
+	default:
+		pub := f.str("pub", "the kit owner's public key, checked over a second channel", true)
+		prov := f.str("provenance", "the kit's provenance envelope", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		files, err := kitFiles(f.Args())
+		if err != nil {
+			return err
+		}
+		commit, err := hslsa.VerifyKit(*pub, *prov, files)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("kit OK: %d files match the provenance, built from commit %s\n", len(files), commit)
+		return nil
+	}
 }
 
 func pilot(args []string) error {

@@ -492,11 +492,7 @@ func RoTCheck(bundle string, hb Obj, policy Obj) (*RoTResult, error) {
 	// The part's own chain: BoardCheck already ran its lot receipt check through hbomRef.
 	rel := strings.TrimPrefix(S(part, "hbomRef", "uri"), "file:")
 	rotBundle := filepath.Dir(filepath.Dir(filepath.Join(bundle, rel)))
-	trust, err := LoadTrustRoot(filepath.Join(rotBundle, "trust-root.json"))
-	if err != nil {
-		return nil, err
-	}
-	rotPolicy, err := ReadObj(filepath.Join(rotBundle, "policy.json"))
+	trust, rotPolicy, err := partTrust(rotBundle)
 	if err != nil {
 		return nil, err
 	}

@@ -83,14 +83,47 @@ func boardRecord(bundle, step, name string, subjects []Obj, external Obj, deps [
 	return relRD(bundle, "att/"+name), nil
 }
 
-// ChipCheck is the buyer's tapeout and lot receipt check on a chip bundle,
-// with the bundle's own trust root and policy. Tests may replace it.
-var ChipCheck = func(chip string, units []string) (*LotResult, error) {
-	trust, err := LoadTrustRoot(filepath.Join(chip, "trust-root.json"))
-	if err != nil {
-		return nil, err
+// PartRoot is a trust root and a policy the buyer supplies for one part on a
+// board, in place of the ones that came in the part's bundle.
+type PartRoot struct {
+	TrustRoot, Policy string
+}
+
+// PartRoots holds the buyer's own trust roots and policies for the parts on a
+// board, by the part's directory under parts/ (such as "rot"). A trust root in
+// the supplier's bundle is the supplier's word about whose keys to trust, so a
+// buyer passes its own; a part with none listed falls back to its bundle's,
+// and the check says so.
+var PartRoots = map[string]PartRoot{}
+
+// partTrust is the trust root and policy a part's chain is checked under.
+func partTrust(chip string) (*TrustRoot, Obj, error) {
+	name := filepath.Base(chip)
+	own := PartRoots[name]
+	trustPath, policyPath := own.TrustRoot, own.Policy
+	if trustPath == "" {
+		trustPath = filepath.Join(chip, "trust-root.json")
+		fmt.Printf("part %s: checked under the trust root in its own bundle; pass --part-trust-root %s=<file> to use yours\n", name, name)
 	}
-	policy, err := ReadObj(filepath.Join(chip, "policy.json"))
+	if policyPath == "" {
+		policyPath = filepath.Join(chip, "policy.json")
+		fmt.Printf("part %s: checked under the policy in its own bundle; pass --part-policy %s=<file> to use yours\n", name, name)
+	}
+	trust, err := LoadTrustRoot(trustPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	policy, err := ReadObj(policyPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	return trust, policy, nil
+}
+
+// ChipCheck is the buyer's tapeout and lot receipt check on a chip bundle,
+// under the trust root and policy partTrust picks. Tests may replace it.
+var ChipCheck = func(chip string, units []string) (*LotResult, error) {
+	trust, policy, err := partTrust(chip)
 	if err != nil {
 		return nil, err
 	}

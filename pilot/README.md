@@ -1,8 +1,33 @@
 # HSLSA pilot kit
 
-This kit is what the owner of this repository hands one buyer for [roadmap phase 4](../docs/roadmap.md#phase-4-pilots-with-one-buyer-who-needs-this): one buyer, one root of trust part, one supplier signing its own records, and a measured result. It is aimed at the roadmap's first candidate, a hyperscaler in the Open Compute Project that already requires a Caliptra-class root of trust and reads OCP S.A.F.E. reports, because the [viability assessment](https://claude.ai/artifact/E5HsAcGhb79T9x3cNw6cmG) found the Firmware track and board checks ready now and Package/Test plausible with a large customer behind it.
+This kit is what the owner of this repository hands one buyer for [roadmap phase 4](../docs/roadmap.md#phase-4-pilots-with-one-buyer-who-needs-this): one buyer, one root of trust part, one supplier signing its own records, and a measured result. It is aimed at the roadmap's first candidate, a hyperscaler in the Open Compute Project that already requires a Caliptra-class root of trust and reads OCP S.A.F.E. reports, because the [viability assessment](../docs/viability.md) found the Firmware track and board checks ready now and Package/Test plausible with a large customer behind it.
 
 The repository is private. The buyer gets the kit as a tarball (`pilot/make-kit.sh`) or a private invitation to the repository; nothing in it needs a public transparency log or a network service.
+
+## Checking the kit you received
+
+A tarball kit arrives as four files: `hslsa-pilot-kit-<commit>.tar.gz`, its `.tar.gz.sig`, its `.provenance.json`, and the kit owner's `.pub.pem`. The owner also sends the public key's sha256 over a different channel, such as a call or a separate email. Check, in order:
+
+1. **The key.** `sha256sum hslsa-pilot-kit-*.pub.pem` prints the value the owner sent you. If it differs, stop.
+2. **The tarball**, with openssl alone, so nothing in the kit is trusted yet:
+
+   ```
+   openssl dgst -sha256 -verify hslsa-pilot-kit-*.pub.pem \
+     -signature hslsa-pilot-kit-*.tar.gz.sig hslsa-pilot-kit-*.tar.gz
+   ```
+
+   It prints `Verified OK`.
+3. **Unpack it and check each binary against the provenance.** From the unpacked directory, with the binary for your platform:
+
+   ```
+   bin/hslsa-linux-amd64 kit verify --pub ../hslsa-pilot-kit-*.pub.pem \
+     --provenance ../hslsa-pilot-kit-*.provenance.json bin/hslsa-*
+   sha256sum -c SHA256SUMS
+   ```
+
+   The first command names the commit the kit was built from, which `KIT.txt` also gives. The provenance is a SLSA provenance statement in a DSSE envelope, so any in-toto verifier can read it too.
+
+The kit is shared under the [HSLSA Evaluation License](../LICENSE): use it inside your organization for the pilot, and do not pass it on. `licenses/` holds the license of every Go module in the binaries, and [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) lists the third-party files in the source. The macOS binaries are not notarized, so macOS may ask you to allow them, or you can build from the source with `go build ./tools/hslsa/cmd/hslsa`.
 
 ## Scope
 
@@ -30,9 +55,10 @@ The roadmap's pilot has three steps. Each maps to commands in this kit.
 | [`buyer.md`](buyer.md) | The buyer's steps: root key, enrollments, policy, receipt and at-boot checks, measurement |
 | [`supplier.md`](supplier.md) | The OSAT's and the RoT vendor's steps: keys, exports to records, provisioning, handing over a lot |
 | [`agreement.md`](agreement.md) | What the parties settle before the first lot: data, keys, retention, what gets published |
-| [`make-kit.sh`](make-kit.sh) | Builds the tarball: the repository at one commit, `hslsa` binaries for common platforms, checksums |
+| [`make-kit.sh`](make-kit.sh) | Builds the tarball: the repository at one commit, `hslsa` binaries for common platforms, the licenses of the Go modules in them, checksums; then signs it and writes its provenance |
+| [`vendor.md`](vendor.md) | Where a chip vendor starts when it receives the kit before any buyer is involved |
 | [`../e2e/pilot/`](../e2e/pilot) | The rehearsal: the buyer's policy for the part, the adapter configuration, a cost sheet template, and `run.sh` |
-| [`../spec/hslsa-v0.1.md`](../spec/hslsa-v0.1.md) | The specification; the pilot uses revision 13 |
+| [`../spec/hslsa-v0.1.md`](../spec/hslsa-v0.1.md) | The specification; the pilot uses revision 14 |
 | [`../tools/hslsa`](../tools/hslsa) | The reference tool and verifier, in Go |
 
 ## The rehearsal
@@ -56,5 +82,5 @@ The rehearsal's companies, organization ids and cost figures are made up. The FP
 These are the owner's decisions, not the kit's:
 
 1. **Which buyer.** The kit defaults to an OCP-member hyperscaler. A defense program, a server OEM or an open silicon project would change the part and the tracks (see the roadmap's table), not the commands.
-2. **Tarball or invitation.** The repository stays private either way. A tarball carries one commit; an invitation lets the buyer follow changes and file issues.
+2. **Tarball or invitation.** The repository stays private either way. A tarball carries one commit; an invitation lets the buyer follow changes and file issues. A tarball is signed with the owner's key (`HSLSA_KIT_KEY=<key> pilot/make-kit.sh`); send the printed public key sha256 separately from the kit.
 3. **What gets published at the end.** Step 3 says "publish the result". [agreement.md](agreement.md) lists what each party has to approve first.

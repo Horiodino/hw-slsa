@@ -151,20 +151,29 @@ board() {
   }
   enroll_all "$b/parts/rot/trust-root.json" "$work/rot" "Example RoT Co" duns:100000004 "Example RoT Co"
   enroll_all "$b/trust-root.json" "$work/board" "Example Board Co" duns:100000005 "Example Board Co"
-  hslsa pilot trust-root --buyer-pub "$work/buyer/buyer-root.pub.pem" --enrollments "$work/rot" --out "$b/parts/rot/trust-root.json" > /dev/null
-  hslsa pilot trust-root --buyer-pub "$work/buyer/buyer-root.pub.pem" --enrollments "$work/board" --out "$b/trust-root.json" > /dev/null
-  cp "$b/trust-root.json" "$b/design/trust-root.json"
+  # The buyer's trust roots and the part's policy stay with the buyer, outside
+  # the bundle; the trust roots that came in the bundle are left as the
+  # suppliers sent them, and the check must not use them.
+  hslsa pilot trust-root --buyer-pub "$work/buyer/buyer-root.pub.pem" --enrollments "$work/rot" --out "$work/rot-trust-root.json" > /dev/null
+  hslsa pilot trust-root --buyer-pub "$work/buyer/buyer-root.pub.pem" --enrollments "$work/board" --out "$work/board-trust-root.json" > /dev/null
+  cp "$b/parts/rot/policy.json" "$work/rot-policy.json"
 
   echo "== the buyer's board and at-boot checks under its own trust roots"
-  local check=(--bundle "$b" --trust-root "$b/trust-root.json" --policy "$b/policy.json"
+  local check=(--bundle "$b" --trust-root "$work/board-trust-root.json" --policy "$b/policy.json"
+               --part-trust-root "rot=$work/rot-trust-root.json" --part-policy "rot=$work/rot-policy.json"
                --boards "$ROOT/e2e/fpga/received-boards.txt" --boots "$fpga/boots")
-  hslsa fpga verify "${check[@]}"
+  hslsa fpga verify "${check[@]}" | tee "$work/verify.log"
+  if grep -q "in its own bundle" "$work/verify.log"; then
+    echo "FAIL: the check used a trust root or policy from the supplier's bundle" >&2
+    exit 1
+  fi
   echo "ok: board lot, root of trust firmware and every boot pass under buyer-run trust roots"
 
-  # The root of trust vendor's test site key revoked: its provisioning records no longer count.
+  # The root of trust vendor's test site key revoked: its provisioning records
+  # no longer count, although the bundle's own trust root still lists the key.
   hslsa pilot revoke --buyer-key "$work/buyer/buyer-root.key.pem" --pub "$work/keys/test-site-rot.pub.pem" \
     --reason "station key rotated" --out "$work/rot/revoke-test-site.intoto.json" > /dev/null
-  hslsa pilot trust-root --buyer-pub "$work/buyer/buyer-root.pub.pem" --enrollments "$work/rot" --out "$b/parts/rot/trust-root.json" > /dev/null
+  hslsa pilot trust-root --buyer-pub "$work/buyer/buyer-root.pub.pem" --enrollments "$work/rot" --out "$work/rot-trust-root.json" > /dev/null
   refuses "a root of trust whose test site key was revoked" hslsa fpga verify "${check[@]}"
   rm -f "$work/buyer/buyer-root.key.pem"
 }

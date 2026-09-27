@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 13 (2026-09-24). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 14 (2026-09-27). See the [changelog](#changelog).
 
 ## Overview
 
@@ -222,6 +222,8 @@ The trust root the verifier reads is built from these records at a stated time, 
 2. One key is enrolled for one role and one company. Two enrollments of one key for different roles or companies stop the build.
 3. A key is trusted when an enrollment's validity covers the build time and no revocation names it. A revoked key is dropped for every record it signed, earlier ones included, because a record's own time is whatever its signer wrote. Lots the buyer already accepted keep their receipt VSAs.
 4. The trust root states when it was built and is valid until the earliest `notAfter` among the keys it lists; a verifier MUST refuse it after that and the buyer rebuilds it, so an expired key leaves at the next receipt.
+
+The verifier's trust roots and policy are the buyer's, never the supplier's. A trust root or policy that arrives inside a supplier's bundle, including one for a part on a board, is that supplier's claim about whose keys to trust; a verifier SHOULD check each part's chain under a trust root and policy the buyer supplies for that part, and MUST say so when it falls back to the bundle's.
 
 A buyer-run trust root decides only whose keys a buyer accepts. It does not show that a site follows the level's requirements, which the buyer establishes before enrolling the key, as with any trust root. A record's `hwMfg.site` should name the site the key is enrolled for; the pilot measurement reports any that does not.
 
@@ -581,7 +583,7 @@ Whoever runs this check MAY sign a [receipt record](#receipt-record) for the uni
 1. The board HBOM is signed by the board owner and valid against the schema, and its lot subject is A1's board lot.
 2. A1 is signed by an allowed EMS site, its gates passed, it names the same board design, and it consumes every distribution record and each chip's shipped lot, HBOM and receipt record.
 3. Every `parts[]` entry has a distribution record signed by a shipper the policy names, with the same lot and date code. `authorized: true` holds only where the policy lists that shipper as an authorized channel for the manufacturer, and the policy MAY require an authorized channel for every part.
-4. Each chip with its own chain passes the lot receipt check above under its own trust root, every chip shipped to the EMS is in its shipped lot, and the board HBOM names the lot that chain proves. The EMS's receipt record for that lot passed under the chip's policy and covers exactly the units shipped to the EMS.
+4. Each chip with its own chain passes the lot receipt check above under the trust root and policy the buyer holds for that chip's suppliers ([Buyer-run trust roots](#buyer-run-trust-roots)), every chip shipped to the EMS is in its shipped lot, and the board HBOM names the lot that chain proves. The EMS's receipt record for that lot passed under the chip's policy and covers exactly the units shipped to the EMS.
 5. `parts[]` covers exactly the board design's reference designators; every placement in the build records is a listed lot; no serialized part is placed twice or placed without being shipped, and no lot is placed more often than it was shipped.
 6. The board lot is the set of boards that passed test, A1's yield accounts for the rest, every board in the lot is an A1 subject, and every received board is in the lot.
 
@@ -963,6 +965,11 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 14 (2026-09-27)
+
+- **The buyer's trust roots for parts on a board.** [Buyer-run trust roots](#buyer-run-trust-roots) now says that a trust root or policy arriving in a supplier's bundle is the supplier's claim, and the board receipt check in [Where the chain is checked](#where-the-chain-is-checked) runs each chip's chain under the trust root and policy the buyer holds for it. The reference tool's `board verify` and `fpga verify` take `--part-trust-root` and `--part-policy` per part, and print a line when a part falls back to its bundle's.
+- **Release housekeeping, no rule changes.** The repository carries a [license](../LICENSE) (an evaluation license until it is published), [third-party notices](../THIRD_PARTY_NOTICES.md) and a [security policy](../SECURITY.md); the [pilot kit](../pilot/README.md) is signed by its owner, with SLSA provenance for its binaries that `hslsa kit verify` checks.
 
 ### Revision 13 (2026-09-24)
 

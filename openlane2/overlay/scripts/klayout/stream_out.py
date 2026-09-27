@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Modified for HSLSA (2026): GDS is written with gds2_write_timestamps off
+# when SOURCE_DATE_EPOCH is set. See openlane2/overlay/README.md.
 
 # Original Copyright Follows
 #

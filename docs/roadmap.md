@@ -1,6 +1,6 @@
 # Roadmap to real-world use
 
-This roadmap turns HSLSA from a working draft with simulated supply chain data into something suppliers and buyers can run. It follows from the [viability assessment](https://claude.ai/artifact/E5HsAcGhb79T9x3cNw6cmG) of 2026-09-12, whose short version is: the design is technically sound, but nobody outside this repository signs the records yet.
+This roadmap turns HSLSA from a working draft with simulated supply chain data into something suppliers and buyers can run. It follows from the [viability assessment](viability.md) of 2026-09-12, whose short version is: the design is technically sound, but nobody outside this repository signs the records yet.
 
 The phases are ordered by dependency, not by date. Each ends with an exit criterion that can be checked, and the first two can be done entirely in this repository.
 
@@ -108,7 +108,7 @@ In the pilot:
 
 **Exit:** one external supplier signs one record type for a real product, and one buyer verifies it before accepting parts.
 
-**Pilot kit: ready to hand to a buyer.** Spec revision 13. The [pilot kit](../pilot/README.md) is aimed at the first row, an OCP hyperscaler, for one root of trust part: Package/Test L2 signed by one OSAT group with its own keys, Firmware L2 for the part, and the at-boot check. For step 1, `hslsa pilot enroll`, `revoke` and `trust-root` let the buyer run the trust root from its own signed enrollments ([Buyer-run trust roots](../spec/hslsa-v0.1.md#buyer-run-trust-roots)). For step 2, `hslsa mfg --sign` lets each site sign only its own records into a lot, with keys no other party holds. For step 3, `hslsa pilot measure` records each lot's check result, who signed what and which fields the buyer holds, and each party's reported cost, with a summary across lots. `e2e/pilot/run.sh` rehearses all of it in CI on the PicoRV32 lot and the FPGA board. Still needed, and only the owner can start it: a buyer and its OSAT willing to run it on a real part, and the decisions below.
+**Pilot kit: ready to hand to a buyer.** Spec revision 13. The [pilot kit](../pilot/README.md) is aimed at the first row, an OCP hyperscaler, for one root of trust part: Package/Test L2 signed by one OSAT group with its own keys, Firmware L2 for the part, and the at-boot check. For step 1, `hslsa pilot enroll`, `revoke` and `trust-root` let the buyer run the trust root from its own signed enrollments ([Buyer-run trust roots](../spec/hslsa-v0.1.md#buyer-run-trust-roots)). For step 2, `hslsa mfg --sign` lets each site sign only its own records into a lot, with keys no other party holds. For step 3, `hslsa pilot measure` records each lot's check result, who signed what and which fields the buyer holds, and each party's reported cost, with a summary across lots. Since revision 14 the board check also runs each part's chain under the buyer's own trust root and policy for that part (`--part-trust-root`, `--part-policy`), and the kit is signed with SLSA provenance for its binaries. `e2e/pilot/run.sh` rehearses all of it in CI on the PicoRV32 lot and the FPGA board. Still needed, and only the owner can start it: a buyer and its OSAT willing to run it on a real part, and the decisions below.
 
 ## Phase 5: A neutral home and v1.0
 

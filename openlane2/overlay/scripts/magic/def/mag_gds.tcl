@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Modified for HSLSA (2026): the .mag timestamp and the GDS dates come from
+# SOURCE_DATE_EPOCH. See openlane2/overlay/README.md.
 source $::env(SCRIPTS_DIR)/magic/common/read.tcl
 
 # HSLSA overlay: "gds datestamp" sets the creation date of the library and of

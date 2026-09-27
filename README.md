@@ -44,4 +44,4 @@ Predicate types and schema IDs live under `https://github.com/Horiodino/hw-slsa/
 
 ## License
 
-HSLSA is shared for evaluation and pilots under the [HSLSA Evaluation License](LICENSE); it is not open source yet. Third-party files keep their own licenses ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). To report a security problem, see [SECURITY.md](SECURITY.md).
+The code (the reference tool, adapters, examples, schemas and workflows) is under the [Apache License 2.0](LICENSE). The specification and the documentation (`spec/`, `docs/` and every Markdown file) are under [Creative Commons Attribution 4.0](LICENSE-CC-BY-4.0). Third-party files keep their own licenses ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). To report a security problem, see [SECURITY.md](SECURITY.md).

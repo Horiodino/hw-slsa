@@ -1,0 +1,9 @@
+HSLSA: Hardware Supply Chain Security Framework
+Copyright 2026 Horiodino (https://github.com/Horiodino)
+
+The code in this repository is licensed under the Apache License 2.0 (LICENSE).
+The specification and documentation (spec/, docs/ and every Markdown file) are
+licensed under Creative Commons Attribution 4.0 International (LICENSE-CC-BY-4.0).
+
+This product includes files from other projects under their own licenses; see
+THIRD_PARTY_NOTICES.md.

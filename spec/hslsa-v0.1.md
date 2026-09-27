@@ -969,7 +969,7 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 ### Revision 14 (2026-09-27)
 
 - **The buyer's trust roots for parts on a board.** [Buyer-run trust roots](#buyer-run-trust-roots) now says that a trust root or policy arriving in a supplier's bundle is the supplier's claim, and the board receipt check in [Where the chain is checked](#where-the-chain-is-checked) runs each chip's chain under the trust root and policy the buyer holds for it. The reference tool's `board verify` and `fpga verify` take `--part-trust-root` and `--part-policy` per part, and print a line when a part falls back to its bundle's.
-- **Release housekeeping, no rule changes.** The repository carries a [license](../LICENSE) (an evaluation license until it is published), [third-party notices](../THIRD_PARTY_NOTICES.md) and a [security policy](../SECURITY.md); the [pilot kit](../pilot/README.md) is signed by its owner, with SLSA provenance for its binaries that `hslsa kit verify` checks.
+- **Release housekeeping, no rule changes.** The code is under the [Apache License 2.0](../LICENSE) and this specification and the documentation under [CC BY 4.0](../LICENSE-CC-BY-4.0); the repository also carries [third-party notices](../THIRD_PARTY_NOTICES.md) and a [security policy](../SECURITY.md); the [pilot kit](../pilot/README.md) is signed by its owner, with SLSA provenance for its binaries that `hslsa kit verify` checks.
 
 ### Revision 13 (2026-09-24)
 

@@ -1,6 +1,6 @@
 # Third-party files
 
-These files are not under this repository's [LICENSE](LICENSE). Each stays under its own license, as listed. The `hslsa` binaries in a pilot kit also contain Go modules under their own licenses; the kit's `licenses/` directory carries each module's license text.
+These files are not under this repository's licenses ([Apache-2.0](LICENSE) for code, [CC BY 4.0](LICENSE-CC-BY-4.0) for the specification and documentation). Each stays under its own license, as listed. The `hslsa` binaries in a pilot kit also contain Go modules under their own licenses; the kit's `licenses/` directory carries each module's license text.
 
 | Files | From | License | Changed |
 | --- | --- | --- | --- |

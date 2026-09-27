@@ -28,4 +28,4 @@ Until one of your customers joins, the owner of this kit plays the buyer: it enr
 
 For every lot, `hslsa pilot measure` reports whether the buyer's check passed and why not if it failed, how long it took, which of your records' fields the buyer now holds, and the hours each party spent. Those reports are the pilot's result; [agreement.md](agreement.md) says what may be published from them, and each party approves it first.
 
-The kit is shared under the [HSLSA Evaluation License](../LICENSE): use it inside your organization for this pilot, and do not pass it on. Report a security problem in the tool as [SECURITY.md](../SECURITY.md) says.
+The kit's code is under the [Apache License 2.0](../LICENSE) and its specification and documentation under [CC BY 4.0](../LICENSE-CC-BY-4.0). What you sign with it, and the data in your records, stay yours; [agreement.md](agreement.md) says who receives them. Report a security problem in the tool as [SECURITY.md](../SECURITY.md) says.

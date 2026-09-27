@@ -81,7 +81,7 @@ commit:        $commit
 spec revision: $spec_rev
 committed:     $(date -u -d "@$epoch" +%Y-%m-%dT%H:%M:%SZ)
 go:            $have_go
-license:       LICENSE (HSLSA Evaluation License); licenses/ for the Go modules in bin/
+license:       code Apache-2.0 (LICENSE), spec and docs CC-BY-4.0 (LICENSE-CC-BY-4.0); licenses/ for the Go modules in bin/
 start here:    pilot/README.md
 EOF
 (cd "$stage" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS)

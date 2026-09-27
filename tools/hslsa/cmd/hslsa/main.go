@@ -1193,7 +1193,8 @@ type multiFlag []string
 func (m *multiFlag) String() string     { return strings.Join(*m, ",") }
 func (m *multiFlag) Set(v string) error { *m = append(*m, v); return nil }
 
-// kitFiles reads name=path arguments; a bare path is named by its base name.
+// kitFiles reads name=path arguments; a bare path is named as written, so
+// bin/hslsa-linux-amd64 run from the unpacked kit is the provenance's name.
 func kitFiles(args []string) ([]hslsa.KitFile, error) {
 	if len(args) == 0 {
 		return nil, usageError{"at least one file is required"}
@@ -1202,7 +1203,7 @@ func kitFiles(args []string) ([]hslsa.KitFile, error) {
 	for _, a := range args {
 		name, path, ok := strings.Cut(a, "=")
 		if !ok {
-			name, path = filepath.Base(a), a
+			name, path = filepath.ToSlash(filepath.Clean(a)), a
 		}
 		if name == "" || path == "" {
 			return nil, usageError{fmt.Sprintf("%q: want name=path or a path", a)}
@@ -1250,7 +1251,7 @@ func kit(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("kit OK: %d files match the provenance, built from commit %s\n", len(files), commit)
+		fmt.Printf("kit OK: all %d named files match the provenance; built from commit %s\n", len(files), commit)
 		return nil
 	}
 }

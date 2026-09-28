@@ -23,6 +23,8 @@ on:
     paths: [openlane2/**, adapters/eda-tcl/**, tools/hslsa/**, go.mod, go.sum, .github/workflows/openlane2-flow.yml]
   pull_request:
     paths: [openlane2/**, adapters/eda-tcl/**, tools/hslsa/**, go.mod, go.sum, .github/workflows/openlane2-flow.yml]
+  # The release workflow runs this as one of the tests a release must pass.
+  workflow_call:
   workflow_dispatch:
 
 permissions:

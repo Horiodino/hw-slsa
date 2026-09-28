@@ -30,6 +30,8 @@ on:
       - go.sum
       - hbom/**
       - .github/workflows/caliptra-e2e.yml
+  # The release workflow runs this as one of the tests a release must pass.
+  workflow_call:
   workflow_dispatch:
     inputs:
       rtl:

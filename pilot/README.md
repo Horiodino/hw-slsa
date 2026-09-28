@@ -27,6 +27,8 @@ A tarball kit arrives as four files: `hslsa-pilot-kit-<commit>.tar.gz`, its `.ta
 
    The first command names the commit the kit was built from, which `KIT.txt` also gives. The provenance is a SLSA provenance statement in a DSSE envelope, so any in-toto verifier can read it too.
 
+The same `hslsa` tool also ships as a private container image on GHCR for anyone the owner grants access to; [docs/release.md](../docs/release.md#the-container-image) says how to pull and run it.
+
 The code in the kit is under the [Apache License 2.0](../LICENSE) and the specification and documentation under [CC BY 4.0](../LICENSE-CC-BY-4.0). `licenses/` holds the license of every Go module in the binaries, and [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) lists the third-party files in the source. The macOS binaries are not notarized, so macOS may ask you to allow them, or you can build from the source with `go build ./tools/hslsa/cmd/hslsa`.
 
 ## Scope

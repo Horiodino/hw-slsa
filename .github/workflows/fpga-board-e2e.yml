@@ -34,6 +34,8 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/fpga-board-e2e.yml"
+  # The release workflow runs this as one of the tests a release must pass.
+  workflow_call:
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,12 @@
+# Only what the Dockerfile copies.
+*
+!dist/hslsa-linux-*
+!dist/licenses
+!LICENSE
+!LICENSE-CC-BY-4.0
+!NOTICE
+!THIRD_PARTY_NOTICES.md
+!SECURITY.md
+!spec
+!pilot
+!e2e/pilot

@@ -1,0 +1,226 @@
+# Release: run every test, then publish the pilot kit, the hslsa container
+# image on GHCR and a GitHub release for one tag.
+#
+#   git tag v0.1.0-pilot.2 && git push origin v0.1.0-pilot.2
+#
+# or run this workflow by hand from a tag (Actions > Release > Run workflow,
+# "Use workflow from: Tags"). Run from a branch, or on a pull request that
+# touches the release files, it is a dry run: the same tests (not on pull
+# requests, where they run on their own), a kit signed with a throwaway key,
+# the image built and run locally, and nothing published.
+#
+# Private by design, like the other workflows: the kit is signed with the
+# owner's own key from the HSLSA_KIT_KEY secret, no job requests an OIDC
+# token or talks to Sigstore, and the image goes to GHCR as a package of
+# this private repository, so it is private too. See docs/release.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/release.yml
+      - pilot/make-kit.sh
+      - pilot/collect-licenses.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Every test a pull request runs, on the commit being released. Each is the
+  # repository's own workflow, called as is.
+  e2e:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/hslsa-e2e.yml
+    secrets: inherit
+  fpga-board:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/fpga-board-e2e.yml
+    secrets: inherit
+  openlane2:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/openlane2-flow.yml
+    secrets: inherit
+  caliptra:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/caliptra-e2e.yml
+    secrets: inherit
+
+  publish:
+    name: Kit, container image and release
+    needs: [e2e, fpga-board, openlane2, caliptra]
+    # On a pull request the tests are skipped here, so only the dry run runs.
+    if: >-
+      !cancelled() && (github.event_name == 'pull_request' ||
+      (needs.e2e.result == 'success' && needs.fpga-board.result == 'success' &&
+       needs.openlane2.result == 'success' && needs.caliptra.result == 'success'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the release and upload its files
+      packages: write # push the image to GHCR
+    env:
+      PUBLISH: ${{ github.ref_type == 'tag' && github.event_name != 'pull_request' }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Name the release
+        run: |
+          image=ghcr.io/${GITHUB_REPOSITORY,,}
+          {
+            echo "IMAGE=$image"
+            echo "COMMIT=$(git rev-parse HEAD)"
+            echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct HEAD)"
+            if [[ $PUBLISH == true ]]; then echo "VERSION=$TAG"; else echo "VERSION=dry-run-$(git rev-parse --short=12 HEAD)"; fi
+          } >> "$GITHUB_ENV"
+          echo "Mode: $([[ $PUBLISH == true ]] && echo "publish $TAG" || echo "dry run, nothing is published")" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build the pilot kit, signed with the owner's key
+        env:
+          HSLSA_KIT_KEY_PEM: ${{ secrets.HSLSA_KIT_KEY }}
+        run: |
+          keydir=$RUNNER_TEMP/kit-key
+          mkdir -p "$keydir" && chmod 700 "$keydir"
+          if [[ $PUBLISH == true && -n $HSLSA_KIT_KEY_PEM ]]; then
+            (umask 077 && printf '%s\n' "$HSLSA_KIT_KEY_PEM" > "$keydir/kit-signer.key.pem")
+            echo "KIT_SIGNED=owner" >> "$GITHUB_ENV"
+          elif [[ $PUBLISH == true ]]; then
+            echo "::warning::HSLSA_KIT_KEY is not set: the release gets the image but no pilot kit. Add the secret, or build and sign the kit yourself with pilot/make-kit.sh."
+            echo "KIT_SIGNED=none" >> "$GITHUB_ENV"
+            exit 0
+          else
+            go run ./tools/hslsa/cmd/hslsa keygen --out "$keydir" kit-signer
+            echo "KIT_SIGNED=throwaway" >> "$GITHUB_ENV"
+          fi
+          HSLSA_KIT_KEY=$keydir/kit-signer.key.pem pilot/make-kit.sh out/kit | tee kit.log
+          go run ./tools/hslsa/cmd/hslsa pubkey --key "$keydir/kit-signer.key.pem" --out "$RUNNER_TEMP/kit-signer.pub.pem"
+          rm -f "$keydir/kit-signer.key.pem"
+
+      - name: Check the kit as a recipient would
+        if: env.KIT_SIGNED != 'none'
+        run: |
+          cd out/kit
+          name=$(basename ./*.tar.gz .tar.gz)
+          cmp "$name.pub.pem" "$RUNNER_TEMP/kit-signer.pub.pem"
+          openssl dgst -sha256 -verify "$name.pub.pem" -signature "$name.tar.gz.sig" "$name.tar.gz"
+          tar -xzf "$name.tar.gz"
+          (cd "$name" && bin/hslsa-linux-amd64 kit verify --pub "../$name.pub.pem" \
+            --provenance "../$name.provenance.json" bin/hslsa-* && sha256sum -c --quiet SHA256SUMS)
+          rm -rf "$name"
+          echo "KIT_NAME=$name" >> "$GITHUB_ENV"
+          echo "KIT_KEY_SHA256=$(sha256sum "$name.pub.pem" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - name: Build the image's binaries and licenses
+        run: |
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" \
+              -o "dist/hslsa-linux-$arch" ./tools/hslsa/cmd/hslsa
+          done
+          pilot/collect-licenses.sh dist/licenses
+
+      # One image per platform with the plain docker builder (FROM scratch
+      # needs no emulator), then one multi-platform tag over both.
+      - name: Build the image and run it
+        run: |
+          labels=(
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY"
+            --label "org.opencontainers.image.revision=$COMMIT"
+            --label "org.opencontainers.image.version=$VERSION"
+            --label "org.opencontainers.image.licenses=Apache-2.0 AND CC-BY-4.0"
+            --label "org.opencontainers.image.title=hslsa"
+            --label "org.opencontainers.image.description=HSLSA reference tool: sign and verify hardware supply chain records"
+          )
+          for arch in amd64 arm64; do
+            docker build --platform "linux/$arch" "${labels[@]}" -t "$IMAGE:$VERSION-linux-$arch" .
+          done
+          # The image must run the tool and check a kit from a mounted directory.
+          docker run --rm --platform linux/amd64 "$IMAGE:$VERSION-linux-amd64" help
+          if [[ -n ${KIT_NAME:-} ]]; then
+            docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" -v "$PWD/out/kit:/work:ro" \
+              "$IMAGE:$VERSION-linux-amd64" kit verify --pub "$KIT_NAME.pub.pem" \
+              --provenance "$KIT_NAME.provenance.json" "$KIT_NAME.tar.gz"
+          fi
+
+      - name: Push the image to GHCR
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for arch in amd64 arm64; do docker push "$IMAGE:$VERSION-linux-$arch"; done
+          docker buildx imagetools create -t "$IMAGE:$VERSION" \
+            "$IMAGE:$VERSION-linux-amd64" "$IMAGE:$VERSION-linux-arm64"
+          digest=$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+          [[ $digest == sha256:* ]]
+          echo "$IMAGE@$digest" > out/hslsa-image.txt
+          echo "IMAGE_REF=$IMAGE@$digest" >> "$GITHUB_ENV"
+          docker logout ghcr.io
+
+      # The image digest goes into a record signed with the kit key, so a
+      # recipient who checked the key can pull exactly this image.
+      - name: Sign the image reference with the kit key
+        if: env.PUBLISH == 'true' && env.KIT_SIGNED == 'owner'
+        env:
+          HSLSA_KIT_KEY_PEM: ${{ secrets.HSLSA_KIT_KEY }}
+        run: |
+          key=$RUNNER_TEMP/kit-key/kit-signer.key.pem
+          (umask 077 && printf '%s\n' "$HSLSA_KIT_KEY_PEM" > "$key")
+          go run ./tools/hslsa/cmd/hslsa kit sign --key "$key" --commit "$COMMIT" \
+            --provenance out/hslsa-image.provenance.json hslsa-image.txt=out/hslsa-image.txt
+          rm -f "$key"
+          go run ./tools/hslsa/cmd/hslsa kit verify --pub "out/kit/$KIT_NAME.pub.pem" \
+            --provenance out/hslsa-image.provenance.json hslsa-image.txt=out/hslsa-image.txt
+
+      - name: Create the release, or add the files to it
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          files=()
+          if [[ -n ${KIT_NAME:-} ]]; then
+            files+=(out/kit/"$KIT_NAME".tar.gz out/kit/"$KIT_NAME".tar.gz.sig out/kit/"$KIT_NAME".tar.gz.sha256
+                    out/kit/"$KIT_NAME".provenance.json out/kit/"$KIT_NAME".pub.pem)
+          fi
+          files+=(out/hslsa-image.txt)
+          [[ -f out/hslsa-image.provenance.json ]] && files+=(out/hslsa-image.provenance.json)
+          {
+            echo "Spec revision $(sed -n 's/.*revision \([0-9]*\) (.*/\1/p' spec/hslsa-v0.1.md | head -1), commit $COMMIT. Every test passed first: [run $GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
+            echo
+            echo "**Container image** (private, like this repository): \`$IMAGE_REF\`"
+            echo
+            echo '```'
+            echo "docker run --rm --user \"\$(id -u):\$(id -g)\" -v \"\$PWD:/work\" $IMAGE_REF help"
+            echo '```'
+            echo
+            if [[ -n ${KIT_NAME:-} ]]; then
+              echo "**Pilot kit:** \`$KIT_NAME.tar.gz\`, signed with the kit key whose public key has sha256 \`$KIT_KEY_SHA256\`. Confirm that value with the owner over a second channel, then check the kit as [pilot/README.md]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$TAG/pilot/README.md#checking-the-kit-you-received) says."
+              echo "\`hslsa-image.provenance.json\` signs the image reference with the same key: \`hslsa kit verify --pub $KIT_NAME.pub.pem --provenance hslsa-image.provenance.json hslsa-image.txt\`."
+            else
+              echo "**No pilot kit attached:** the HSLSA_KIT_KEY secret is not set. Build and sign it locally with \`pilot/make-kit.sh\`."
+            fi
+            echo
+            echo "Code under Apache-2.0, specification and documentation under CC-BY-4.0."
+          } > notes.md
+          prerelease=()
+          [[ $TAG == *-* ]] && prerelease=(--prerelease)
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" "${files[@]}" --verify-tag --title "HSLSA $TAG" --notes-file notes.md "${prerelease[@]}"
+          fi
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"

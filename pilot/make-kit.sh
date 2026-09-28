@@ -59,20 +59,7 @@ for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; d
 done
 
 # The license, notice and patent files of Go and of every module the binaries link.
-cp "$(go env GOROOT)/LICENSE" "$stage/licenses/go.LICENSE"
-[[ -f $(go env GOROOT)/PATENTS ]] && cp "$(go env GOROOT)/PATENTS" "$stage/licenses/go.PATENTS"
-for target in linux/amd64 darwin/arm64 windows/amd64; do
-  CGO_ENABLED=0 GOOS=${target%/*} GOARCH=${target#*/} go list -deps \
-    -f '{{with .Module}}{{if not .Main}}{{.Path}}@{{.Version}} {{.Dir}}{{end}}{{end}}' ./tools/hslsa/cmd/hslsa
-done | sort -u | while read -r mod dir; do
-  found=0
-  for f in "$dir"/LICENSE* "$dir"/LICENCE* "$dir"/COPYING* "$dir"/NOTICE* "$dir"/PATENTS*; do
-    [[ -f $f ]] || continue
-    dest=$stage/licenses/${mod%@*}
-    mkdir -p "$dest" && cp "$f" "$dest/" && found=1
-  done
-  [[ $found == 1 ]] || { echo "no license file in $mod ($dir)" >&2; exit 1; }
-done
+"$ROOT/pilot/collect-licenses.sh" "$stage/licenses"
 
 spec_rev=$(sed -n 's/.*revision \([0-9]*\) (.*/\1/p' spec/hslsa-v0.1.md | head -1)
 cat > "$stage/KIT.txt" <<EOF

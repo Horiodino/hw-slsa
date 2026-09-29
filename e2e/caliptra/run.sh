@@ -129,22 +129,25 @@ build_rtl() {
   # so pass its data(), which 5.020 also has.
   sed -i 's/memcpy(result->v\.\(cptra_obf_key\|cptra_csr_hmac_key\), /memcpy(result->v.\1.data(), /' \
     "$sw/hw/verilated/caliptra_verilated.cpp"
-  # caliptra-sw's harness compiles with -Os on one thread; -O3 with a thread
-  # per core, up to 4, boots faster: on four cores two threads ran 3,450
-  # cycles a second, four 4,570. Neither changes the design.
+  # caliptra-sw's harness builds one thread with -Os. A thread per core, up
+  # to 4, Verilator's -O3 and the C++ compiler's -O3 -march=native boot
+  # faster: on four cores two threads ran 3,450 cycles a second and four
+  # 4,570, and the two -O3s with -march=native added about 10%. The model
+  # runs on the machine that built it. None of this changes the design.
   local threads=${RTL_THREADS:-$(( $(nproc) < 4 ? $(nproc) : 4 ))}
-  { verilator --version; echo "threads: $threads, -O3"; } | tee "$BUILD/verilator-version.txt"
+  local vflags="--threads $threads -O3" cflags="-O3 -march=native"
+  { verilator --version; echo "Verilator $vflags, C++ $cflags"; } | tee "$BUILD/verilator-version.txt"
 
   # With RTL_MODEL_CACHE set, a model built earlier on this machine is reused
   # when everything it was built from is the same: the released design's
   # digest and every bench file's, the caliptra-sw commit and harness change,
-  # the device tool, the compilers and the build options.
+  # the device tool, the compilers, the build options and the CPU model.
   local key cached=
   if [[ -n ${RTL_MODEL_CACHE:-} ]]; then
     key=$({ cat "$model/rtl.json" "$BUILD/verilator-version.txt"
             git -C "$sw" rev-parse HEAD && git -C "$sw" diff
             (cd "$E2E/device" && cat Cargo.toml Cargo.lock rust-toolchain.toml src/*.rs && rustc -Vv)
-            g++ --version | sed -n 1p; } | sha256sum | cut -c1-64)
+            g++ --version | sed -n 1p; grep -m1 '^model name' /proc/cpuinfo; } | sha256sum | cut -c1-64)
     cached=$RTL_MODEL_CACHE/$key/hslsa-caliptra-device
   fi
   if [[ -n $cached && -x $cached ]]; then
@@ -154,7 +157,7 @@ build_rtl() {
     return
   fi
   (cd "$E2E/device" &&
-    MAKEFLAGS="VERILATOR_MAKE_FLAGS=OPT_FAST=-O3 EXTRA_VERILATOR_FLAGS=--threads\\ $threads" \
+    MAKEFLAGS="VERILATOR_MAKE_FLAGS=OPT_FAST=\"${cflags// /\\ }\" EXTRA_VERILATOR_FLAGS=${vflags// /\\ }" \
     CALIPTRA_VERILATOR_JOBS=$(nproc) cargo build -q --locked --release --features verilator --target-dir "$BUILD/rtl-target")
   cp "$BUILD/rtl-target/release/hslsa-caliptra-device" "$DEVICE_RTL_BIN"
   if [[ -n $cached ]]; then

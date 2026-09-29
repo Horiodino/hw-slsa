@@ -176,7 +176,8 @@ fn csr(args: &[String]) -> Result<()> {
 /// `done` is checked every POLL_STEPS steps: on the RTL a register read is a
 /// bus transaction, and polling every cycle only adds bus traffic.
 fn step_until<M: HwModel>(hw: &mut M, what: &str, start: Instant, mut done: impl FnMut(&mut M) -> bool) {
-    let (mut next, mut polls) = (PROGRESS_SECS, 0u64);
+    // First report PROGRESS_SECS after this stage starts, not after the boot did.
+    let (mut next, mut polls) = (start.elapsed().as_secs() + PROGRESS_SECS, 0u64);
     while !done(hw) {
         for _ in 0..POLL_STEPS {
             hw.step();

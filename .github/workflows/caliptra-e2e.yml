@@ -9,10 +9,10 @@
 # certificates back to the RTL, signs VSAs and checks them with slsa-verifier.
 #
 # "verify-rtl" is the same buyer with the device built from the released RTL
-# instead of the emulator. The RTL runs a few hundred to a thousand cycles a
-# second, so it runs only when dispatched by hand with rtl set. rtl-stage
-# "identity" runs the ROM until it exports each unit's IDevID CSR, which fits a
-# hosted runner (about 3.5 hours for one unit); "boot" boots to runtime and
+# instead of the emulator. The RTL runs a few thousand cycles a second, so it
+# runs only when dispatched by hand with rtl set. rtl-stage "identity" runs the
+# ROM until it exports each unit's IDevID CSR (about 11 million cycles), which
+# fits a hosted runner; "boot" boots to runtime (about 36 million cycles) and
 # needs a runner without the 6-hour job limit.
 #
 # Private by design, like hslsa-e2e.yml: local keys and DSSE envelopes, no OIDC
@@ -43,7 +43,7 @@ on:
         type: number
         default: 1
       rtl-stage:
-        description: "identity: ROM to the IDevID CSR (about 2 hours). boot: to runtime (longer than a hosted runner allows)"
+        description: "identity: ROM to the IDevID CSR (11 million cycles). boot: to runtime (36 million cycles, longer than a hosted runner allows)"
         type: choice
         options: [identity, boot]
         default: identity
@@ -51,6 +51,10 @@ on:
         description: Runner label for the RTL job; self-hosted for rtl-stage boot, which runs past the 6-hour hosted limit
         type: string
         default: ubuntu-24.04
+      rtl-threads:
+        description: Verilator threads for the RTL model; empty for one per core, up to 4
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -229,6 +233,7 @@ jobs:
       - name: Verilate the released design into the device model
         env:
           RTL_MODEL_CACHE: ${{ runner.environment == 'self-hosted' && format('{0}/hslsa-rtl-models', runner.tool_cache) || '' }}
+          RTL_THREADS: ${{ inputs.rtl-threads }}
         run: e2e/caliptra/run.sh build-rtl
       - name: Run the units on the RTL and check them (${{ inputs.rtl-stage }})
         env:

@@ -49,6 +49,7 @@ var commands = map[string]command{
 	"safe":          {"sign, show or check an OCP S.A.F.E. short-form report", safeCmd},
 	"pilot":         {"a buyer-run pilot: enroll or revoke site keys, build the trust root from them, measure a lot", pilot},
 	"kit":           {"sign the pilot kit's provenance, or check a kit against it", kit},
+	"sim":           {"simulated hardware: the virtual shuttle makes a lot's supplier exports by simulating the released netlist", sim},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -331,6 +332,26 @@ func adapt(args []string) error {
 		return err
 	}
 	return hslsa.Adapt(*config, *out)
+}
+
+func sim(args []string) error {
+	act, rest, err := action(args, "shuttle")
+	if err != nil {
+		return err
+	}
+	switch act {
+	case "shuttle":
+		f := newFlags("sim shuttle")
+		bundle := f.str("bundle", "design bundle holding the release and the netlist it names", true)
+		lock := f.str("lock", "the design's inputs lock (synthesis top and RTL files)", true)
+		config := f.str("config", "shuttle configuration (JSON): sites, lot, wafer grid, defect rates and seed", true)
+		out := f.str("out", "directory for the exports, adapter.json and report.json", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.Shuttle(hslsa.ShuttleOptions{Bundle: *bundle, Lock: *lock, Config: *config, Out: *out})
+	}
+	return nil
 }
 
 func mfg(args []string) error {

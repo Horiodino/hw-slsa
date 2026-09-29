@@ -1,4 +1,5 @@
 {
+  "simulated": {"simulator": "hand-written scenario and the EXR-01 model in tools/hslsa/rot.go", "standsIn": "the root of trust vendor's fab, sort, packaging and final test, and the EXR-01 part itself"},
   "note": "The root of trust vendor's lot. EXR-01 is a simulated part whose die is the PicoRV32 example's design under another name; everything about it that makes it a root of trust (secure-boot ROM, UDS, DICE identity, firmware) is modeled in tools/hslsa/rot.go.",
   "product": {
     "name": "exr01-root-of-trust",

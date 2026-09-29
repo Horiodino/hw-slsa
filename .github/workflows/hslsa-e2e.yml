@@ -83,6 +83,10 @@ jobs:
         run: e2e/run.sh adapt
       - name: Pilot rehearsal, the lot signed by the OSAT under a buyer-run trust root, checked and measured
         run: e2e/pilot/run.sh chip
+      - name: A lot from the virtual shuttle, every die simulated gate-level, checked as simulated evidence
+        run: e2e/run.sh shuttle
+      - name: Virtual shuttle tests (same lot twice, swapped dies, unreleased netlist)
+        run: go test -count=1 -run 'RV32|Shuttle' ./tools/hslsa/
       - name: HSM signing tests against SoftHSM2
         env:
           HSLSA_REQUIRE_PKCS11: "1"
@@ -109,6 +113,12 @@ jobs:
         with:
           name: hslsa-board-bundle
           path: out/board
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hslsa-shuttle-exports
+          path: out/shuttle/exports
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

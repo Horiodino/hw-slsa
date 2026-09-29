@@ -1,5 +1,6 @@
 {
   "note": "The board buyer's policy for the root of trust's own chain, which ships with the part. Its design and lot sections are the PicoRV32 example's, since EXR-01's die is that design.",
+  "simulated": {"accept": true, "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."},
   "design": {
     "requiredSteps": ["source-freeze", "simulation", "synthesis"],
     "consumes": {"simulation": ["source-freeze"], "synthesis": ["source-freeze"]},

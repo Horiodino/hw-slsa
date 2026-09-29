@@ -302,7 +302,7 @@ func FPGAProvision(bundle, devices, boards, scenarioPath, keys string) error {
 				"builder":  Obj{"id": "urn:hslsa:site:" + slug(S(station, "site", "name"))},
 				"metadata": Obj{"invocationId": "provision:" + serial, "finishedOn": Now()},
 			},
-			"hwProvision": Obj{
+			"hwProvision": markSimulated(Obj{
 				"station":   get(station, "id"),
 				"site":      get(station, "site"),
 				"unit":      boardURN(mfr, serial),
@@ -322,7 +322,7 @@ func FPGAProvision(bundle, devices, boards, scenarioPath, keys string) error {
 					"endorsingCa":     cert.Issuer.String(),
 				},
 				"checks": checks,
-			},
+			}, O(sc, "simulated")),
 		}
 		stmt, err := statement([]Obj{rd(boardURN(mfr, serial), onBoard)}, FWProvisioning, pred)
 		if err != nil {
@@ -1053,6 +1053,12 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 		provInputs = append(provInputs, u.Inputs...)
 	}
 	fmt.Printf("provisioning check: PASSED for all %d boards in the lot\n", len(lotBoards))
+	provSim, err := simulatedCheck(bundle, policy, append(append([]Obj{}, rot.Inputs...), provInputs...), "provisioning check")
+	if err != nil {
+		return err
+	}
+	printSimulated(append(append([]string{}, board.Simulated...), provSim...))
+	sim := len(board.Simulated) > 0 || len(provSim) > 0
 	if bootsDir != "" {
 		for _, serial := range received {
 			if err := FPGADeviceCheck(units[serial], rot, images, policy, filepath.Join(bootsDir, serial)); err != nil {
@@ -1078,7 +1084,7 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 	}
 	common := append(append(append([]Obj{}, board.Inputs...), images.Inputs...), rot.Inputs...)
 	common = append(common, designInputs[0])
-	if err := signVSA(board.Lot, S(board.Lot, "name"), claims["board"], append(common, provInputs...), policyPath, vsaKey, out("board.vsa.intoto.json")); err != nil {
+	if err := signVSA(board.Lot, S(board.Lot, "name"), vsaLevels(claims["board"], sim), append(common, provInputs...), policyPath, vsaKey, out("board.vsa.intoto.json")); err != nil {
 		return err
 	}
 	n := 0
@@ -1087,7 +1093,7 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 		for _, serial := range received {
 			u := units[serial]
 			subject := rd(boardURN(mfr, serial), sha256Bytes(u.IDevID.Raw))
-			if err := signVSA(subject, S(subject, "name"), claims["device"], append(append([]Obj{}, u.Inputs...), common...), policyPath, vsaKey,
+			if err := signVSA(subject, S(subject, "name"), vsaLevels(claims["device"], sim), append(append([]Obj{}, u.Inputs...), common...), policyPath, vsaKey,
 				out("board-"+serial+".vsa.intoto.json")); err != nil {
 				return err
 			}

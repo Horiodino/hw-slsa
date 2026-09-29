@@ -6,6 +6,7 @@
 #   e2e/run.sh proxy     after produce: the same lot with two suppliers that sign nothing
 #   e2e/run.sh adapt     after produce: the same lot made from the suppliers' MES and STDF exports
 #   e2e/run.sh hsm       after produce: the release and the lot again, signed with keys in an HSM
+#   e2e/run.sh shuttle   after produce: a lot from the virtual shuttle, every die simulated gate-level
 #
 # Nothing here uploads to a transparency log: every signature is a DSSE
 # envelope made with a local ECDSA P-256 key.
@@ -89,6 +90,19 @@ verify() {
     --subject-digest "sha256:${lot#* }" --resource-uri "${lot% *}" \
     --verified-level HSLSA_WAFER_LEVEL_2 --verified-level HSLSA_PACKAGE_TEST_LEVEL_2 --verified-level HSLSA_DESIGN_LEVEL_2
 
+  # The lot is simulated (its scenario says so in every record), the policy
+  # accepts that, and the lot VSA says so for anyone reading only the VSA.
+  echo "== slsa-verifier verify-vsa: the shipped lot's evidence is simulated"
+  "$sv" verify-vsa "${common[@]}" --attestation-path "$vsa_dir/lot.vsa.intoto.json" \
+    --subject-digest "sha256:${lot#* }" --resource-uri "${lot% *}" --verified-level HSLSA_SIMULATED
+  # The same policy without simulated.accept, as a buyer of real parts writes it.
+  grep -v '"simulated"' "$BUNDLE/policy.json" > "$OUT/real-parts-policy.json"
+  if hslsa verify --bundle "$BUNDLE" --trust-root "$BUNDLE/trust-root.json" --policy "$OUT/real-parts-policy.json" >/dev/null 2>&1; then
+    echo "FAIL: a policy without simulated.accept accepted the simulated lot" >&2
+    exit 1
+  fi
+  echo "ok: a policy without simulated.accept refuses the simulated lot"
+
   echo "== slsa-verifier negative cases"
   local lotargs=("${common[@]}" --attestation-path "$vsa_dir/lot.vsa.intoto.json" --resource-uri "${lot% *}")
   expect_fail "a level the lot was not verified at" "$sv" verify-vsa "${lotargs[@]}" \
@@ -159,6 +173,30 @@ adapt() {
   echo "ok: a policy that requires exports refuses records without them"
 }
 
+# A lot from the virtual shuttle (docs/simulated-hardware.md): the released
+# netlist is "fabricated" on two wafers of dies with seeded defects, and wafer
+# sort and final test run test programs on each die in Icarus Verilog. Its
+# exports go through the same adapter as a supplier's, every record says it
+# was made from simulated hardware, and the policy accepts that. Runs after
+# produce, in the same job.
+shuttle() {
+  local sb=$OUT/shuttle ex=$OUT/shuttle/exports
+  rm -rf "$sb" && mkdir -p "$sb"
+  cp -r "$BUNDLE" "$sb/bundle"
+  cp "$ROOT/e2e/shuttle/policy.json" "$sb/bundle/policy.json"
+  hslsa sim shuttle --bundle "$sb/bundle" --lock "$E2E/inputs.lock.json" --config "$ROOT/e2e/shuttle/shuttle.json" --out "$ex"
+  hslsa adapt --config "$ex/adapter.json" --out "$sb/scenario.json"
+  hslsa mfg  --bundle "$sb/bundle" --scenario "$sb/scenario.json" --keys "$KEYS"
+  hslsa hbom --bundle "$sb/bundle" --lock "$E2E/inputs.lock.json" --scenario "$sb/scenario.json" --key "$KEYS/product-owner.key.pem"
+  hslsa verify --bundle "$sb/bundle" --trust-root "$sb/bundle/trust-root.json" --policy "$sb/bundle/policy.json"
+  grep -v '"simulated"' "$sb/bundle/policy.json" > "$sb/real-parts-policy.json"
+  if hslsa verify --bundle "$sb/bundle" --trust-root "$sb/bundle/trust-root.json" --policy "$sb/real-parts-policy.json" >/dev/null 2>&1; then
+    echo "FAIL: a policy without simulated.accept accepted the shuttle's lot" >&2
+    exit 1
+  fi
+  echo "ok: a policy without simulated.accept refuses the shuttle's lot"
+}
+
 # The release and the lot again, with the tapeout authority's and every site's
 # key in an HSM (docs/hsm-signing.md). Each <role>.key.pem is replaced by a
 # <role>.pkcs11 file naming the key on the token, and nothing else changes: the
@@ -211,6 +249,7 @@ case "${1:-}" in
   proxy) proxy ;;
   adapt) adapt ;;
   hsm) hsm ;;
-  all) produce; verify; proxy; adapt; hsm ;;
-  *) echo "usage: $0 produce|verify|proxy|adapt|hsm|all" >&2; exit 2 ;;
+  shuttle) shuttle ;;
+  all) produce; verify; proxy; adapt; hsm; shuttle ;;
+  *) echo "usage: $0 produce|verify|proxy|adapt|hsm|shuttle|all" >&2; exit 2 ;;
 esac

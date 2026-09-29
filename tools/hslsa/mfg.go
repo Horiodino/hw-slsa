@@ -64,6 +64,9 @@ func mfgNames(step string) (att, role, buildType, hwStep string) {
 type mfgKeys struct {
 	dir  string
 	only map[string]bool
+	// sim is the scenario's simulated block, which every record this run
+	// signs carries in hwMfg.
+	sim Obj
 }
 
 func (k *mfgKeys) signs(role string) bool { return k.only == nil || k.only[role] }
@@ -107,6 +110,7 @@ func slug(name string) string { return strings.ReplaceAll(strings.ToLower(name),
 // supplier's behalf.
 func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw Obj, keys *mfgKeys, w *Withholding, by Obj) (Obj, error) {
 	att, role, bt, hwStep := mfgNames(step)
+	hw = markSimulated(hw, keys.sim)
 	if by != nil {
 		role = S(by, "role")
 	}
@@ -270,6 +274,10 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 		return err
 	}
 	scenarioDir := filepath.Dir(scenarioPath)
+	keys.sim = O(sc, "simulated")
+	if err := checkSimulated(keys.sim, "scenario"); err != nil {
+		return err
+	}
 	if O(sc, "adapter") != nil && w != nil && (len(w.Fields) > 0 || len(w.SaltFiles) > 0) {
 		return fmt.Errorf("a lot made from supplier exports cannot withhold fields yet: the exports it carries hold every value")
 	}

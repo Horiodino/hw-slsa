@@ -1,4 +1,5 @@
 {
+  "simulated": {"simulator": "the simulated Example XG-8 gang programmer (hslsa fpga rot-station)", "standsIn": "the root of trust vendor's programming station and the parts it programs"},
   "note": "Station ps-02 at the root of trust vendor's test house, programming EXR-01 at final test. What the adapter needs that the station does not know: where each image's provenance is, the fuse types, which fields are secrets, and the identity scheme.",
   "station": "urn:hslsa:station:example-test-house:ps-02",
   "site": {"name": "Example Test House", "country": "US"},

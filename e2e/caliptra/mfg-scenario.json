@@ -1,4 +1,5 @@
 {
+  "simulated": {"simulator": "hand-written scenario and the caliptra-sw hardware model (emulator, or Verilator RTL)", "standsIn": "wafer fab, wafer sort, packaging and final test, and each unit's silicon during provisioning"},
   "product": {
     "name": "caliptra-hslsa-e2e",
     "level": "package",

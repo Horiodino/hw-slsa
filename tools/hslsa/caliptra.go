@@ -1191,6 +1191,9 @@ func CaliptraProvision(bundle, devices, keysDir, deviceBin, scenarioPath, lockPa
 				"endorsingCa":     caName,
 			},
 		}
+		if m := O(sc, "simulated"); m != nil {
+			log["simulated"] = m
+		}
 		if err := WriteJSON(filepath.Join(art, "provisioning", unit+".json"), log); err != nil {
 			return err
 		}
@@ -1277,7 +1280,7 @@ func SignProvisioning(bundle, key string) error {
 				"builder":  Obj{"id": "urn:hslsa:site:" + slug(S(log, "station", "site", "name"))},
 				"metadata": Obj{"invocationId": "provision:" + unit, "finishedOn": Now()},
 			},
-			"hwProvision": Obj{
+			"hwProvision": markSimulated(Obj{
 				"station":   get(log, "station", "id"),
 				"site":      get(log, "station", "site"),
 				"unit":      "urn:hslsa:unit:" + unit,
@@ -1288,7 +1291,7 @@ func SignProvisioning(bundle, key string) error {
 				"secrets":   get(log, "secrets"),
 				"identity":  identity,
 				"checks":    checks,
-			},
+			}, O(log, "simulated")),
 		}
 		subject := []Obj{rd("urn:hslsa:unit:"+unit, S(ident, "idevidPublicKey", "sha256"))}
 		stmt, err := statement(subject, FWProvisioning, pred)
@@ -1852,6 +1855,15 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 		devices = append(devices, dev)
 	}
 	fmt.Printf("at-boot check: PASSED for %d booted units (%s)\n", len(devices), strings.Join(units, ", "))
+	var devInputs []Obj
+	for _, dev := range devices {
+		devInputs = append(devInputs, dev.Inputs...)
+	}
+	devSim, err := simulatedCheck(bundle, policy, devInputs, "at-boot check")
+	if err != nil {
+		return err
+	}
+	printSimulated(append(append([]string{}, lot.Simulated...), devSim...))
 	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", "hbom.intoto.json"), "hbom"); err != nil {
 		return err
 	}
@@ -1865,7 +1877,7 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 		return err
 	}
 	lotInputs := append(append([]Obj{}, lot.Inputs...), design.Release)
-	if err := signVSA(lot.Lot, S(lot.Lot, "name"), claims["lot"], lotInputs, policyPath, vsaKey, out("lot.vsa.intoto.json")); err != nil {
+	if err := signVSA(lot.Lot, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0), lotInputs, policyPath, vsaKey, out("lot.vsa.intoto.json")); err != nil {
 		return err
 	}
 	fwSubject := rd(S(fw.Bundle, "name"), S(fw.Bundle, "digest", "sha256"))
@@ -1876,7 +1888,7 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 	for i, unit := range units {
 		dev := devices[i]
 		inputs := append(append(append(append([]Obj{}, dev.Inputs...), fw.Inputs...), lot.Inputs...), design.Release)
-		if err := signVSA(dev.Unit, S(dev.Unit, "name"), claims["device"], inputs, policyPath, vsaKey,
+		if err := signVSA(dev.Unit, S(dev.Unit, "name"), vsaLevels(claims["device"], len(simulatedRecords(bundle, inputs)) > 0), inputs, policyPath, vsaKey,
 			out("device-"+unit+".vsa.intoto.json")); err != nil {
 			return err
 		}

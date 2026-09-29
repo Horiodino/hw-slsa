@@ -229,6 +229,7 @@ type LotResult struct {
 	NotRecorded []string // optional records the bundle does not have
 	OnBehalf    []string // records signed on a supplier's behalf, which hold their track at L1
 	Exports     []string // records checked against the supplier exports they carry
+	Simulated   []string // records made from simulated hardware, which the policy accepted
 }
 
 // LotCheck verifies F1 to F4, any transfers between them (all of them when
@@ -453,7 +454,11 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	}
 	inputs = append(inputs, transfers...)
 	inputs = append(inputs, envRD(bundle, "hbom.intoto.json"))
-	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded, OnBehalf: onBehalf, Exports: exports}, nil
+	sim, err := simulatedCheck(bundle, policy, inputs, "lot receipt check")
+	if err != nil {
+		return nil, err
+	}
+	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded, OnBehalf: onBehalf, Exports: exports, Simulated: sim}, nil
 }
 
 // signVSA signs a SLSA Verification Summary Attestation for one subject.
@@ -528,6 +533,7 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 			fmt.Printf("  %s\n", line)
 		}
 	}
+	printSimulated(lot.Simulated)
 	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", "hbom.intoto.json"), "hbom"); err != nil {
 		return nil, nil, err
 	}
@@ -538,12 +544,12 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 			filepath.Join(vsaDir, "design.vsa.intoto.json")); err != nil {
 			return nil, nil, err
 		}
-		if err := signVSA(lot.Lot, S(lot.Lot, "name"), claims["lot"],
+		if err := signVSA(lot.Lot, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0),
 			append(append([]Obj{}, lot.Inputs...), design.Release), policyPath, vsaKey,
 			filepath.Join(vsaDir, "lot.vsa.intoto.json")); err != nil {
 			return nil, nil, err
 		}
-		fmt.Printf("VSAs written to %s: design %s, lot %s\n", vsaDir, pyList(claims["design"]), pyList(claims["lot"]))
+		fmt.Printf("VSAs written to %s: design %s, lot %s\n", vsaDir, pyList(claims["design"]), pyList(vsaLevels(claims["lot"], len(lot.Simulated) > 0)))
 	}
 	return design, lot, nil
 }

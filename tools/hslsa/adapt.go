@@ -357,6 +357,15 @@ func AdaptScenario(configPath string) (Obj, error) {
 	if u := get(cfg, "unsigned"); u != nil {
 		sc["unsigned"] = u
 	}
+	// Exports a simulator wrote (the virtual shuttle's) say so in the
+	// configuration that comes with them, and every record made from them
+	// carries it.
+	if m := O(cfg, "simulated"); m != nil {
+		if err := checkSimulated(m, configPath); err != nil {
+			return nil, err
+		}
+		sc["simulated"] = m
+	}
 	fmt.Printf("adapted: lot %s, %d wafers, %d of %d dies failed sort, %d units packaged as %s, %d failed final test\n",
 		S(fab, "lotId"), len(wafers), len(failedDies), len(Objs(srt, "dies")), len(genealogy), S(pkg, "assemblyLot"), len(failedUnits))
 	return sc, nil

@@ -76,13 +76,20 @@ chip() {
 
   echo "== the buyer checks and measures the lot"
   local units=$ROOT/e2e/picorv32/received-units.txt
-  hslsa verify --bundle "$lot" --trust-root "$PILOT/trust-root.json" --policy "$HERE/policy.json" --units "$units"
-  hslsa pilot measure --bundle "$lot" --trust-root "$PILOT/trust-root.json" --policy "$HERE/policy.json" \
+  # The kit's policy is for real parts and refuses records made from simulated
+  # hardware; the rehearsal's lot is simulated, so it runs under a copy that
+  # accepts them.
+  local policy=$PILOT/rehearsal-policy.json
+  sed '1a\  "simulated": {"accept": true, "note": "rehearsal only: the lot is simulated"},' "$HERE/policy.json" > "$policy"
+  refuses "the simulated lot under the policy for real parts" \
+    hslsa verify --bundle "$lot" --trust-root "$PILOT/trust-root.json" --policy "$HERE/policy.json" --units "$units"
+  hslsa verify --bundle "$lot" --trust-root "$PILOT/trust-root.json" --policy "$policy" --units "$units"
+  hslsa pilot measure --bundle "$lot" --trust-root "$PILOT/trust-root.json" --policy "$policy" \
     --units "$units" --costs "$HERE/costs.json" --out "$PILOT/report" > /dev/null
   echo "ok: report in $PILOT/report"
 
   echo "== what the buyer-run trust root refuses"
-  local check=(--bundle "$lot" --policy "$HERE/policy.json" --units "$units")
+  local check=(--bundle "$lot" --policy "$policy" --units "$units")
   # The vendor's own trust root, the one produce wrote, does not list the OSAT's keys.
   refuses "the lot under the vendor's trust root, which never saw the OSAT's keys" \
     hslsa verify "${check[@]}" --trust-root "$bundle/trust-root.json"

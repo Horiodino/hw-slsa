@@ -125,7 +125,7 @@ func EscrowAudit(bundle string, trust *TrustRoot, policyPath, unitsPath, key, vs
 		policyPath, key, filepath.Join(vsaDir, EscrowDesignVSA)); err != nil {
 		return err
 	}
-	if err := signVSA(receipt, S(lot.Lot, "name"), claims["lot"], []Obj{manifestRD},
+	if err := signVSA(receipt, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0), []Obj{manifestRD},
 		policyPath, key, filepath.Join(vsaDir, EscrowReceiptVSA)); err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func EscrowAudit(bundle string, trust *TrustRoot, policyPath, unitsPath, key, vs
 
 // openEscrowVSA opens a VSA signed by the auditor and checks that it passed
 // under the buyer's policy and states every level the buyer asks for.
-func openEscrowVSA(path string, trust *TrustRoot, policyDigest string, levels []string) (Obj, error) {
+func openEscrowVSA(path string, trust *TrustRoot, policy Obj, policyDigest string, levels []string) (Obj, error) {
 	label := filepath.Base(path)
 	stmt, err := trust.Open(path, AuditorRole, VSAType)
 	if err != nil {
@@ -151,6 +151,9 @@ func openEscrowVSA(path string, trust *TrustRoot, policyDigest string, levels []
 	}
 	if S(p, "policy", "digest", "sha256") != policyDigest {
 		return nil, failf("%s: verified under a policy other than the buyer's", label)
+	}
+	if err := refuseSimulatedVSA(stmt, policy, label); err != nil {
+		return nil, err
 	}
 	have := Strs(p, "verifiedLevels")
 	for _, l := range levels {
@@ -182,11 +185,11 @@ func EscrowCheck(vsaDir string, trust *TrustRoot, policyPath, unitsPath string) 
 		return err
 	}
 	claims := O(policy, "claims")
-	design, err := openEscrowVSA(filepath.Join(vsaDir, EscrowDesignVSA), trust, policyDigest, Strs(claims, "design"))
+	design, err := openEscrowVSA(filepath.Join(vsaDir, EscrowDesignVSA), trust, policy, policyDigest, Strs(claims, "design"))
 	if err != nil {
 		return err
 	}
-	receipt, err := openEscrowVSA(filepath.Join(vsaDir, EscrowReceiptVSA), trust, policyDigest, Strs(claims, "lot"))
+	receipt, err := openEscrowVSA(filepath.Join(vsaDir, EscrowReceiptVSA), trust, policy, policyDigest, Strs(claims, "lot"))
 	if err != nil {
 		return err
 	}

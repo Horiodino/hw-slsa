@@ -809,7 +809,7 @@ func (a *adapter) unit(unit string) (Obj, Obj, error) {
 			"builder":  Obj{"id": "urn:hslsa:site:" + slug(S(a.station, "site", "name"))},
 			"metadata": Obj{"invocationId": "provision:" + unit, "startedOn": rows[0].Time.UTC().Format(time.RFC3339), "finishedOn": rows[len(rows)-1].Time.UTC().Format(time.RFC3339)},
 		},
-		"hwProvision": Obj{
+		"hwProvision": markSimulated(Obj{
 			"station":      S(a.station, "station"),
 			"site":         get(a.station, "site"),
 			"unit":         "urn:hslsa:unit:" + unit,
@@ -822,7 +822,7 @@ func (a *adapter) unit(unit string) (Obj, Obj, error) {
 			"identity":     identity,
 			"export":       export,
 			"checks":       checks,
-		},
+		}, O(a.station, "simulated")),
 	}
 	return pred, subject, nil
 }

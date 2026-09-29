@@ -1,0 +1,45 @@
+{
+  "note": "The virtual shuttle's run of the PicoRV32 example's release: no fab, sort house, OSAT or test house takes part. Sites, facilities, lot ids and dates are placeholders. The defect rates are chosen so a lot shows every outcome (dies failing sort, units failing final test, and defects no test catches), not to model SKY130 yields. labelSwaps puts two dies in each other's packages, an OSAT mistake final test catches by reading each unit's die id back.",
+  "seed": "hslsa-virtual-shuttle-2026-10-lot-a",
+  "start": "2026-08-03T06:00:00Z",
+  "product": {
+    "name": "picorv32-hslsa-shuttle",
+    "level": "package",
+    "partNumber": "PSOC130-QFN64",
+    "revision": "A0",
+    "manufacturer": {"name": "Example Open Silicon Group", "country": "US"},
+    "deviceIdentity": {"scheme": "serial", "serial": "per unit; the shipped lot lists every serial, and final test reads each unit's die id from its fuses"}
+  },
+  "fab": {
+    "id": "virtual-fab",
+    "site": {"name": "Example Virtual Fab", "country": "US"},
+    "facility": "VFAB-1",
+    "processNode": "SKY130 (130 nm CMOS), simulated",
+    "maskSetId": "MS-SIM-0001",
+    "lotId": "LOT-SIM-A",
+    "wafers": 2,
+    "grid": [6, 6],
+    "defectsPerDie": 0.35
+  },
+  "sort": {
+    "site": {"name": "Example Virtual Sort House", "country": "US"},
+    "facility": "VSORT-1",
+    "program": {"name": "psoc130-probe", "version": "sim-1.0"}
+  },
+  "packaging": {
+    "site": {"name": "Example Virtual OSAT", "country": "US"},
+    "facility": "VOSAT-1",
+    "packageType": "QFN-64 7x7 mm",
+    "assemblyLot": "ASM-SIM-01",
+    "serialPrefix": "PSOC130-S-",
+    "units": 48,
+    "bondDefectRate": 0.06,
+    "labelSwaps": [["PSOC130-S-00030", "PSOC130-S-00031"]]
+  },
+  "transfers": true,
+  "finalTest": {
+    "site": {"name": "Example Virtual Test House", "country": "US"},
+    "facility": "VFT-1",
+    "program": {"name": "psoc130-ft", "version": "sim-1.0"}
+  }
+}

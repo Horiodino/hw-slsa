@@ -193,6 +193,10 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 	if err != nil {
 		return err
 	}
+	sim := O(sc, "simulated")
+	if err := checkSimulated(sim, scenarioPath); err != nil {
+		return err
+	}
 	pol, err := ReadObj(policyPath)
 	if err != nil {
 		return err
@@ -259,7 +263,7 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 		role := S(pol, "shippers", S(s, "shipper", "name"), "role")
 		env, err := boardRecord(bundle, "distribution", ShipAtt(id), []Obj{subject},
 			Obj{"id": id, "shipDate": get(s, "shipDate")}, deps,
-			Obj{"site": get(s, "shipper"), "checks": passed("certificate-of-conformance", "traceable-to-manufacturer")},
+			markSimulated(Obj{"site": get(s, "shipper"), "checks": passed("certificate-of-conformance", "traceable-to-manufacturer")}, sim),
 			filepath.Join(keys, role+".key.pem"))
 		if err != nil {
 			return err
@@ -294,7 +298,8 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 		checked = append(checked, Obj{"name": chipRel + "/" + S(in, "name"), "digest": get(in, "digest")})
 	}
 	receiptName := ReceiptAtt(S(chipLine.line, "lot"))
-	if err := signVSA(receipt, S(chipLot, "name"), get(chipPolicy, "claims", "lot"), checked, filepath.Join(chip, "policy.json"),
+	chipSim := len(simulatedRecords(bundle, checked)) > 0
+	if err := signVSA(receipt, S(chipLot, "name"), vsaLevels(get(chipPolicy, "claims", "lot"), chipSim), checked, filepath.Join(chip, "policy.json"),
 		filepath.Join(keys, emsRole+".key.pem"), filepath.Join(bundle, "att", receiptName)); err != nil {
 		return err
 	}
@@ -368,12 +373,12 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 		chipLot, design)
 	if _, err := boardRecord(bundle, "board-assembly", BoardA1, subjects,
 		Obj{"id": S(asm, "boardLot"), "boardDesign": BoardDesign}, deps,
-		Obj{
+		markSimulated(Obj{
 			"site":      get(asm, "site"),
 			"designRef": Obj{"name": design["name"], "digest": design["digest"]},
 			"yield":     Obj{"in": len(serials), "passed": len(boards), "failed": anyStrings(sortedCopy(failedBoards))},
 			"checks":    passed("part-lot-receipt-check", "aoi", "x-ray-sample", "ict", "functional-test"),
-		},
+		}, sim),
 		filepath.Join(keys, emsRole+".key.pem")); err != nil {
 		return err
 	}
@@ -699,7 +704,12 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 			return nil, failf("received board %s is not in the board lot", serial)
 		}
 	}
-	return &LotResult{Lot: lotSubj, Inputs: append([]Obj{relRD(bundle, "att/"+BoardHBOM)}, inputs...)}, nil
+	inputs = append([]Obj{relRD(bundle, "att/"+BoardHBOM)}, inputs...)
+	sim, err := simulatedCheck(bundle, pol, inputs, "board receipt check")
+	if err != nil {
+		return nil, err
+	}
+	return &LotResult{Lot: lotSubj, Inputs: inputs, Simulated: sim}, nil
 }
 
 // partCheck runs a part's own chain checks when it has an HBOM, checks the
@@ -765,6 +775,9 @@ func receiptCheck(bundle string, trust *TrustRoot, chip, rel string, lot Obj, un
 	if err != nil {
 		return err
 	}
+	if err := refuseSimulatedVSA(stmt, policy, label); err != nil {
+		return err
+	}
 	for _, l := range Strs(policy, "claims", "lot") {
 		if !contains(Strs(p, "verifiedLevels"), l) {
 			return failf("%s: does not state %s", label, l)
@@ -801,6 +814,7 @@ func BoardVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, vsaKey
 		msg += fmt.Sprintf(", %d received boards found in the lot", len(received))
 	}
 	fmt.Println(msg)
+	printSimulated(result.Simulated)
 	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", BoardHBOM), "board hbom"); err != nil {
 		return nil, err
 	}
@@ -811,10 +825,10 @@ func BoardVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, vsaKey
 		}
 		claims := get(pol, "claims", "board")
 		out := filepath.Join(vsaDir, "board.vsa.intoto.json")
-		if err := signVSA(lot, S(lot, "name"), claims, result.Inputs, policyPath, vsaKey, out); err != nil {
+		if err := signVSA(lot, S(lot, "name"), vsaLevels(claims, len(result.Simulated) > 0), result.Inputs, policyPath, vsaKey, out); err != nil {
 			return nil, err
 		}
-		fmt.Printf("VSA written to %s: board %s\n", out, pyList(claims))
+		fmt.Printf("VSA written to %s: board %s\n", out, pyList(vsaLevels(claims, len(result.Simulated) > 0)))
 	}
 	return result, nil
 }

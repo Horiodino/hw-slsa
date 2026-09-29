@@ -1,4 +1,5 @@
 {
+  "simulated": {"accept": true, "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."},
   "design": {
     "requiredSteps": ["source-freeze", "simulation", "rom-merge"],
     "consumes": {"simulation": ["source-freeze"], "rom-merge": ["source-freeze"]},

@@ -1,4 +1,5 @@
 {
+  "simulated": {"simulator": "hand-written scenario", "standsIn": "the distributors' shipments and the EMS line: placement, inspection and board test"},
   "note": "Manufacturers and part numbers are real. Distributors, sites, shipment IDs, lot codes, date codes and dates are placeholders, so every such value starts with EXAMPLE or Example.",
   "product": {
     "name": "picosoc-devboard",

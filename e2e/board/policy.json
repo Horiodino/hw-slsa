@@ -1,5 +1,6 @@
 {
   "note": "The buyer's policy for the board. Each shipper signs with its own role in the trust root and may ship, as an authorized channel, only the manufacturers listed for it.",
+  "simulated": {"accept": true, "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."},
   "shippers": {
     "Example Franchised Distributor": {
       "role": "dist-franchised",

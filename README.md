@@ -4,7 +4,7 @@ HSLSA is a framework for proving how a chip or board was made, the way [SLSA](ht
 
 This README is the entry point for anyone new to the project, whether you are here to contribute, to review the spec, or to run the pilot as a buyer or supplier. It explains the ideas, says where everything lives, and links to the documents that go deeper.
 
-**Status:** working draft, spec version 0.1, [revision 14](spec/hslsa-v0.1.md#changelog) (2026-09-27). Everything runs in CI on real open-source designs and tools, with simulated fab, packaging and test data. No company outside this repository signs records yet; the [pilot kit](pilot/README.md) is how that starts. The repository is private by the owner's choice.
+**Status:** working draft, spec version 0.1, [revision 15](spec/hslsa-v0.1.md#changelog) (2026-09-29). Everything runs in CI on real open-source designs and tools, with simulated fab, packaging and test data, and every record made from simulated hardware says so. No company outside this repository signs records yet; the [pilot kit](pilot/README.md) is how that starts. The repository is private by the owner's choice.
 
 ## Contents
 
@@ -93,6 +93,7 @@ Which keys count, which levels are required and whether records signed on a supp
 
 - **Proxy signing.** A supplier that signs nothing can still appear in the chain: whoever received its output signs a record on its behalf, from the supplier's own data, and that caps the track at L1 ([docs](docs/proxy-signing.md)).
 - **Selective disclosure and verifier escrow.** Records can withhold confidential fields behind salted digests; an auditor sees everything, the buyer sees only the auditor's VSAs ([docs](docs/selective-disclosure.md)).
+- **Simulated hardware, marked.** A record made from a simulator says so, the verifier refuses it unless the buyer's policy accepts simulated evidence, and every VSA over it states `HSLSA_SIMULATED`. The virtual shuttle makes a lot's supplier exports by simulating the released netlist on every die, with seeded defects ([docs](docs/simulated-hardware.md)).
 - **Firmware L2 through a board root of trust.** A part with no secure-boot ROM can reach Firmware L2 on a board whose attested root of trust verifies the flash before the SoC runs ([spec](spec/hslsa-v0.1.md#core-requirements), [example](docs/fpga-board-example.md)).
 - **Private transparency logs.** Every L3 log requirement can be met by a private log, since no foundry publishes lot ids or yields.
 
@@ -153,6 +154,7 @@ pilot/           the pilot kit: buyer, supplier and vendor guides, agreement, ma
 | [`docs/mes-stdf-adapter.md`](docs/mes-stdf-adapter.md) | Manufacturing records from MES, STDF and SEMI E142 exports |
 | [`docs/provisioning-adapter.md`](docs/provisioning-adapter.md) | Per-unit provisioning records from a programming station's export |
 | [`docs/hsm-signing.md`](docs/hsm-signing.md) | Site keys held in an HSM over PKCS#11 |
+| [`docs/simulated-hardware.md`](docs/simulated-hardware.md) | The virtual shuttle, the simulated mark on records, and what simulation proves and cannot |
 | [`docs/viability.md`](docs/viability.md) | Which tracks are ready, which are hard, and why |
 | [`docs/release.md`](docs/release.md) | Making a release, and pulling and running the `hslsa` container image |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phases from draft to real use, exit criteria, open owner decisions |
@@ -193,7 +195,7 @@ Each example script builds the tool into `bin/hslsa` itself (set `HSLSA` to use 
 
 | Run | Needs, besides Go | Docs |
 | --- | --- | --- |
-| `SLSA_VERIFIER=/path/to/slsa-verifier e2e/run.sh all` | git, ssh-keygen (OpenSSH 8.2+), Yosys, Icarus Verilog, slsa-verifier; SoftHSM2 for the `hsm` step | [e2e-test.md](docs/e2e-test.md#running-it-locally) |
+| `SLSA_VERIFIER=/path/to/slsa-verifier e2e/run.sh all` | git, ssh-keygen (OpenSSH 8.2+), Yosys, Icarus Verilog, slsa-verifier; SoftHSM2 for the `hsm` step; the `shuttle` step takes a minute or two on four cores | [e2e-test.md](docs/e2e-test.md#running-it-locally), [simulated-hardware.md](docs/simulated-hardware.md#running-it) |
 | `e2e/board/run.sh produce`, then `verify` | after `e2e/run.sh produce` | [board-example.md](docs/board-example.md) |
 | `e2e/escrow.sh produce`, `audit`, `buyer`, `leaks` | after `e2e/run.sh produce` | [selective-disclosure.md](docs/selective-disclosure.md) |
 | `e2e/eda-tcl/run.sh` | Yosys | [adapters/eda-tcl](adapters/eda-tcl/README.md) |
@@ -226,7 +228,7 @@ Five examples run end to end in CI. Each plays every party, signs every record, 
 
 | Example | What is real | Levels verified | Docs |
 | --- | --- | --- | --- |
-| PicoRV32 on SKY130 | The RTL at a pinned commit, simulated in Icarus Verilog and synthesized in Yosys; a signed source tag, review and IP provenance. The fab, sort, package and test data are simulated. Also runs the lot with withheld fields (escrow), with proxy signers, from sample MES and STDF exports, and with keys in SoftHSM2 | Design L2, Wafer L2, Package/Test L2 | [e2e-test.md](docs/e2e-test.md) |
+| PicoRV32 on SKY130 | The RTL at a pinned commit, simulated in Icarus Verilog and synthesized in Yosys; a signed source tag, review and IP provenance. The fab, sort, package and test data are simulated. Also runs the lot with withheld fields (escrow), with proxy signers, from sample MES and STDF exports, with keys in SoftHSM2, and from the virtual shuttle, which simulates every die of the released netlist gate-level with seeded defects | Design L2, Wafer L2, Package/Test L2 (lot VSAs state `HSLSA_SIMULATED`) | [e2e-test.md](docs/e2e-test.md) |
 | Board with the PicoSoC | Distribution records, A1 board build, board HBOM with `parts[]` | Assembly L2 | [board-example.md](docs/board-example.md) |
 | OpenLane 2 `spm` | A real RTL-to-GDS run with the pinned OpenLane image and SKY130 PDK, a record per step, and a second build that matches the GDS byte for byte | Design L4 rebuild evidence (same operator, so not an L4 claim) | [openlane2-flow.md](docs/openlane2-flow.md) |
 | FPGA board with a root of trust | An iCE40UP5K bitstream built with Yosys, nextpnr and IceStorm; a simulated root of trust that verifies the flash before the FPGA runs, provisioned through the station adapter | Design L2, Assembly L2, Firmware L2 for the board | [fpga-board-example.md](docs/fpga-board-example.md) |
@@ -283,7 +285,7 @@ The [roadmap](docs/roadmap.md) has six phases, ordered by dependency:
 | --- | --- | --- |
 | 0 | Make the spec honest and complete: threat model, Design L2 example, bit-exact GDS, independent rebuild, boot on RTL | Done |
 | 1 | Build on existing standards: NIST IR 8536 profile, selective disclosure, CoRIM, CycloneDX and SPDX renderings | Done, except NIST's reference implementation ingest check (NIST has not published it) |
-| 2 | Touch real silicon and hardware: FPGA board, proxy signing | Software done; a real board and a shuttle tapeout wait on the owner |
+| 2 | Touch real silicon and hardware: FPGA board, proxy signing, shuttle tapeout | Software done, with simulated stand-ins for the board, the tapeout and its test data (the virtual shuttle), each marked as simulated; a real board and a real shuttle tapeout wait on the owner |
 | 3 | Adapters for tools suppliers already run | Built; each needs a real supplier export to meet its exit |
 | 4 | A pilot with one buyer | Kit ready; needs a buyer and its OSAT |
 | 5 | A neutral home (OpenSSF, CHIPS Alliance or OCP) and v1.0 | Not started; needs the repository public first |

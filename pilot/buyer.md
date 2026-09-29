@@ -64,6 +64,7 @@ Start from [`e2e/pilot/policy.json`](../e2e/pilot/policy.json) and change the de
 | `manufacturing.requireExports` | `true` | Every chip record carries the export it was made from, and the check reads it again ([MES and STDF adapter](../docs/mes-stdf-adapter.md)) |
 | `manufacturing.requireTransfers` | `true` | Every shipment between sites is a signed record |
 | `firmware.provisioningSigner` | `test-site` | For the root of trust part's provisioning records, in the board policy (see [the FPGA example's](../e2e/fpga/rot/policy.json)) |
+| `simulated` | Left out | Without `simulated.accept` the check refuses any record made from simulated hardware ([simulated hardware](../docs/simulated-hardware.md)), so a vendor's rehearsal lot cannot pass as real parts. The examples' policies, and the board policies in the FPGA example, set it because their lots are simulated; leave it out of every policy for real parts |
 
 ## 5. Check each lot before accepting it
 

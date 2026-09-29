@@ -104,6 +104,8 @@ SLSA_VERIFIER=/path/to/slsa-verifier e2e/run.sh all
 go test ./...
 ```
 
+`all` includes the [virtual shuttle](simulated-hardware.md) (`e2e/run.sh shuttle`), a second lot whose exports come from simulating every die of the released netlist. The example's records are all made from simulated manufacturing data and carry `hwMfg.simulated`; its policy accepts that with `simulated.accept`, and the lot VSA states `HSLSA_SIMULATED`, which `verify` checks with slsa-verifier.
+
 ## Moving to public Sigstore later
 
 If the repository goes public, or keyless signing is otherwise acceptable, the change is small:

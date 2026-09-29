@@ -191,8 +191,12 @@ fn step_until<M: HwModel>(hw: &mut M, what: &str, start: Instant, mut done: impl
             let (boot, flow) = (soc.cptra_boot_status().read(), u32::from(soc.cptra_flow_status().read()));
             let (fatal, non_fatal) = (soc.cptra_fw_error_fatal().read(), soc.cptra_fw_error_non_fatal().read());
             let secs = start.elapsed().as_secs();
+            // The model's threads slow down many times over when other work
+            // shares their cores, so show the machine's load too.
+            let load = std::fs::read_to_string("/proc/loadavg").unwrap_or_default();
+            let load = load.split_whitespace().next().unwrap_or("unknown");
             eprintln!("boot: {what}: {now} cycles, {} a second, boot status 0x{boot:x}, flow status 0x{flow:x}, \
-                       fw error 0x{fatal:x}/0x{non_fatal:x}, {secs}s", now / secs.max(1));
+                       fw error 0x{fatal:x}/0x{non_fatal:x}, {secs}s, load {load}", now / secs.max(1));
         }
     }
 }

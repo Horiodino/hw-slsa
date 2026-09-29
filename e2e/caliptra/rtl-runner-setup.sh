@@ -21,6 +21,11 @@ verilator_is() { [[ $("${1:-verilator}" --version 2>/dev/null | awk '{print $2}'
 
 os=$( (. /etc/os-release && echo "${PRETTY_NAME:-$ID}") 2>/dev/null || uname -s)
 echo "runner: $os, $(uname -m), $(nproc) CPUs, $(awk '/^MemTotal:/ {printf "%d GB", $2 / 1048576}' /proc/meminfo) RAM"
+# A boot's speed depends on the CPU, its frequency governor and whatever else
+# is running, so say what they are.
+echo "cpu: $(awk -F': ' '/^model name/ {print $2; exit}' /proc/cpuinfo)," \
+  "governor $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo unknown)," \
+  "load average $(cut -d' ' -f1-3 /proc/loadavg)"
 if [[ $(uname -m) != x86_64 ]]; then
   echo "::error::The RTL job needs an x86_64 runner; slsa-verifier is fetched for linux-amd64."
   exit 1

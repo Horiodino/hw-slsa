@@ -67,6 +67,9 @@ type mfgKeys struct {
 	// sim is the scenario's simulated block, which every record this run
 	// signs carries in hwMfg.
 	sim Obj
+	// devices is where the parts are, when the scenario provisions unit
+	// identities (mfgid.go).
+	devices string
 }
 
 func (k *mfgKeys) signs(role string) bool { return k.only == nil || k.only[role] }
@@ -251,7 +254,14 @@ func Mfg(bundle, scenarioPath, keys string, w *Withholding) error {
 // record is neither its own nor in the bundle yet, and says whose it is.
 // No roles means every role, with every key in keys.
 func MfgAs(bundle, scenarioPath, keysDir string, w *Withholding, roles []string) error {
-	keys := &mfgKeys{dir: keysDir}
+	return MfgWith(bundle, scenarioPath, keysDir, w, roles, "")
+}
+
+// MfgWith is MfgAs for a scenario that provisions unit identities: devices
+// is the directory that holds the parts, one directory per die and then per
+// unit, which wafer sort fills and final test challenges.
+func MfgWith(bundle, scenarioPath, keysDir string, w *Withholding, roles []string, devices string) error {
+	keys := &mfgKeys{dir: keysDir, devices: devices}
 	if len(roles) > 0 {
 		if w != nil && (len(w.Fields) > 0 || len(w.SaltFiles) > 0) {
 			return fmt.Errorf("signing only some roles' records cannot withhold fields yet: each run rewrites the data files")
@@ -302,6 +312,18 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 			return err
 		}
 	}
+	var ident *identityRun
+	if b := O(sc, "identity"); b != nil {
+		if keys.devices == "" {
+			return fmt.Errorf("the scenario provisions unit identities; name the directory that holds the parts (--devices)")
+		}
+		for _, step := range []string{"wafer-sort", "packaging", "final-test"} {
+			if by[step] != nil {
+				return fmt.Errorf("%s: provisioning unit identities needs the site's own record, not one signed on its behalf", step)
+			}
+		}
+		ident = &identityRun{block: b, devices: keys.devices}
+	}
 
 	// F1: wafer fabrication
 	fab, lot := O(sc, "fab"), O(sc, "waferLot")
@@ -311,8 +333,24 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 		return err
 	}
 	waferLot := rd(fmt.Sprintf("urn:hslsa:wafer-lot:%s:%s", S(fab, "id"), S(lot, "lotId")), waferDigest)
-	f1HW := Obj{"site": O(fab, "site"), "designRef": designRef, "checks": stepChecks(fab, "mask-vs-gds-xor", "inline-parametrics")}
-	f1Deps, err := attachExports(bundle, scenarioDir, sc, "wafer-fab", []Obj{releaseRD}, f1HW)
+	f1Checks := stepChecks(fab, "mask-vs-gds-xor", "inline-parametrics")
+	f1Base := []Obj{releaseRD}
+	// The fab's own check of the release (Wafer L3), when it ran one: F1
+	// consumes it, and the mask XOR names the design it compared against.
+	if rc := filepath.Join(bundle, "att", FabReleaseCheckAtt); fileExists(rc) {
+		rcRD, err := fileRD(rc, "att/"+FabReleaseCheckAtt)
+		if err != nil {
+			return err
+		}
+		f1Base = append(f1Base, rcRD)
+		for _, c := range f1Checks {
+			if S(c, "name") == "mask-vs-gds-xor" {
+				c["against"] = Obj{"name": S(final, "name"), "digest": O(final, "digest")}
+			}
+		}
+	}
+	f1HW := Obj{"site": O(fab, "site"), "designRef": designRef, "checks": f1Checks}
+	f1Deps, err := attachExports(bundle, scenarioDir, sc, "wafer-fab", f1Base, f1HW)
 	if err != nil {
 		return err
 	}
@@ -340,7 +378,7 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 			good = append(good, d)
 		}
 	}
-	var f2, mapsRD Obj
+	var f2, mapsRD, idsRD Obj
 	if S(by["wafer-sort"], "kind") == ByEvidence {
 		// The sort house hands over paper only: its certificate and traveller
 		// stand in for F2, and no wafer map enters the bundle.
@@ -372,11 +410,20 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 			"yield":     Obj{"in": len(dies), "passed": len(good), "failed": len(dies) - len(good)},
 			"checks":    passed("probe"),
 		}
+		f2Subjects := []Obj{mapsRD}
+		if ident != nil {
+			if idsRD, err = ident.provision(bundle, good, S(waferLot, "name"), S(final, "digest", "sha256"), keys, w); err != nil {
+				return err
+			}
+			f2Subjects = append(f2Subjects, idsRD)
+			f2HW["identity"] = Obj{"rootOfTrust": S(ident.block, "rootOfTrust"), "ca": S(ident.block, "ca"), "provisioned": len(good)}
+			f2HW["checks"] = passed("probe", "identity-provisioned")
+		}
 		f2Deps, err := attachExports(bundle, scenarioDir, sc, "wafer-sort", []Obj{t1, waferLot}, f2HW)
 		if err != nil {
 			return err
 		}
-		f2, err = mfgRecord(bundle, "wafer-sort", []Obj{mapsRD},
+		f2, err = mfgRecord(bundle, "wafer-sort", f2Subjects,
 			Obj{"lotId": S(lot, "lotId"), "probeProgram": get(sort, "program")},
 			f2Deps, f2HW, keys, w, by["wafer-sort"])
 		if err != nil {
@@ -394,6 +441,13 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 	genealogy, packagedUnits, err := packageDies(pkg, good, S(waferLot, "name"))
 	if err != nil {
 		return err
+	}
+	// At L3 a unit is named by its die's certificate digest, not its serial.
+	var bySerial map[string]string
+	if ident != nil {
+		if genealogy, packagedUnits, bySerial, err = ident.nameUnits(genealogy, packagedUnits, keys.signs(MfgSigner["packaging"])); err != nil {
+			return err
+		}
 	}
 	if err := writeData(filepath.Join(art, "genealogy.json"), Obj{"units": genealogy}, w); err != nil {
 		return err
@@ -419,6 +473,10 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 		"designRef": designRef,
 		"checks":    stepChecks(pkg, "die-attach", "wire-bond", "x-ray-sample", "marking"),
 	}
+	if idsRD != nil {
+		f3Deps = append(f3Deps, idsRD)
+		f3HW["identity"] = Obj{"lotNaming": "certificate"}
+	}
 	if f3Deps, err = attachExports(bundle, scenarioDir, sc, "packaging", f3Deps, f3HW); err != nil {
 		return err
 	}
@@ -437,6 +495,24 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 
 	// F4: final test, names the shipped lot
 	failedUnits := Strs(ft, "failedUnits")
+	var transcript Obj
+	if ident != nil {
+		failedUnits = unitIDs(failedUnits, bySerial)
+		var noAnswer []string
+		if keys.signs(MfgSigner["final-test"]) {
+			if transcript, noAnswer, err = ident.challenge(genealogy, packagedUnits); err != nil {
+				return err
+			}
+			if err := writeData(filepath.Join(art, IdentityChallenges), transcript, w); err != nil {
+				return err
+			}
+		} else if transcript, err = ReadObj(filepath.Join(art, IdentityChallenges)); err != nil {
+			return &waitingFor{"final-test", MfgSigner["final-test"]}
+		} else {
+			noAnswer = minus(packagedUnits, sortedKeys(O(transcript, "units")))
+		}
+		failedUnits = append(minus(failedUnits, noAnswer), noAnswer...)
+	}
 	shipped := minus(packagedUnits, failedUnits)
 	if err := writeUnits(filepath.Join(art, "shipped-lot.txt"), shipped); err != nil {
 		return err
@@ -466,11 +542,21 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 		"yield":     Obj{"in": len(packagedUnits), "passed": len(shipped), "failed": anyStrings(sortedCopy(failedUnits))},
 		"checks":    passed("final-test-per-unit", "yield-within-limits"),
 	}
+	f4Subjects := []Obj{shippedLot, resultsRD}
+	if transcript != nil {
+		challengesRD, err := fileRD(filepath.Join(art, IdentityChallenges), "")
+		if err != nil {
+			return err
+		}
+		f4Subjects = append(f4Subjects, challengesRD)
+		f4HW["identity"] = Obj{"lotNaming": "certificate", "challenge": ChallengeFormat}
+		f4HW["checks"] = passed("final-test-per-unit", "yield-within-limits", "identity-challenge")
+	}
 	f4Deps, err := attachExports(bundle, scenarioDir, sc, "final-test", []Obj{t3, packaged}, f4HW)
 	if err != nil {
 		return err
 	}
-	_, err = mfgRecord(bundle, "final-test", []Obj{shippedLot, resultsRD},
+	_, err = mfgRecord(bundle, "final-test", f4Subjects,
 		Obj{"lotId": S(ft, "lotId"), "testProgram": get(ft, "program")},
 		f4Deps, f4HW, keys, w, by["final-test"])
 	if err != nil {

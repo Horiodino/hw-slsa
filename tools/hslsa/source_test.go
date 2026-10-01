@@ -175,11 +175,17 @@ func TestIPIsNotWhatTheVendorReleased(t *testing.T) {
 
 // The level claim
 
+// claimDesignL2 lowers the example policy's Design claims to L2.
+func claimDesignL2(p Obj) {
+	O(p, "claims")["design"] = []any{"HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_2"}
+	O(p, "claims")["lot"] = []any{"HSLSA_WAFER_LEVEL_2", "HSLSA_PACKAGE_TEST_LEVEL_2", "HSLSA_DESIGN_LEVEL_2"}
+}
+
 func TestPolicyClaimsDesignL2WithoutSourceRules(t *testing.T) {
 	bundle := chipBundle(t)
 	policy := filepath.Join(t.TempDir(), "policy.json")
 	must(t, copyFile(e2ePolicy, policy))
-	editJSON(t, policy, func(p Obj) { delete(O(p, "design"), "source") })
+	editJSON(t, policy, func(p Obj) { delete(O(p, "design"), "source"); claimDesignL2(p) })
 	rejects(t, chipCheckPolicy(t, bundle, nil, policy), "policy claims Design L2 but does not require a signed, reviewed source freeze")
 }
 
@@ -187,6 +193,6 @@ func TestPolicyClaimsDesignL2WithoutIPRules(t *testing.T) {
 	bundle := chipBundle(t)
 	policy := filepath.Join(t.TempDir(), "policy.json")
 	must(t, copyFile(e2ePolicy, policy))
-	editJSON(t, policy, func(p Obj) { delete(O(p, "design"), "thirdPartyIP") })
+	editJSON(t, policy, func(p Obj) { delete(O(p, "design"), "thirdPartyIP"); claimDesignL2(p) })
 	rejects(t, chipCheckPolicy(t, bundle, nil, policy), "policy claims Design L2 but does not require signed provenance for IP block picorv32")
 }

@@ -431,6 +431,11 @@ func DecodeEnvelope(path string) (Obj, error) {
 // File format: {"roles": {"<role>": ["<PEM public key>", ...]}}
 type TrustRoot struct {
 	Roles map[string][]Key
+	// Enrolled holds, by keyid, what a buyer-run trust root records about
+	// each key it lists (its "enrollments"): role, organization, site, key
+	// custody and accreditation. A trust root built from bare public keys
+	// records none.
+	Enrolled map[string]Obj
 }
 
 // LoadTrustRoot reads a trust root file.
@@ -442,7 +447,7 @@ func LoadTrustRoot(path string) (*TrustRoot, error) {
 	if err := checkTrustRootValid(path, data); err != nil {
 		return nil, err
 	}
-	t := &TrustRoot{Roles: map[string][]Key{}}
+	t := &TrustRoot{Roles: map[string][]Key{}, Enrolled: map[string]Obj{}}
 	for role := range O(data, "roles") {
 		for _, p := range Strs(data, "roles", role) {
 			k, err := PublicKeyFromPEM(p)
@@ -451,6 +456,9 @@ func LoadTrustRoot(path string) (*TrustRoot, error) {
 			}
 			t.Roles[role] = append(t.Roles[role], k)
 		}
+	}
+	for _, e := range Objs(data, "enrollments") {
+		t.Enrolled[S(e, "keyid")] = e
 	}
 	return t, nil
 }

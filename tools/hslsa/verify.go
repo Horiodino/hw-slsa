@@ -10,6 +10,7 @@ package hslsa
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -107,6 +108,9 @@ type DesignResult struct {
 // TapeoutCheck verifies the design steps the policy requires, then (with
 // release) the tapeout release over them.
 func TapeoutCheck(bundle string, trust *TrustRoot, policy Obj, release bool) (*DesignResult, error) {
+	if err := checkPolicyClaims(policy); err != nil {
+		return nil, err
+	}
 	pol := O(policy, "design")
 	stmts := map[string]Obj{}
 	required := Strs(pol, "requiredSteps")
@@ -192,6 +196,9 @@ func TapeoutCheck(bundle string, trust *TrustRoot, policy Obj, release bool) (*D
 	if err := requireDesignL2Rules(policy, rel); err != nil {
 		return nil, err
 	}
+	if err := designL3(bundle, policy, stmts, final); err != nil {
+		return nil, err
+	}
 	return &DesignResult{Final: final, Release: envRD(bundle, AttName("release")), Inputs: stepEnvs}, nil
 }
 
@@ -237,6 +244,12 @@ type LotResult struct {
 // the design, and that every received unit is in the shipped lot (units may
 // be nil).
 func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult, units []string) (*LotResult, error) {
+	return lotCheck(bundle, trust, policy, design, units, false)
+}
+
+// lotCheck is LotCheck, told whether the received units answered an
+// identity challenge (ChallengeParts) or were only listed.
+func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult, units []string, challenged bool) (*LotResult, error) {
 	art := filepath.Join(bundle, "artifacts")
 	gaps, notRecorded := chipGaps(bundle, policy)
 	if err := gapError("lot receipt check", gaps); err != nil {
@@ -442,6 +455,9 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	if err := capAtL1(policy, capped); err != nil {
 		return nil, err
 	}
+	if err := chipL3(bundle, trust, policy, design, stmts, units, challenged); err != nil {
+		return nil, err
+	}
 
 	for _, unit := range units {
 		if !contains(shipped, unit) {
@@ -463,6 +479,9 @@ func LotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 
 // signVSA signs a SLSA Verification Summary Attestation for one subject.
 func signVSA(subject Obj, resourceURI string, levels any, inputs []Obj, policyPath, key, out string) error {
+	if err := checkClaimList(levels); err != nil {
+		return err
+	}
 	policyDigest, err := sha256File(policyPath)
 	if err != nil {
 		return err
@@ -504,17 +523,26 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 	}
 	fmt.Printf("tapeout check: PASSED for %s sha256:%s\n", S(design.Final, "name"), S(design.Final, "digest", "sha256"))
 	var units []string
-	if unitsPath != "" {
+	challenged := false
+	if info, err := os.Stat(unitsPath); err == nil && info.IsDir() {
+		if units, err = ChallengeParts(trust, unitsPath); err != nil {
+			return nil, nil, err
+		}
+		challenged = true
+	} else if unitsPath != "" {
 		if units, err = ReadUnits(unitsPath); err != nil {
 			return nil, nil, err
 		}
 	}
-	lot, err := LotCheck(bundle, trust, policy, design, units)
+	lot, err := lotCheck(bundle, trust, policy, design, units, challenged)
 	if err != nil {
 		return nil, nil, err
 	}
 	msg := fmt.Sprintf("lot receipt check: PASSED for %s sha256:%s", S(lot.Lot, "name"), S(lot.Lot, "digest", "sha256"))
-	if len(units) > 0 {
+	switch {
+	case challenged:
+		msg += fmt.Sprintf(", %d received parts answered an identity challenge and are in the lot", len(units))
+	case len(units) > 0:
 		msg += fmt.Sprintf(", %d received units found in the lot", len(units))
 	}
 	fmt.Println(msg)
@@ -561,4 +589,87 @@ func pyList(v any) string {
 		parts = append(parts, "'"+s+"'")
 	}
 	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+// hasCheck reports whether checks hold a passing check of that name.
+func hasCheck(checks []Obj, name string) bool {
+	for _, c := range checks {
+		if S(c, "name") == name && S(c, "result") == "pass" {
+			return true
+		}
+	}
+	return false
+}
+
+// designL3 runs the tapeout check's Design L3 rules (spec, "Core
+// requirements" and "Where the chain is checked") when the policy claims
+// Design L3: every step that runs tools ran in a sandbox of its own, with no
+// network beyond declared license servers and no signing key in its reach;
+// every tool it names is pinned by digest on the policy's list
+// (design.toolPins); and an equivalence record proves the released netlist
+// equal to the frozen RTL, consuming both by digest so it can be run again.
+// The source freeze only fetches the pinned sources, and the release is the
+// tapeout authority's decision; neither runs a design tool.
+func designL3(bundle string, policy Obj, stmts map[string]Obj, final Obj) error {
+	if designClaim(policy) < 3 {
+		return nil
+	}
+	pol := O(policy, "design")
+	// Isolation is required, so declared license servers must be on the policy's list (rule 4).
+	strict := Obj{"network": Obj{}}
+	for k, v := range O(pol, "network") {
+		O(strict, "network")[k] = v
+	}
+	O(strict, "network")["requireIsolation"] = true
+	pins := Objs(pol, "toolPins")
+	for _, step := range Strs(pol, "requiredSteps") {
+		if step == "source-freeze" {
+			continue
+		}
+		stmt, label := stmts[step], "Design L3: design "+step
+		if err := checkNetwork(stmt, label, strict); err != nil {
+			return err
+		}
+		if err := isolationOK(stmt, label); err != nil {
+			return err
+		}
+		tools := Objs(stmt, "predicate", "hwFlow", "tools")
+		if len(tools) == 0 {
+			return failf("%s: the record names no tool, so nothing is pinned", label)
+		}
+		for _, t := range tools {
+			if err := toolPinned(t, pins, label); err != nil {
+				return err
+			}
+		}
+	}
+	eq := S(pol, "equivalence", "step")
+	if eq == "" {
+		return failf("Design L3: the policy names no equivalence record (design.equivalence.step)")
+	}
+	stmt, ok := stmts[eq]
+	if !ok {
+		return failf("Design L3: the equivalence record, design %s, is not one of the policy's required steps", eq)
+	}
+	label := "Design L3: design " + eq
+	if !hasCheck(Objs(stmt, "predicate", "hwFlow", "checks"), EquivalenceCheck) {
+		return failf("%s: no passing %s check, so no record proves the netlist equal to the RTL", label, EquivalenceCheck)
+	}
+	if err := requireLink(stmt, label, Objs(stmts["source-freeze"], "subject"), "frozen source"); err != nil {
+		return err
+	}
+	if err := requireLink(stmt, label, []Obj{final}, "released design"); err != nil {
+		return err
+	}
+	// Enough to run the proof again: its script is in the bundle, by the digest the record names.
+	script := S(stmt, "predicate", "buildDefinition", "externalParameters", "script")
+	for _, d := range Objs(stmt, "predicate", "buildDefinition", "resolvedDependencies") {
+		if S(d, "name") == script {
+			if !jsonEqual(fileDigest(filepath.Join(bundle, "artifacts", script)), get(d, "digest")) {
+				return failf("%s: the equivalence script %s in the bundle is not the one the record names", label, script)
+			}
+			return nil
+		}
+	}
+	return failf("%s: the record does not carry its equivalence script, so the proof cannot be run again", label)
 }

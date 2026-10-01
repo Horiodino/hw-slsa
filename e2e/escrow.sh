@@ -84,11 +84,11 @@ buyer() {
   echo "== slsa-verifier verify-vsa: design, from the auditor"
   "$sv" verify-vsa "${common[@]}" --attestation-path "$BUYER/vsa/design.vsa.intoto.json" \
     --subject-digest "sha256:${final#* }" --resource-uri "hslsa:design:${final% *}" \
-    --verified-level HSLSA_DESIGN_LEVEL_2 --verified-level SLSA_BUILD_LEVEL_2
+    --verified-level HSLSA_DESIGN_LEVEL_3 --verified-level SLSA_BUILD_LEVEL_3
   echo "== slsa-verifier verify-vsa: received units, from the auditor"
   "$sv" verify-vsa "${common[@]}" --attestation-path "$BUYER/vsa/receipt.vsa.intoto.json" \
     --subject-digest "sha256:$receipt" --resource-uri "$LOT" \
-    --verified-level HSLSA_WAFER_LEVEL_2 --verified-level HSLSA_PACKAGE_TEST_LEVEL_2 --verified-level HSLSA_DESIGN_LEVEL_2
+    --verified-level HSLSA_WAFER_LEVEL_2 --verified-level HSLSA_PACKAGE_TEST_LEVEL_2 --verified-level HSLSA_DESIGN_LEVEL_3
 
   echo "== negative cases"
   printf 'PSOC130-A0-00001\nPSOC130-A0-00020\n' > "$BUYER/other-units.txt"

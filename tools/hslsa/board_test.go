@@ -291,7 +291,7 @@ func TestScrappedChipShippedToTheEMS(t *testing.T) {
 	})
 	rejects(t, boardProduce(work, scenario), "PSOC130-A0-00007 is not in the shipped lot")
 	real := ChipCheck
-	ChipCheck = func(chip string, _ []string) (*LotResult, error) { return real(chip, nil) }
+	ChipCheck = func(chip string, _ []string, _ bool) (*LotResult, error) { return real(chip, nil, false) }
 	err := boardProduce(work, scenario)
 	ChipCheck = real
 	must(t, err)

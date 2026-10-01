@@ -31,6 +31,8 @@ var commands = map[string]command{
 	"design":        {"run and attest one design flow step", design},
 	"adapt":         {"turn MES, STDF and SEMI E142 exports into a scenario for mfg and hbom", adapt},
 	"mfg":           {"emit signed F1 to F4 records for the scenario lot", mfg},
+	"fab-check":     {"the fab's check of the design release before mask making, signed as a VSA with its site key", fabCheck},
+	"challenge":     {"challenge parts for their identity and print their unit names", challenge},
 	"hbom":          {"build, validate and sign the HBOM", hbomCmd},
 	"verify":        {"tapeout and lot receipt checks, then VSAs", verify},
 	"escrow":        {"verifier escrow: the auditor's full check and VSAs, or the buyer's check of them", escrow},
@@ -275,9 +277,23 @@ func trustRoot(args []string) error {
 }
 
 func design(args []string) error {
-	step, rest, err := action(args, "ip-release", "source-tag", "review", "source-freeze", "simulation", "synthesis", "release")
+	step, rest, err := action(args, "ip-release", "source-tag", "review", "source-freeze", "simulation", "synthesis", "signoff", "release", "rerun-equivalence")
 	if err != nil {
 		return err
+	}
+	if step == "rerun-equivalence" {
+		f := newFlags("design rerun-equivalence")
+		bundle := f.str("bundle", "the design bundle", true)
+		trust := f.str("trust-root", "the buyer's trust root, which lists the flow platform's key", true)
+		isolate := f.Bool("isolate", false, "run Yosys in a sandbox, as the flow did")
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		tr, err := hslsa.LoadTrustRoot(*trust)
+		if err != nil {
+			return err
+		}
+		return hslsa.RerunEquivalence(*bundle, tr, *isolate)
 	}
 	f := newFlags("design " + step)
 	bundle := f.str("bundle", "", true)
@@ -286,6 +302,7 @@ func design(args []string) error {
 	cache := f.str("cache", "", false)
 	trust := f.str("trust-root", "", false)
 	policy := f.str("policy", "", false)
+	isolate := f.Bool("isolate", false, "run the step's tools in a sandbox of their own, with no network and no signing key in reach (Design L3)")
 	if err := f.parse(rest); err != nil {
 		return err
 	}
@@ -311,9 +328,11 @@ func design(args []string) error {
 		}
 		return hslsa.SourceFreezeL2(*bundle, *lock, *key, *cache, *trust, *policy)
 	case "simulation":
-		return hslsa.Simulation(*bundle, *lock, *key)
+		return hslsa.Simulation(*bundle, *lock, *key, *isolate)
 	case "synthesis":
-		return hslsa.Synthesis(*bundle, *lock, *key)
+		return hslsa.Synthesis(*bundle, *lock, *key, *isolate)
+	case "signoff":
+		return hslsa.Equivalence(*bundle, *lock, *key, *isolate)
 	}
 	if err := need(trust, "trust-root", "release"); err != nil {
 		return err
@@ -361,6 +380,7 @@ func mfg(args []string) error {
 	keys := f.str("keys", "directory of <role>.key.pem", true)
 	hold := f.str("withhold", "fields and files to withhold (JSON); disclosures go to the bundle's disclosures directory", false)
 	sign := f.str("sign", "comma-separated roles to sign for; records of other roles must already be in the bundle (default: every role)", false)
+	devices := f.str("devices", "directory that holds the parts, when the scenario provisions unit identities", false)
 	if err := f.parse(args); err != nil {
 		return err
 	}
@@ -368,7 +388,44 @@ func mfg(args []string) error {
 	if err != nil {
 		return err
 	}
-	return hslsa.MfgAs(*bundle, *scenario, *keys, w, splitList(*sign))
+	return hslsa.MfgWith(*bundle, *scenario, *keys, w, splitList(*sign), *devices)
+}
+
+func fabCheck(args []string) error {
+	f := newFlags("fab-check")
+	bundle := f.str("bundle", "", true)
+	trust := f.str("trust-root", "the fab's trust root for the design records", true)
+	policy := f.str("policy", "the fab's policy for the design records", true)
+	key := f.str("key", "the fab's site key", true)
+	if err := f.parse(args); err != nil {
+		return err
+	}
+	tr, err := hslsa.LoadTrustRoot(*trust)
+	if err != nil {
+		return err
+	}
+	return hslsa.FabReleaseCheck(*bundle, tr, *policy, *key)
+}
+
+func challenge(args []string) error {
+	f := newFlags("challenge")
+	parts := f.str("parts", "directory with one directory per part", true)
+	trust := f.str("trust-root", "trust root listing the identity CA", true)
+	if err := f.parse(args); err != nil {
+		return err
+	}
+	tr, err := hslsa.LoadTrustRoot(*trust)
+	if err != nil {
+		return err
+	}
+	units, err := hslsa.ChallengeParts(tr, *parts)
+	if err != nil {
+		return err
+	}
+	for _, u := range units {
+		fmt.Println(u)
+	}
+	return nil
 }
 
 func hbomCmd(args []string) error {
@@ -393,7 +450,7 @@ func verify(args []string) error {
 	bundle := f.str("bundle", "", true)
 	trust := f.str("trust-root", "", true)
 	policy := f.str("policy", "", true)
-	units := f.str("units", "file with the serials of the units received", false)
+	units := f.str("units", "file with the serials of the units received, or a directory of the parts received, which must answer an identity challenge", false)
 	vsaKey := f.str("vsa-key", "", false)
 	vsaOut := f.str("vsa-out", "", false)
 	if err := f.parse(args); err != nil {
@@ -717,8 +774,10 @@ func board(args []string) error {
 	scenario := f.str("scenario", "produce: shipments and board build", false)
 	designPath := f.str("design", "produce: the released board design", false)
 	keys := f.str("keys", "produce: directory of <role>.key.pem", false)
+	chipParts := f.str("chip-parts", "produce, Assembly L3: directory of the chips shipped to the EMS, one per marked serial, which the EMS challenges before placement", false)
+	boardsOut := f.str("boards-out", "produce, Assembly L3: directory to put the built boards in, one per serial", false)
 	trust := f.str("trust-root", "verify: trust root for the board's signers", false)
-	boards := f.str("boards", "verify: file with the serials of the boards received", false)
+	boards := f.str("boards", "verify: file with the serials of the boards received, or a directory of the boards received, whose identity parts must answer a challenge", false)
 	vsaKey := f.str("vsa-key", "", false)
 	vsaOut := f.str("vsa-out", "", false)
 	setPartRoots := partRootFlags(f)
@@ -733,6 +792,13 @@ func board(args []string) error {
 			if err := need(v, name, "produce"); err != nil {
 				return err
 			}
+		}
+		if *chipParts != "" {
+			if err := need(boardsOut, "boards-out", "the chips are challenged (--chip-parts)"); err != nil {
+				return err
+			}
+			return hslsa.BoardProduceParts(*bundle, *chip, *scenario, *designPath, *policy, *keys,
+				&hslsa.BoardParts{Chips: *chipParts, Boards: *boardsOut})
 		}
 		return hslsa.BoardProduce(*bundle, *chip, *scenario, *designPath, *policy, *keys)
 	}
@@ -1297,6 +1363,8 @@ func pilot(args []string) error {
 		notBefore := f.str("not-before", "start of the enrollment (default now)", false)
 		notAfter := f.str("not-after", "end of the enrollment", true)
 		note := f.str("note", "how the buyer checked the key with the site", false)
+		accScheme := f.str("accreditation", "the site's accreditation scheme, such as \"DMEA Trusted Supplier\" (L3 needs one the buyer's policy accepts)", false)
+		accID := f.str("accreditation-id", "the accreditation's certificate or listing id", false)
 		if err := f.parse(rest); err != nil {
 			return err
 		}
@@ -1311,7 +1379,8 @@ func pilot(args []string) error {
 			return err
 		}
 		return hslsa.Enroll(*buyerKey, *pub, hslsa.Enrollment{Role: *role, OrgName: *orgName, OrgID: *orgID, Site: *site,
-			Country: *country, Custody: *custody, NotBefore: nb, NotAfter: na, Note: *note}, *out)
+			Country: *country, Custody: *custody, NotBefore: nb, NotAfter: na, Note: *note,
+			Accreditation: hslsa.Accreditation{Scheme: *accScheme, ID: *accID}}, *out)
 	case "revoke":
 		buyerKey := f.str("buyer-key", "the buyer's root key", true)
 		pub := f.str("pub", "the public key to revoke", true)

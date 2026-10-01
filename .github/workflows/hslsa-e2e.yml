@@ -73,10 +73,35 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Install Yosys, Icarus Verilog and SoftHSM2
-        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends yosys iverilog softhsm2
-      - name: Run the flow and sign every step
+      # The versions are pinned because the example's Design L3 policy pins
+      # these packages' binaries and files by digest (design.toolPins).
+      - name: Install Yosys, Icarus Verilog, SoftHSM2 and bubblewrap
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends yosys=0.33-5build2 iverilog=12.0-2build2 softhsm2 bubblewrap
+      # Ubuntu 24.04 stops unprivileged processes from making user namespaces,
+      # which the sandbox the design steps run in needs.
+      - name: Allow the sandbox to make user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Run the flow, design steps isolated, and sign every step
         run: e2e/run.sh produce
+      - name: Design L3, as an independent party, prove the netlist equal to the RTL again
+        run: e2e/run.sh rerun
+      - name: Design L3 tests, a netlist altered under forged records, caught by the rerun
+        env:
+          HSLSA_REQUIRE_YOSYS: "1"
+        run: go test -count=1 -run 'RerunEquivalence' ./tools/hslsa/
+      - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
+            "https://github.com/slsa-framework/slsa-verifier/releases/download/${SLSA_VERIFIER_VERSION}/slsa-verifier-linux-amd64"
+          echo "${SLSA_VERIFIER_SHA256}  $RUNNER_TEMP/slsa-verifier" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/slsa-verifier"
+          echo "SLSA_VERIFIER=$RUNNER_TEMP/slsa-verifier" >> "$GITHUB_ENV"
+      - name: Wafer L3 and Package/Test L3, the lot with HSM site keys, die identities and challenged parts, under a buyer-run trust root
+        run: e2e/run.sh l3
+      - name: Assembly L3, the board on those chips, challenged at build, a platform certificate per board, challenged at receipt
+        run: e2e/board/run.sh l3
       - name: The same lot with suppliers that sign nothing, proxy-signed and checked
         run: e2e/run.sh proxy
       - name: The same lot made from the suppliers' MES and STDF exports, and checked against them

@@ -3,9 +3,12 @@ package hslsa
 // Design track: run a real RTL flow with open tools and attest every step.
 //
 // Steps run here: 0 source freeze, 1 simulation (Icarus Verilog), 2 synthesis
-// (Yosys), and the tapeout release. Floorplan through GDS stream-out (steps 3
-// to 7) need OpenROAD and a PDK and run in the OpenLane example, so the
+// (Yosys), 6 signoff (a formal proof in Yosys that the netlist equals the
+// RTL), and the tapeout release. Floorplan through GDS stream-out (steps 3 to
+// 5 and 7) need OpenROAD and a PDK and run in the OpenLane example, so the
 // release subject here is the gate-level netlist standing in for the GDS.
+// With isolate, steps 1, 2 and 6 run their tools in a sandbox of their own
+// (sandbox.go), as Design L3 asks.
 
 import (
 	"archive/tar"
@@ -17,13 +20,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // DesignSteps are the PicoRV32 example's design steps before the release.
-var DesignSteps = []string{"source-freeze", "simulation", "synthesis"}
+var DesignSteps = []string{"source-freeze", "simulation", "synthesis", "signoff"}
 
 // AttName is the envelope file name for a design step.
 func AttName(step string) string {
@@ -349,38 +354,91 @@ func sourceFreeze(bundle, lockPath, key, cache, trustRoot, policyPath string) er
 	return finish(bundle, "source-freeze", []Obj{subject}, pred, signer)
 }
 
+// stepRunner runs one design step's tools: in a sandbox of its own when the
+// flow isolates its steps (Design L3), otherwise directly. Either way the
+// step works in a fresh directory holding only its inputs.
+type stepRunner struct {
+	work string
+	sb   *Sandbox
+}
+
+func newStepRunner(prefix string, isolate bool) (*stepRunner, error) {
+	r := &stepRunner{}
+	if isolate {
+		sb, err := NewSandbox()
+		if err != nil {
+			return nil, err
+		}
+		r.sb = sb
+	}
+	work, err := os.MkdirTemp("", prefix)
+	if err != nil {
+		return nil, err
+	}
+	r.work = work
+	return r, nil
+}
+
+func (r *stepRunner) close() { os.RemoveAll(r.work) }
+
+func (r *stepRunner) run(name string, args ...string) (procResult, error) {
+	if r.sb != nil {
+		return r.sb.Run(r.work, nil, name, args...)
+	}
+	return runCmd(r.work, nil, name, args...)
+}
+
+// record adds hwFlow.isolation and hwFlow.network to a step predicate when
+// the step ran isolated.
+func (r *stepRunner) record(pred Obj) Obj {
+	if r.sb != nil {
+		hw := O(pred, "hwFlow")
+		hw["isolation"] = r.sb.Isolation()
+		hw["network"] = IsolatedNetwork()
+	}
+	return pred
+}
+
+// collect copies a file the step wrote in its working directory into the bundle's artifacts.
+func (r *stepRunner) collect(name, art string) error {
+	if _, err := os.Stat(filepath.Join(r.work, name)); err != nil {
+		return nil
+	}
+	return copyFile(filepath.Join(r.work, name), filepath.Join(art, name))
+}
+
 // Simulation is step 1: run the testbench on the frozen source.
-func Simulation(bundle, lockPath, key string) error {
+func Simulation(bundle, lockPath, key string, isolate bool) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
 		return err
 	}
 	art := filepath.Join(bundle, "artifacts")
-	iverilog, err := tool("iverilog", "-V")
+	iverilog, err := pinnedTool("iverilog", "-V")
 	if err != nil {
 		return err
 	}
-	vvp, err := tool("vvp", "-V")
+	vvp, err := pinnedTool("vvp", "-V")
 	if err != nil {
 		return err
 	}
 	sim := O(lock, "simulation")
-	work, err := os.MkdirTemp("", "hslsa-sim-")
+	r, err := newStepRunner("hslsa-sim-", isolate)
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(work)
-	if err := unpack(filepath.Join(art, "source.tar"), work); err != nil {
+	defer r.close()
+	if err := unpack(filepath.Join(art, "source.tar"), r.work); err != nil {
 		return err
 	}
-	build, err := runCmd(work, nil, "iverilog", append([]string{"-o", "tb"}, Strs(sim, "files")...)...)
+	build, err := r.run("iverilog", append([]string{"-o", "tb"}, Strs(sim, "files")...)...)
 	if err != nil {
 		return err
 	}
 	run := build
 	if build.Code == 0 {
-		if run, err = runCmd(work, nil, "vvp", "-n", "tb"); err != nil {
+		if run, err = r.run("vvp", "-n", "tb"); err != nil {
 			return err
 		}
 	}
@@ -396,7 +454,7 @@ func Simulation(bundle, lockPath, key string) error {
 	if err != nil {
 		return err
 	}
-	pred := designPredicate(
+	pred := r.record(designPredicate(
 		"simulation",
 		Obj{"top": S(sim, "top"), "files": get(sim, "files")},
 		[]Obj{source},
@@ -407,7 +465,7 @@ func Simulation(bundle, lockPath, key string) error {
 			check("activity", int64(activity) >= minActivity, fmt.Sprintf("%d x '%s'", activity, marker)),
 		},
 		nil, started,
-	)
+	))
 	subject, err := fileRD(filepath.Join(art, "simulation.log"), "")
 	if err != nil {
 		return err
@@ -419,43 +477,59 @@ func Simulation(bundle, lockPath, key string) error {
 	return finish(bundle, "simulation", []Obj{subject}, pred, signer)
 }
 
+// synthesisScript is step 2's Yosys script. It reads the RTL the way the
+// equivalence check reads it (equivalenceScript): case statements' full_case
+// and parallel_case attributes dropped, so a case means what it says in
+// simulation, and every undefined value (an 'x assignment) resolved to 0.
+// That fixes everything the RTL leaves open before synthesis starts, so the
+// netlist can be proven equal to the RTL, not only simulated against it.
+func synthesisScript(files []string, top, stat, netlist string) string {
+	return fmt.Sprintf(
+		"read_verilog %s; attrmap -remove parallel_case -remove full_case; prep -flatten -top %s; memory_map; setundef -zero; "+
+			"synth -top %s -flatten -nofsm; check -assert; tee -q -o %s stat; write_verilog -noattr %s",
+		strings.Join(files, " "), top, top, stat, netlist,
+	)
+}
+
 // Synthesis is step 2: synthesize the frozen RTL to a gate-level netlist.
-func Synthesis(bundle, lockPath, key string) error {
+func Synthesis(bundle, lockPath, key string, isolate bool) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
 		return err
 	}
 	syn := O(lock, "synthesis")
-	art, err := filepath.Abs(filepath.Join(bundle, "artifacts"))
-	if err != nil {
-		return err
-	}
+	art := filepath.Join(bundle, "artifacts")
 	top := S(syn, "top")
-	netlist := filepath.Join(art, top+".netlist.v")
-	stat := filepath.Join(art, "synthesis-stat.txt")
-	script := fmt.Sprintf(
-		"read_verilog %s; synth -top %s -flatten; check -assert; tee -q -o %s stat; write_verilog -noattr %s",
-		strings.Join(Strs(syn, "files"), " "), top, stat, netlist,
-	)
-	work, err := os.MkdirTemp("", "hslsa-syn-")
+	netlist := top + ".netlist.v"
+	stat := "synthesis-stat.txt"
+	script := synthesisScript(Strs(syn, "files"), top, stat, netlist)
+	r, err := newStepRunner("hslsa-syn-", isolate)
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(work)
-	if err := unpack(filepath.Join(art, "source.tar"), work); err != nil {
+	defer r.close()
+	if err := unpack(filepath.Join(art, "source.tar"), r.work); err != nil {
 		return err
 	}
-	proc, err := runCmd(work, nil, "yosys", "-q", "-p", script)
+	proc, err := r.run("yosys", "-q", "-p", script)
 	if err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(art, "synthesis.log"), []byte(proc.Stdout+proc.Stderr), 0o644); err != nil {
 		return err
 	}
-	fi, statErr := os.Stat(netlist)
+	for _, name := range []string{netlist, stat} {
+		if err := os.Remove(filepath.Join(art, name)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		if err := r.collect(name, art); err != nil {
+			return err
+		}
+	}
+	fi, statErr := os.Stat(filepath.Join(art, netlist))
 	ok := proc.Code == 0 && statErr == nil && fi.Size() > 0
-	yosys, err := tool("yosys", "-V")
+	yosys, err := pinnedTool("yosys", "-V")
 	if err != nil {
 		return err
 	}
@@ -467,21 +541,21 @@ func Synthesis(bundle, lockPath, key string) error {
 	if err != nil {
 		return err
 	}
-	pred := designPredicate(
+	pred := r.record(designPredicate(
 		"synthesis",
-		Obj{"top": top, "script": strings.ReplaceAll(script, art+"/", "")},
+		Obj{"top": top, "script": script},
 		[]Obj{source},
 		[]Obj{yosys},
 		[]Obj{check("synthesis-and-check-assert", ok, fmt.Sprintf("exit %d", proc.Code))},
 		[]Obj{logRD}, started,
-	)
-	netRD, err := fileRD(netlist, "")
+	))
+	netRD, err := fileRD(filepath.Join(art, netlist), "")
 	if err != nil {
 		return err
 	}
 	subjects := []Obj{netRD}
-	if _, err := os.Stat(stat); err == nil {
-		statRD, err := fileRD(stat, "")
+	if _, err := os.Stat(filepath.Join(art, stat)); err == nil {
+		statRD, err := fileRD(filepath.Join(art, stat), "")
 		if err != nil {
 			return err
 		}
@@ -492,6 +566,200 @@ func Synthesis(bundle, lockPath, key string) error {
 		return err
 	}
 	return finish(bundle, "synthesis", subjects, pred, signer)
+}
+
+// EquivalenceCheck is the check name of a formal equivalence proof between
+// the RTL and a netlist (spec, Design L3).
+const EquivalenceCheck = "rtl-netlist-equivalence"
+
+// equivalenceScript proves the netlist equal to the RTL, read as synthesis
+// read it (synthesisScript), with Yosys's equivalence checker: equiv_make
+// pairs every signal the two designs share by name, and equiv_induct proves
+// all the pairs equal at once by induction over the clock, so the proof
+// holds in every cycle, not only those a testbench ran. equiv_status -assert
+// fails the run if any pair is left unproven.
+func equivalenceScript(files []string, top, netlist string) string {
+	return strings.Join([]string{
+		"read_verilog " + netlist,
+		"proc",
+		"rename " + top + " gate",
+		"design -stash gate",
+		"read_verilog " + strings.Join(files, " "),
+		"attrmap -remove parallel_case -remove full_case",
+		"prep -flatten -top " + top,
+		"memory_map",
+		"setundef -zero",
+		"opt_clean",
+		"rename " + top + " gold",
+		"design -copy-from gate -as gate gate",
+		"equiv_make gold gate equiv",
+		"hierarchy -top equiv",
+		"async2sync",
+		"equiv_induct",
+		"equiv_status -assert",
+	}, "\n") + "\n"
+}
+
+// EquivalenceScriptFile and EquivalenceLog are the step's artifacts.
+const (
+	EquivalenceScriptFile = "equivalence.ys"
+	EquivalenceLog        = "equivalence.log"
+)
+
+// Equivalence is step 6 (signoff) for a design released as a netlist: a
+// formal proof that the netlist synthesis made is equal to the frozen RTL.
+// The record carries the script and consumes the source archive and the
+// netlist by digest, so anyone can run the same proof again
+// (RerunEquivalence).
+func Equivalence(bundle, lockPath, key string, isolate bool) error {
+	started := Now()
+	lock, err := ReadObj(lockPath)
+	if err != nil {
+		return err
+	}
+	syn := O(lock, "synthesis")
+	art := filepath.Join(bundle, "artifacts")
+	top := S(syn, "top")
+	netlist := top + ".netlist.v"
+	script := equivalenceScript(Strs(syn, "files"), top, netlist)
+	if err := os.WriteFile(filepath.Join(art, EquivalenceScriptFile), []byte(script), 0o644); err != nil {
+		return err
+	}
+	r, err := newStepRunner("hslsa-eqv-", isolate)
+	if err != nil {
+		return err
+	}
+	defer r.close()
+	proven, proc, err := runEquivalence(r, art, script, netlist)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(art, EquivalenceLog), []byte(proc.Stdout+proc.Stderr), 0o644); err != nil {
+		return err
+	}
+	yosys, err := pinnedTool("yosys", "-V")
+	if err != nil {
+		return err
+	}
+	var deps []Obj
+	for _, name := range []string{"source.tar", netlist, EquivalenceScriptFile} {
+		d, err := fileRD(filepath.Join(art, name), "")
+		if err != nil {
+			return err
+		}
+		deps = append(deps, d)
+	}
+	ok := proc.Code == 0 && proven > 0
+	pred := r.record(designPredicate(
+		"signoff",
+		Obj{"top": top, "gold": get(syn, "files"), "gate": netlist, "script": EquivalenceScriptFile,
+			"method": "yosys equiv_make + equiv_induct (induction over the clock, every shared signal)"},
+		deps,
+		[]Obj{yosys},
+		[]Obj{check(EquivalenceCheck, ok, fmt.Sprintf("%d signals proven equal, exit %d", proven, proc.Code))},
+		nil, started,
+	))
+	logRD, err := fileRD(filepath.Join(art, EquivalenceLog), "")
+	if err != nil {
+		return err
+	}
+	signer, err := LoadSigner(key)
+	if err != nil {
+		return err
+	}
+	return finish(bundle, "signoff", []Obj{logRD}, pred, signer)
+}
+
+// provenPattern is how equiv_status reports the proof.
+var provenPattern = regexp.MustCompile(`Of those cells (\d+) are proven and (\d+) are unproven`)
+
+// runEquivalence runs the equivalence script over the source archive and the
+// netlist in art, and returns how many signal pairs it proved equal (0 when
+// any is unproven).
+func runEquivalence(r *stepRunner, art, script, netlist string) (int, procResult, error) {
+	if err := unpack(filepath.Join(art, "source.tar"), r.work); err != nil {
+		return 0, procResult{}, err
+	}
+	if err := copyFile(filepath.Join(art, netlist), filepath.Join(r.work, netlist)); err != nil {
+		return 0, procResult{}, err
+	}
+	if err := os.WriteFile(filepath.Join(r.work, EquivalenceScriptFile), []byte(script), 0o644); err != nil {
+		return 0, procResult{}, err
+	}
+	proc, err := r.run("yosys", "-l", "equivalence.full.log", "-q", EquivalenceScriptFile)
+	if err != nil {
+		return 0, proc, err
+	}
+	full, _ := os.ReadFile(filepath.Join(r.work, "equivalence.full.log"))
+	proc.Stdout = equivalenceSummary(string(full)) + proc.Stdout
+	m := provenPattern.FindStringSubmatch(string(full))
+	if m == nil || m[2] != "0" || proc.Code != 0 {
+		return 0, proc, nil
+	}
+	n, _ := strconv.Atoi(m[1])
+	return n, proc, nil
+}
+
+// equivalenceSummary keeps the lines of a Yosys equivalence log that say
+// what was paired and proven, not the thousands of per-signal lines.
+func equivalenceSummary(log string) string {
+	var out []string
+	for _, l := range splitLines(log) {
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, "Yosys ") || strings.Contains(t, "Executing EQUIV") || strings.HasPrefix(t, "Found ") ||
+			strings.HasPrefix(t, "Of those") || strings.HasPrefix(t, "Proof for induction") || strings.HasPrefix(t, "Proved ") ||
+			strings.HasPrefix(t, "Equivalence successfully") || strings.HasPrefix(t, "Unproven") || strings.HasPrefix(t, "ERROR") {
+			out = append(out, l)
+		}
+	}
+	return strings.Join(out, "\n") + "\n"
+}
+
+// RerunEquivalence is the independent rerun Design L3 makes possible: it
+// opens the bundle's equivalence record under the trust root, checks the
+// script, source archive and netlist in the bundle against the digests the
+// record names, runs the proof with this machine's Yosys and this tool's own
+// recipe (not the script the record carries), and fails unless every pair is
+// proven again.
+func RerunEquivalence(bundle string, trust *TrustRoot, isolate bool) error {
+	stmt, err := trust.Open(filepath.Join(bundle, "att", AttName("signoff")), "flow-platform", DesignFlow)
+	if err != nil {
+		return err
+	}
+	ext := O(stmt, "predicate", "buildDefinition", "externalParameters")
+	art := filepath.Join(bundle, "artifacts")
+	for _, d := range Objs(stmt, "predicate", "buildDefinition", "resolvedDependencies") {
+		if !jsonEqual(fileDigest(filepath.Join(art, S(d, "name"))), get(d, "digest")) {
+			return failf("equivalence rerun: %s in the bundle is not the file the record names", S(d, "name"))
+		}
+	}
+	// The rerun proves with this tool's own recipe, not the script the flow
+	// platform shipped, so a script that proves nothing cannot pass here.
+	script := equivalenceScript(Strs(ext, "gold"), S(ext, "top"), S(ext, "gate"))
+	if shipped, err := os.ReadFile(filepath.Join(art, S(ext, "script"))); err != nil || string(shipped) != script {
+		fmt.Printf("equivalence rerun: the record's script %s is not this tool's recipe; proving with the recipe instead\n", S(ext, "script"))
+	}
+	r, err := newStepRunner("hslsa-eqv-", isolate)
+	if err != nil {
+		return err
+	}
+	defer r.close()
+	proven, proc, err := runEquivalence(r, art, script, S(ext, "gate"))
+	if err != nil {
+		return err
+	}
+	if proven == 0 {
+		return failf("equivalence rerun: the proof did not hold on this machine:\n%s", proc.Stdout)
+	}
+	fmt.Printf("equivalence rerun: PASSED, %d signals of %s proven equal to the RTL with %s\n", proven, S(ext, "gate"), firstLine(proc.Stdout))
+	return nil
+}
+
+func firstLine(s string) string {
+	if l := splitLines(strings.TrimSpace(s)); len(l) > 0 {
+		return strings.TrimSpace(l[0])
+	}
+	return ""
 }
 
 // tapeoutGate runs the tapeout check over the design steps, as the release's gate.

@@ -100,7 +100,7 @@ func FPGABoardProduce(bundle, rotBundle, designBundle, scenarioPath, designPath,
 		}
 		return nil
 	}
-	return boardProduceWith(bundle, rotBundle, scenarioPath, designPath, policyPath, keys, extend)
+	return boardProduceWith(bundle, rotBundle, scenarioPath, designPath, policyPath, keys, nil, extend)
 }
 
 // rotUnitOn is the root of trust unit the EMS placed on a board, from its build records.

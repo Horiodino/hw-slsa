@@ -1,0 +1,19 @@
+{
+  "note": "The buyer's policy for the board at Assembly L3. Each shipper signs with its own role in the trust root and may ship, as an authorized channel, only the manufacturers listed for it; the EMS and every shipper sign at sites accredited under a scheme listed here.",
+  "simulated": {"accept": true, "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."},
+  "shippers": {
+    "Example Franchised Distributor": {
+      "role": "dist-franchised",
+      "authorizedFor": [
+        "Example Open Silicon Group", "Winbond Electronics", "Texas Instruments", "Abracon", "Murata Electronics", "YAGEO"
+      ]
+    },
+    "Example Components Broker": {"role": "dist-broker", "authorizedFor": []},
+    "Example PCB Fab": {"role": "pcb-fab", "authorizedFor": ["Example PCB Fab"]}
+  },
+  "requireAuthorizedChannel": true,
+  "accreditations": ["ipc-1791", "sae-as6496"],
+  "claims": {
+    "board": ["HSLSA_ASSEMBLY_LEVEL_3"]
+  }
+}

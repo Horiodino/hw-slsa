@@ -15,6 +15,8 @@ package hslsa
 // is real.
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -122,7 +124,9 @@ func partTrust(chip string) (*TrustRoot, Obj, error) {
 
 // ChipCheck is the buyer's tapeout and lot receipt check on a chip bundle,
 // under the trust root and policy partTrust picks. Tests may replace it.
-var ChipCheck = func(chip string, units []string) (*LotResult, error) {
+// challenged says the units answered an identity challenge (Package/Test
+// L3) rather than being listed.
+var ChipCheck = func(chip string, units []string, challenged bool) (*LotResult, error) {
 	trust, policy, err := partTrust(chip)
 	if err != nil {
 		return nil, err
@@ -131,7 +135,7 @@ var ChipCheck = func(chip string, units []string) (*LotResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	return LotCheck(chip, trust, policy, design, units)
+	return lotCheck(chip, trust, policy, design, units, challenged)
 }
 
 func copyFile(src, dst string) error {
@@ -182,12 +186,20 @@ type shipLine struct {
 
 // BoardProduce signs the shipments, A1 and the board HBOM for a board built on the chip bundle.
 func BoardProduce(bundle, chipBundle, scenarioPath, designPath, policyPath, keys string) error {
-	return boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, keys, nil)
+	return boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, keys, nil, nil)
+}
+
+// BoardProduceParts is BoardProduce for Assembly L3: the EMS challenges every
+// chip it places (the chips are in parts.Chips by marked serial), records the
+// answers, puts each built board's identity parts in parts.Boards, and the
+// platform CA signs a platform certificate per board.
+func BoardProduceParts(bundle, chipBundle, scenarioPath, designPath, policyPath, keys string, parts *BoardParts) error {
+	return boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, keys, parts, nil)
 }
 
 // boardProduceWith is BoardProduce with a hook that adds to the board HBOM's
 // predicate before it is validated and signed.
-func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, keys string, extend func(predicate Obj) error) error {
+func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, keys string, phys *BoardParts, extend func(predicate Obj) error) error {
 	art := filepath.Join(bundle, "artifacts")
 	sc, err := ReadObj(scenarioPath)
 	if err != nil {
@@ -277,7 +289,20 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 		return fmt.Errorf("no shipment carries the chip %s", chipMPN)
 	}
 	chipUnits := Strs(chipLine.line, "units")
-	chipResult, err := ChipCheck(chip, chipUnits)
+	chipSerials := chipUnits
+	var answers []partAnswer
+	if phys != nil {
+		// Assembly L3: each chip answers a challenge before placement, and is
+		// named from then on by the certificate it answered under.
+		if answers, err = attestComponents(chip, phys.Chips, chipUnits); err != nil {
+			return err
+		}
+		chipUnits = nil
+		for _, a := range answers {
+			chipUnits = append(chipUnits, a.unit)
+		}
+	}
+	chipResult, err := ChipCheck(chip, chipUnits, phys != nil)
 	if err != nil {
 		return err
 	}
@@ -310,6 +335,7 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 	boardsBuilt, _ := Int(asm, "boards")
 	next := 0
 	builds := Obj{}
+	attested := Obj{}
 	var serials []string
 	for i := int64(0); i < boardsBuilt; i++ {
 		serial := fmt.Sprintf("%s%04d", S(asm, "serialPrefix"), i+1)
@@ -326,6 +352,16 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 						return fmt.Errorf("more %s placed than were shipped", chipMPN)
 					}
 					p["unit"] = chipUnits[next]
+					if phys != nil {
+						p["serial"] = chipSerials[next]
+						if O(attested, serial) == nil {
+							attested[serial] = Obj{}
+						}
+						O(attested, serial)[refDes] = chipSerials[next]
+						if err := copyTree(filepath.Join(phys.Chips, chipSerials[next]), filepath.Join(phys.Boards, serial, refDes)); err != nil {
+							return err
+						}
+					}
 					next++
 				}
 				placements[refDes] = p
@@ -365,6 +401,29 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 		return err
 	}
 	subjects = append(subjects, buildRD)
+	a1Checks := passed("part-lot-receipt-check", "aoi", "x-ray-sample", "ict", "functional-test")
+	if phys != nil {
+		chips := Obj{}
+		for _, a := range answers {
+			cert, err := identityCertRef(chip, a.unit)
+			if err != nil {
+				return err
+			}
+			chips[a.serial] = Obj{
+				"unit": a.unit, "chipBundle": chipRel, "certificate": "file:" + cert,
+				"nonce": hex.EncodeToString(a.nonce), "signature": base64.StdEncoding.EncodeToString(a.sig),
+			}
+		}
+		if err := WriteJSON(filepath.Join(art, PartAttestations), Obj{"format": ChallengeFormat, "chips": chips, "boards": attested}); err != nil {
+			return err
+		}
+		attRD, err := fileRD(filepath.Join(art, PartAttestations), "")
+		if err != nil {
+			return err
+		}
+		subjects = append(subjects, attRD)
+		a1Checks = passed("part-lot-receipt-check", "component-identity-attestation", "aoi", "x-ray-sample", "ict", "functional-test")
+	}
 	deps := append([]Obj{}, ships...)
 	deps = append(deps,
 		relRD(bundle, chipRel+"/att/"+BoardHBOM),
@@ -377,10 +436,23 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 			"site":      get(asm, "site"),
 			"designRef": Obj{"name": design["name"], "digest": design["digest"]},
 			"yield":     Obj{"in": len(serials), "passed": len(boards), "failed": anyStrings(sortedCopy(failedBoards))},
-			"checks":    passed("part-lot-receipt-check", "aoi", "x-ray-sample", "ict", "functional-test"),
+			"checks":    a1Checks,
 		}, sim),
 		filepath.Join(keys, emsRole+".key.pem")); err != nil {
 		return err
+	}
+	if phys != nil {
+		mpnMfr := map[string]string{}
+		for _, item := range Objs(boardDesign, "bom") {
+			mpnMfr[S(item, "mpn")] = S(item, "manufacturer")
+		}
+		a1RD := relRD(bundle, "att/"+BoardA1)
+		for _, s := range boards {
+			if err := signPlatformCert(bundle, keys, mfr, O(sc, "product"), s, a1RD, O(builds, s, "placements"), mpnMfr); err != nil {
+				return err
+			}
+		}
+		fmt.Printf("platform certificates: signed by %s for %d boards\n", platformCARole, len(boards))
 	}
 
 	// Board HBOM: parts[] carries the distributor lot data and points at each shipment record.
@@ -459,6 +531,12 @@ type partLine struct {
 // HBOM, A1, every shipment and part with the EMS's receipt for it, and the
 // board lot; received may be nil.
 func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []string) (*LotResult, error) {
+	return checkBoard(bundle, trust, policyPath, received, "")
+}
+
+// checkBoard is BoardCheck; with boardsDir set, received are the boards in
+// it, whose identity parts answer a challenge (Assembly L3).
+func checkBoard(bundle string, trust *TrustRoot, policyPath string, received []string, boardsDir string) (*LotResult, error) {
 	art := filepath.Join(bundle, "artifacts")
 	pol, err := ReadObj(policyPath)
 	if err != nil {
@@ -525,6 +603,14 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 	if !jsonEqual(lotSubj, firstSubject(a1)) {
 		return nil, failf("board hbom: lot subject does not match the A1 board lot")
 	}
+	// Assembly L3: the EMS's challenge to each identity part at build, and
+	// the chips' names from it.
+	attested, shippedAs, err := boardAttestations(bundle, a1)
+	if err != nil {
+		return nil, err
+	}
+	idParts := map[string]string{}
+	var shipmentRels []string
 
 	// parts[]: every lot traces to a signed shipment whose data matches, through an allowed channel.
 	byRefDes := map[string]partLine{}
@@ -560,6 +646,7 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 				return nil, failf("%s: shipment: %v", label, err)
 			}
 			shipments[rel] = data
+			shipmentRels = append(shipmentRels, rel)
 			inputs = append(inputs, relRD(bundle, rel))
 		}
 		if !jsonEqual(get(part, "distributionRef", "digest"), relRD(bundle, rel)["digest"]) {
@@ -590,9 +677,10 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 			return nil, failf("parts: policy requires an authorized channel, and %s lot %s was not bought through one", mpn, lot)
 		}
 		if Has(part, "hbomRef") {
-			if err := partCheck(bundle, trust, a1, part, line); err != nil {
+			if err := partCheck(bundle, trust, a1, part, line, shippedAs); err != nil {
 				return nil, err
 			}
+			idParts[strings.TrimPrefix(S(part, "hbomRef", "uri"), "file:")] = S(part, "lot")
 		}
 		for _, r := range Strs(part, "refDes") {
 			byRefDes[r] = partLine{part, line}
@@ -642,7 +730,14 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 			used[S(p, "mpn")+"\x00"+num(get(p, "lot"))]++
 			if Has(pl.line, "units") {
 				unit := S(p, "unit")
-				if !Has(p, "unit") || !contains(Strs(pl.line, "units"), unit) {
+				shipped := unit
+				if shippedAs != nil {
+					// Shipped by marked serial, named by certificate since the EMS challenged it.
+					if shipped = S(p, "serial"); shippedAs[shipped] != unit {
+						return nil, failf("board-assembly: board %s %s unit %s is not the chip the EMS challenged as %s", serial, r, short(unit), shipped)
+					}
+				}
+				if !Has(p, "unit") || !contains(Strs(pl.line, "units"), shipped) {
 					return nil, failf("board-assembly: board %s %s unit %s was never shipped to the EMS", serial, r, num(get(p, "unit")))
 				}
 				if units[unit] {
@@ -704,6 +799,14 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 			return nil, failf("received board %s is not in the board lot", serial)
 		}
 	}
+	if trackClaim(pol, "ASSEMBLY") >= 3 {
+		if err := boardL3(bundle, trust, pol, a1, attested, builds, mfr, boards, idParts, shipmentRels, received, boardsDir); err != nil {
+			return nil, err
+		}
+		for _, s := range boards {
+			inputs = append(inputs, relRD(bundle, "att/"+PlatformCertAtt(s)))
+		}
+	}
 	inputs = append([]Obj{relRD(bundle, "att/"+BoardHBOM)}, inputs...)
 	sim, err := simulatedCheck(bundle, pol, inputs, "board receipt check")
 	if err != nil {
@@ -715,7 +818,7 @@ func BoardCheck(bundle string, trust *TrustRoot, policyPath string, received []s
 // partCheck runs a part's own chain checks when it has an HBOM, checks the
 // EMS's receipt VSA for the units it received, and binds the lot, the HBOM
 // and the receipt to A1.
-func partCheck(bundle string, trust *TrustRoot, a1, part, line Obj) error {
+func partCheck(bundle string, trust *TrustRoot, a1, part, line Obj, shippedAs map[string]string) error {
 	mpn := S(part, "mpn")
 	rel := strings.TrimPrefix(S(part, "hbomRef", "uri"), "file:")
 	chip := filepath.Dir(filepath.Dir(filepath.Join(bundle, rel)))
@@ -726,7 +829,16 @@ func partCheck(bundle string, trust *TrustRoot, a1, part, line Obj) error {
 	if Has(line, "units") {
 		units = Strs(line, "units")
 	}
-	result, err := ChipCheck(chip, units)
+	if shippedAs != nil {
+		// The EMS challenged every chip it received; the receipt names them by certificate.
+		for i, serial := range units {
+			if shippedAs[serial] == "" {
+				return failf("parts: %s %s was shipped to the EMS but not checked by attestation", mpn, serial)
+			}
+			units[i] = shippedAs[serial]
+		}
+	}
+	result, err := ChipCheck(chip, units, shippedAs != nil)
 	if err != nil {
 		if IsVerificationError(err) {
 			return failf("parts: %s lot receipt check failed: %s", mpn, err.Error())
@@ -795,22 +907,43 @@ func receiptCheck(bundle string, trust *TrustRoot, chip, rel string, lot Obj, un
 	return nil
 }
 
+// readPolicy reads a policy a check has already read, or none.
+func readPolicy(path string) Obj {
+	p, _ := ReadObj(path)
+	return p
+}
+
 // BoardVerify runs the board receipt check, then signs the board VSA when vsaKey is set.
 func BoardVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, vsaKey, vsaDir string) (*LotResult, error) {
 	var received []string
-	if boardsPath != "" {
-		var err error
+	boardsDir := ""
+	if info, err := os.Stat(boardsPath); err == nil && info.IsDir() {
+		// The boards themselves: one directory per board, named by its serial.
+		entries, err := os.ReadDir(boardsPath)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				received = append(received, e.Name())
+			}
+		}
+		boardsDir = boardsPath
+	} else if boardsPath != "" {
 		if received, err = ReadUnits(boardsPath); err != nil {
 			return nil, err
 		}
 	}
-	result, err := BoardCheck(bundle, trust, policyPath, received)
+	result, err := checkBoard(bundle, trust, policyPath, received, boardsDir)
 	if err != nil {
 		return nil, err
 	}
 	lot := result.Lot
 	msg := fmt.Sprintf("board receipt check: PASSED for %s sha256:%s", S(lot, "name"), S(lot, "digest", "sha256"))
-	if len(received) > 0 {
+	switch {
+	case boardsDir != "" && trackClaim(readPolicy(policyPath), "ASSEMBLY") >= 3:
+		msg += fmt.Sprintf(", %d received boards in the lot, their identity parts answered a challenge", len(received))
+	case len(received) > 0:
 		msg += fmt.Sprintf(", %d received boards found in the lot", len(received))
 	}
 	fmt.Println(msg)

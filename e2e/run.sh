@@ -7,6 +7,8 @@
 #   e2e/run.sh adapt     after produce: the same lot made from the suppliers' MES and STDF exports
 #   e2e/run.sh hsm       after produce: the release and the lot again, signed with keys in an HSM
 #   e2e/run.sh shuttle   after produce: a lot from the virtual shuttle, every die simulated gate-level
+#   e2e/run.sh rerun     after produce: prove the netlist equal to the RTL again, as an independent party would
+#   e2e/run.sh l3        after produce: the lot at Wafer L3 and Package/Test L3, under a buyer-run trust root
 #
 # Nothing here uploads to a transparency log: every signature is a DSSE
 # envelope made with a local ECDSA P-256 key.
@@ -41,8 +43,11 @@ produce() {
   hslsa design review        --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/source-reviewer.key.pem"
   hslsa design source-freeze --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem" --cache "$OUT/cache" \
     --trust-root "$BUNDLE/trust-root.json" --policy "$BUNDLE/policy.json"
-  hslsa design simulation    --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem"
-  hslsa design synthesis     --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem"
+  # Steps 1, 2 and 6 run their tools isolated (no network, no key in reach), and
+  # step 6 proves the netlist equal to the RTL: what Design L3 asks of the flow.
+  hslsa design simulation    --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem" --isolate
+  hslsa design synthesis     --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem" --isolate
+  hslsa design signoff       --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/flow-platform.key.pem" --isolate
   hslsa design release       --bundle "$BUNDLE" --lock "$E2E/inputs.lock.json" --key "$KEYS/tapeout-authority.key.pem" \
     --trust-root "$BUNDLE/trust-root.json" --policy "$BUNDLE/policy.json"
   hslsa mfg  --bundle "$BUNDLE" --scenario "$E2E/mfg-scenario.json" --keys "$KEYS"
@@ -84,11 +89,11 @@ verify() {
   echo "== slsa-verifier verify-vsa: design"
   "$sv" verify-vsa "${common[@]}" --attestation-path "$vsa_dir/design.vsa.intoto.json" \
     --subject-digest "sha256:${final#* }" --resource-uri "hslsa:design:${final% *}" \
-    --verified-level HSLSA_DESIGN_LEVEL_2 --verified-level SLSA_BUILD_LEVEL_2
+    --verified-level HSLSA_DESIGN_LEVEL_3 --verified-level SLSA_BUILD_LEVEL_3
   echo "== slsa-verifier verify-vsa: shipped lot"
   "$sv" verify-vsa "${common[@]}" --attestation-path "$vsa_dir/lot.vsa.intoto.json" \
     --subject-digest "sha256:${lot#* }" --resource-uri "${lot% *}" \
-    --verified-level HSLSA_WAFER_LEVEL_2 --verified-level HSLSA_PACKAGE_TEST_LEVEL_2 --verified-level HSLSA_DESIGN_LEVEL_2
+    --verified-level HSLSA_WAFER_LEVEL_2 --verified-level HSLSA_PACKAGE_TEST_LEVEL_2 --verified-level HSLSA_DESIGN_LEVEL_3
 
   # The lot is simulated (its scenario says so in every record), the policy
   # accepts that, and the lot VSA says so for anyone reading only the VSA.
@@ -109,9 +114,9 @@ verify() {
     --subject-digest "sha256:${lot#* }" --verified-level HSLSA_PACKAGE_TEST_LEVEL_3
   expect_fail "a different lot digest" "$sv" verify-vsa "${lotargs[@]}" \
     --subject-digest "sha256:${final#* }" --verified-level HSLSA_WAFER_LEVEL_2
-  expect_fail "an SLSA build level above the claim" "$sv" verify-vsa "${common[@]}" \
+  expect_fail "a design level above the claim" "$sv" verify-vsa "${common[@]}" \
     --attestation-path "$vsa_dir/design.vsa.intoto.json" --subject-digest "sha256:${final#* }" \
-    --resource-uri "hslsa:design:${final% *}" --verified-level SLSA_BUILD_LEVEL_3
+    --resource-uri "hslsa:design:${final% *}" --verified-level HSLSA_DESIGN_LEVEL_4
   hslsa keygen --out "$vkey/other" verifier
   hslsa pubkey --key "$vkey/other/verifier.key.pem" --out "$vkey/other.pub.pem"
   expect_fail "a VSA checked against another verifier's key" "$sv" verify-vsa \
@@ -197,6 +202,21 @@ shuttle() {
   echo "ok: a policy without simulated.accept refuses the shuttle's lot"
 }
 
+# softhsm_token <dir>: with no HSLSA_PKCS11_TOKEN set, a throwaway SoftHSM2
+# token under <dir> stands in for the HSM.
+softhsm_token() {
+  [[ -z "${HSLSA_PKCS11_TOKEN:-}" ]] || return 0
+  export HSLSA_PKCS11_TOKEN=hslsa-e2e
+  export HSLSA_PKCS11_MODULE=${HSLSA_PKCS11_MODULE:-$(ls /usr/lib/softhsm/libsofthsm2.so /usr/lib/*/softhsm/libsofthsm2.so 2>/dev/null | head -1)}
+  export HSLSA_PKCS11_PIN
+  HSLSA_PKCS11_PIN=$(od -An -N8 -tx8 /dev/urandom | tr -d ' ')
+  export SOFTHSM2_CONF=$1/softhsm2.conf
+  mkdir -p "$1/tokens"
+  printf 'directories.tokendir = %s\nobjectstore.backend = file\nlog.level = ERROR\n' "$1/tokens" > "$SOFTHSM2_CONF"
+  softhsm2-util --init-token --free --label "$HSLSA_PKCS11_TOKEN" --pin "$HSLSA_PKCS11_PIN" \
+    --so-pin "$(od -An -N8 -tx8 /dev/urandom | tr -d ' ')" > /dev/null
+}
+
 # The release and the lot again, with the tapeout authority's and every site's
 # key in an HSM (docs/hsm-signing.md). Each <role>.key.pem is replaced by a
 # <role>.pkcs11 file naming the key on the token, and nothing else changes: the
@@ -209,17 +229,7 @@ hsm() {
   cp -r "$BUNDLE" "$hb/bundle"
   cp -r "$KEYS" "$hb/keys"
   local b=$hb/bundle k=$hb/keys
-  if [[ -z "${HSLSA_PKCS11_TOKEN:-}" ]]; then
-    export HSLSA_PKCS11_TOKEN=hslsa-e2e
-    export HSLSA_PKCS11_MODULE=${HSLSA_PKCS11_MODULE:-$(ls /usr/lib/softhsm/libsofthsm2.so /usr/lib/*/softhsm/libsofthsm2.so 2>/dev/null | head -1)}
-    export HSLSA_PKCS11_PIN
-    HSLSA_PKCS11_PIN=$(od -An -N8 -tx8 /dev/urandom | tr -d ' ')
-    export SOFTHSM2_CONF=$hb/softhsm2.conf
-    mkdir -p "$hb/tokens"
-    printf 'directories.tokendir = %s\nobjectstore.backend = file\nlog.level = ERROR\n' "$hb/tokens" > "$SOFTHSM2_CONF"
-    softhsm2-util --init-token --free --label "$HSLSA_PKCS11_TOKEN" --pin "$HSLSA_PKCS11_PIN" \
-      --so-pin "$(od -An -N8 -tx8 /dev/urandom | tr -d ' ')" > /dev/null
-  fi
+  softhsm_token "$hb"
   for r in "${roles[@]}"; do rm "$k/$r.key.pem"; done
   hslsa hsm keygen --token "$HSLSA_PKCS11_TOKEN" --out "$k" "${roles[@]}" > /dev/null
   cp "$k"/*.pub.pem "$k/pub/"
@@ -243,6 +253,115 @@ hsm() {
   rm -rf "$hb/keys" "$hb/tokens"
 }
 
+# Wafer L3 and Package/Test L3 (docs/levels.md): the lot again, under a
+# buyer-run trust root that records each site key as held in an HSM at an
+# accredited site. The fab checks the design release before mask making;
+# wafer sort gives every passing die an identity rooted in its own (simulated)
+# DICE engine and endorsed by an identity CA whose key is in the HSM; final
+# test challenges every unit and names the shipped lot by certificate digest;
+# and the buyer challenges the parts it received. Runs after produce.
+l3() {
+  local l=$OUT/l3
+  rm -rf "$l" && mkdir -p "$l"
+  cp -r "$BUNDLE" "$l/bundle" && cp -r "$KEYS" "$l/keys"
+  local b=$l/bundle k=$l/keys
+  local sites=(fab-site sort-site osat-site test-site)
+  softhsm_token "$l"
+  for r in "${sites[@]}"; do rm "$k/$r.key.pem"; done
+  hslsa hsm keygen --token "$HSLSA_PKCS11_TOKEN" --out "$k" "${sites[@]}" identity-ca > /dev/null
+
+  echo "== the buyer enrolls each key, with how it is held and the site's accreditation"
+  local ent=$l/enrollments not_after
+  not_after=$(date -u -d '+90 days' +%Y-%m-%d)
+  hslsa keygen --out "$l/buyer" buyer-root
+  enroll() { # <dir> <role> <custody> <org> <org id> <site> [flags]
+    local dir=$1 role=$2 custody=$3 org=$4 id=$5 site=$6; shift 6
+    hslsa pilot enroll --buyer-key "$l/buyer/buyer-root.key.pem" --pub "$k/$role.pub.pem" --role "$role" \
+      --org-name "$org" --org-id "$id" --site "$site" --country US \
+      --custody "$custody" --not-after "$not_after" --out "$dir/$role.intoto.json" "$@" > /dev/null
+  }
+  enroll_all() { # <dir> <site custody>
+    mkdir -p "$1"
+    local r
+    for r in ip-vendor source-owner source-reviewer flow-platform tapeout-authority product-owner; do
+      enroll "$1" "$r" file "Example Open Silicon Group" duns:100000002 "Example Design Center"
+    done
+    enroll "$1" identity-ca hsm "Example Open Silicon Group" duns:100000002 "Example Identity CA"
+    enroll "$1" fab-site "$2" "Example Foundry" duns:100000011 "Example Wafer Fab" --accreditation dmea-trusted-supplier --accreditation-id DMEA-TF-0042
+    enroll "$1" sort-site "$2" "Example Sort Services" duns:100000012 "Example Sort House" --accreditation iso-iec-20243 --accreditation-id OTTPS-0107
+    enroll "$1" osat-site "$2" "Example OSAT Group" duns:100000013 "Example OSAT" --accreditation dmea-trusted-supplier --accreditation-id DMEA-TA-0213
+    enroll "$1" test-site "$2" "Example Test Services" duns:100000014 "Example Test House" --accreditation iso-iec-20243 --accreditation-id OTTPS-0233
+  }
+  enroll_all "$ent" hsm
+  hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$ent" --out "$l/trust-root.json" > /dev/null
+  cp "$E2E/l3/policy.json" "$b/policy.json"
+
+  echo "== the fab checks the release under its own trust root and policy, then the sites sign the lot"
+  hslsa fab-check --bundle "$b" --trust-root "$BUNDLE/trust-root.json" --policy "$E2E/policy.json" --key "$k/fab-site.key.pem"
+  hslsa mfg  --bundle "$b" --scenario "$E2E/l3/mfg-scenario.json" --keys "$k" --devices "$l/parts"
+  hslsa hbom --bundle "$b" --lock "$E2E/inputs.lock.json" --scenario "$E2E/l3/mfg-scenario.json" --key "$k/product-owner.key.pem"
+
+  echo "== the buyer receives three parts and challenges each"
+  mkdir -p "$l/received"
+  local s
+  while read -r s; do cp -r "$l/parts/$s" "$l/received/"; done < "$E2E/received-units.txt"
+  local vkey=$l/verifier
+  hslsa keygen --out "$vkey" verifier
+  hslsa verify --bundle "$b" --trust-root "$l/trust-root.json" --policy "$b/policy.json" --units "$l/received" \
+    --vsa-key "$vkey/verifier.key.pem" --vsa-out "$l/vsa"
+  if command -v "${SLSA_VERIFIER:-slsa-verifier}" > /dev/null; then
+    local sv=${SLSA_VERIFIER:-slsa-verifier} keyid lot
+    hslsa pubkey --key "$vkey/verifier.key.pem" --out "$l/vsa/verifier.pub.pem"
+    keyid=$(hslsa keyid --key "$l/vsa/verifier.pub.pem")
+    lot=$(hslsa subject "$l/vsa/lot.vsa.intoto.json")
+    echo "== slsa-verifier verify-vsa: the L3 lot"
+    "$sv" verify-vsa --verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1 \
+      --public-key-path "$l/vsa/verifier.pub.pem" --public-key-id "$keyid" \
+      --attestation-path "$l/vsa/lot.vsa.intoto.json" --subject-digest "sha256:${lot#* }" --resource-uri "${lot% *}" \
+      --verified-level HSLSA_WAFER_LEVEL_3 --verified-level HSLSA_PACKAGE_TEST_LEVEL_3 --verified-level HSLSA_DESIGN_LEVEL_3
+  fi
+
+  echo "== what Wafer L3 and Package/Test L3 refuse"
+  local check=(--bundle "$b" --policy "$b/policy.json")
+  refuses() { # <what> <reason> <command...>: the command fails, and says why
+    local what=$1 reason=$2 out; shift 2
+    if out=$("$@" 2>&1); then echo "FAIL: accepted $what" >&2; exit 1; fi
+    grep -qF -- "$reason" <<< "$out" || { echo "FAIL: refused $what, but not because $reason: $out" >&2; exit 1; }
+    echo "ok: refuses $what"
+  }
+  # A clone: a copy of a genuine part's certificate on a die with another secret.
+  mkdir -p "$l/clone" && cp -r "$l/received/$(head -1 "$E2E/received-units.txt")" "$l/clone/part"
+  sed -i "s/\"uds\": \"[0-9a-f]*\"/\"uds\": \"$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')\"/" "$l/clone/part/die.json"
+  refuses "a cloned part that carries a genuine certificate" "does not verify under its certificate's key" hslsa verify "${check[@]}" --trust-root "$l/trust-root.json" --units "$l/clone"
+  # A part final test failed, sold on as if it had passed.
+  mkdir -p "$l/scrapped" && cp -r "$l/parts/PSOC130-A0-00007" "$l/scrapped/"
+  refuses "a part that failed final test" "is not in the shipped lot" hslsa verify "${check[@]}" --trust-root "$l/trust-root.json" --units "$l/scrapped"
+  # Serials typed into a list instead of parts answering a challenge.
+  refuses "received units listed by serial, not challenged" "listed, not challenged" hslsa verify "${check[@]}" --trust-root "$l/trust-root.json" \
+    --units "$E2E/received-units.txt"
+  # A trust root of the same keys that says nothing of how they are held.
+  mkdir -p "$l/pub" && cp "$k"/*.pub.pem "$l/pub/"
+  hslsa trust-root --keys "$l/pub" --out "$l/plain-trust-root.json"
+  refuses "a trust root without enrollments" "L3 needs a buyer-run trust root" hslsa verify "${check[@]}" --trust-root "$l/plain-trust-root.json"
+  # The same keys enrolled as held in files, not an HSM.
+  enroll_all "$l/file-custody" file
+  hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$l/file-custody" --out "$l/file-custody.json" > /dev/null
+  refuses "site keys held in files" "L3 needs a key held in an HSM" hslsa verify "${check[@]}" --trust-root "$l/file-custody.json"
+  # A policy that accepts neither site accreditation.
+  sed 's/"accreditations": \[[^]]*\]/"accreditations": ["semi-e187"]/' "$b/policy.json" > "$l/other-accreditation.json"
+  refuses "sites accredited under schemes the policy does not list" "which the policy's accreditations do not list" hslsa verify --bundle "$b" \
+    --policy "$l/other-accreditation.json" --trust-root "$l/trust-root.json"
+  rm -rf "$k" "$l/tokens"
+}
+
+# Design L3 makes an independent rerun of the equivalence proof possible: the
+# signoff record carries the frozen source and the netlist by digest. Anyone
+# holding the bundle and the trust root runs it with their own Yosys and this
+# tool's own recipe, not the script the flow platform shipped.
+rerun() {
+  hslsa design rerun-equivalence --bundle "$BUNDLE" --trust-root "$BUNDLE/trust-root.json" --isolate
+}
+
 case "${1:-}" in
   produce) produce ;;
   verify) verify ;;
@@ -250,6 +369,8 @@ case "${1:-}" in
   adapt) adapt ;;
   hsm) hsm ;;
   shuttle) shuttle ;;
-  all) produce; verify; proxy; adapt; hsm; shuttle ;;
-  *) echo "usage: $0 produce|verify|proxy|adapt|hsm|shuttle|all" >&2; exit 2 ;;
+  rerun) rerun ;;
+  l3) l3 ;;
+  all) produce; verify; proxy; adapt; hsm; shuttle; rerun; l3 ;;
+  *) echo "usage: $0 produce|verify|proxy|adapt|hsm|shuttle|rerun|l3|all" >&2; exit 2 ;;
 esac

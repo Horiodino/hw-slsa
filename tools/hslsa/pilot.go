@@ -36,15 +36,24 @@ var KeyCustody = []string{"hsm", "file"}
 
 // Enrollment is what a buyer accepts about one site key.
 type Enrollment struct {
-	Role      string
-	OrgName   string
-	OrgID     string
-	Site      string
-	Country   string
-	Custody   string
-	NotBefore time.Time
-	NotAfter  time.Time
-	Note      string
+	Role    string
+	OrgName string
+	OrgID   string
+	Site    string
+	Country string
+	Custody string
+	// Accreditation is the scheme and certificate id of the site's
+	// accreditation, as the buyer checked it; empty for none.
+	Accreditation Accreditation
+	NotBefore     time.Time
+	NotAfter      time.Time
+	Note          string
+}
+
+// Accreditation names a site's accreditation: the scheme (for example
+// "DMEA Trusted Supplier" or "O-TTPS") and the certificate or listing id.
+type Accreditation struct {
+	Scheme, ID string
 }
 
 // keySubject names a public key by its keyid, with the sha256 of its
@@ -84,6 +93,8 @@ func Enroll(buyerKey, pubPath string, e Enrollment, out string) error {
 		return fmt.Errorf("enroll: key custody %q is not one of %s", e.Custody, strings.Join(KeyCustody, ", "))
 	case !e.NotAfter.After(e.NotBefore):
 		return fmt.Errorf("enroll: the enrollment ends before it starts")
+	case (e.Accreditation.Scheme == "") != (e.Accreditation.ID == ""):
+		return fmt.Errorf("enroll: an accreditation needs both its scheme and its id")
 	}
 	signer, err := LoadSigner(buyerKey)
 	if err != nil {
@@ -112,6 +123,9 @@ func Enroll(buyerKey, pubPath string, e Enrollment, out string) error {
 		"keyCustody":   e.Custody,
 		"validity":     Obj{"notBefore": e.NotBefore.UTC().Format(timeFormat), "notAfter": e.NotAfter.UTC().Format(timeFormat)},
 		"enrolledOn":   Now(),
+	}
+	if e.Accreditation.Scheme != "" {
+		pred["accreditation"] = Obj{"scheme": e.Accreditation.Scheme, "id": e.Accreditation.ID}
 	}
 	if e.Note != "" {
 		pred["note"] = e.Note
@@ -265,6 +279,9 @@ func BuildPilotTrustRoot(buyerPub, dir string, at time.Time, out string) (Obj, e
 		desc := Obj{
 			"keyid": e.key.ID, "role": role, "organization": O(p, "organization"), "site": O(p, "site"),
 			"keyCustody": S(p, "keyCustody"), "notAfter": S(p, "validity", "notAfter"), "record": e.rd,
+		}
+		if a := O(p, "accreditation"); a != nil {
+			desc["accreditation"] = a
 		}
 		reason := ""
 		switch {

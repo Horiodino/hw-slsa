@@ -82,7 +82,7 @@ Firmware reaches L2. Every image has SLSA provenance signed by the firmware buil
 
 Two caveats apply to the L2 claim. The firmware is signed with Caliptra's public test keys (`caliptra-image-fake-keys`), so anyone could sign firmware these units accept. A real product fuses the hash of its own HSM-held vendor keys, and the policy pins that hash. Also, as in the PicoRV32 test, the platform key is generated per run and its trust root travels with the bundle.
 
-Firmware L3 is out of reach: it needs SLSA Build L3, an independent review, and releases in a transparency log. Its device requirement is already met, though. The units report firmware measurements under a Caliptra identity, and the verifier matches each one to an image with provenance. The review check runs too, on simulated reports, but the reference tool refuses a Firmware L3 claim until it also checks SLSA Build L3 and log inclusion.
+Firmware L3 is out of reach here. The tool checks it ([levels](levels.md#firmware-l3), shown on the FPGA board example), but Caliptra's images are built by `caliptra-builder` outside the sandbox with no pinned toolchain, and are in no release log, so a Firmware L3 claim on this bundle is refused at the build check. Its device requirement is met, though: the units report firmware measurements under a Caliptra identity, and the verifier matches each one to an image with provenance. The review check runs too, on simulated reports.
 
 ## The at-boot check
 

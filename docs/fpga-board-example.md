@@ -18,9 +18,10 @@ It runs in [`.github/workflows/fpga-board-e2e.yml`](../.github/workflows/fpga-bo
 e2e/fpga/run.sh produce   # root of trust vendor, board owner, EMS
 e2e/fpga/run.sh boot      # power on the received boards
 e2e/fpga/run.sh verify    # the buyer's checks and VSAs
+e2e/fpga/run.sh l3        # the whole chain again at Firmware L3 and Assembly L3, then the refusals
 ```
 
-It needs Go, Yosys, nextpnr-ice40, IceStorm (with its chip database), Icarus Verilog, a RISC-V GCC (`gcc-riscv64-unknown-elf` on Ubuntu), git and ssh-keygen. Outputs go under `out/fpga/`.
+It needs Go, Yosys, nextpnr-ice40, IceStorm (with its chip database), Icarus Verilog, a RISC-V GCC (`gcc-riscv64-unknown-elf` on Ubuntu), git and ssh-keygen; `l3` also needs bubblewrap and SoftHSM2. Outputs go under `out/fpga/`.
 
 ## The board
 
@@ -77,6 +78,18 @@ EXR-01 is a model, in [`tools/hslsa/rot.go`](../tools/hslsa/rot.go), of a small 
 
 The board VSA claims `HSLSA_ASSEMBLY_LEVEL_2` and `HSLSA_FIRMWARE_LEVEL_2` for the board lot, and each booted board gets its own VSA for the same levels, whose subject is the board's URN with the sha256 of its root of trust's IDevID certificate. The FPGA design gets `HSLSA_DESIGN_LEVEL_2` and `SLSA_BUILD_LEVEL_2`. Nothing here claims Firmware L2 for the iCE40 itself.
 
+## At Firmware L3
+
+`e2e/fpga/run.sh l3` makes the whole chain again under the buyer's L3 policies, [`e2e/fpga/l3/policy.json`](../e2e/fpga/l3/policy.json) for the board and [`e2e/fpga/l3/rot-policy.json`](../e2e/fpga/l3/rot-policy.json) for the root of trust, and the board VSAs then state `HSLSA_ASSEMBLY_LEVEL_3` and `HSLSA_FIRMWARE_LEVEL_3`. What changes ([levels](levels.md#firmware-l3)):
+
+- **Every site that provisions the board is rated L3 in its own track.** The root of trust's lot is at Wafer L3 and Package/Test L3: site keys in an HSM (SoftHSM), the fab's check of the release, an identity for every die at wafer sort that the part's ROM then uses as its IDevID, and units named by their certificate. The board is at Assembly L3: the EMS challenges each root of trust before placing it, and the board owner's platform CA signs a platform certificate per board. Both trust roots are buyer-run, with every key enrolled.
+- **Both firmware builds run in the sandbox.** `fpga firmware --isolate` and `fpga rot-firmware --isolate` build with no network and nothing of the host but read-only tools. The SoC firmware's record pins the RISC-V GCC and binutils packages, and the root of trust's the Go toolchain; the buyer's policies pin the same in `firmware.toolPins`. The images come out bit for bit the same as outside the sandbox.
+- **Each image is reviewed.** A review lab, enrolled in both trust roots, signs a S.A.F.E. report for the SoC firmware and for the root of trust firmware (simulated: no review took place).
+- **Every release is in the buyer's release log.** The root of trust firmware, the SoC firmware and the flash image each go into a private log with `hslsa tlog add`, and each carries its inclusion proof. The buyer keeps a checkpoint from its first look and later checks that the log only grew.
+- **Boot evidence is required.** The buyer passes the boards it received, which answer a challenge, and what they reported at boot.
+
+Then it shows what Firmware L3 refuses: a flash image not in the log, releases in a log the buyer does not read, firmware built with a compiler the policy does not pin, firmware no lab reviewed, boards with no boot evidence, a root of trust provisioned at a test house the buyer rates below L3, and a log that rewrote a release it had shown. The CI job `l3` runs it with the RISC-V packages at the versions the policy pins.
+
 ## What the tamper tests prove
 
 [`tools/hslsa/fpga_test.go`](../tools/hslsa/fpga_test.go) breaks the chain in 20 ways on a copy of the produced example, with the keys the run made, and requires each to fail for the stated reason. Four of them change a programmed board and power it on again, so the root of trust itself has to refuse:
@@ -105,4 +118,4 @@ The at-boot evidence would then come from the real root of trust over its debug 
 
 ## Keys and privacy
 
-As in every example: local ECDSA P-256 keys in DSSE envelopes, no OIDC token, nothing sent to a transparency log. The CI job deletes every private key, the root of trust units (whose fuses hold their UDS) and the programmed boards before it uploads the board bundle and the boot evidence for the buyer's job.
+As in every example: local ECDSA P-256 keys in DSSE envelopes, no OIDC token, nothing sent to a public transparency log; the L3 run's release log is a private one in `out/fpga/l3/release-log`. The CI job deletes every private key, the root of trust units (whose fuses hold their UDS) and the programmed boards before it uploads the board bundle and the boot evidence for the buyer's job.

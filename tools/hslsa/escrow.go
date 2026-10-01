@@ -121,11 +121,11 @@ func EscrowAudit(bundle string, trust *TrustRoot, policyPath, unitsPath, key, vs
 		return err
 	}
 	claims := O(policy, "claims")
-	if err := signVSA(design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"], []Obj{manifestRD},
+	if err := signVSA(designTracks, design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"], []Obj{manifestRD},
 		policyPath, key, filepath.Join(vsaDir, EscrowDesignVSA)); err != nil {
 		return err
 	}
-	if err := signVSA(receipt, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0), []Obj{manifestRD},
+	if err := signVSA(lotTracks, receipt, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0), []Obj{manifestRD},
 		policyPath, key, filepath.Join(vsaDir, EscrowReceiptVSA)); err != nil {
 		return err
 	}

@@ -60,13 +60,19 @@ func TestVSARefusesUncheckedLevel(t *testing.T) {
 	dir := t.TempDir()
 	must(t, os.WriteFile(filepath.Join(dir, "policy.json"), []byte("{}"), 0o644))
 	ok(Keygen(dir, "verifier"))
-	err := signVSA(Obj{"name": "x", "digest": Obj{"sha256": strings.Repeat("0", 64)}}, "x",
-		anyStrings([]string{"HSLSA_DESIGN_LEVEL_4"}), nil, filepath.Join(dir, "policy.json"),
-		filepath.Join(dir, "verifier.key.pem"), filepath.Join(dir, "vsa.json"))
-	rejects(t, err, "does not check Design L4")
+	sign := func(tracks []string, levels ...string) error {
+		return signVSA(tracks, Obj{"name": "x", "digest": Obj{"sha256": strings.Repeat("0", 64)}}, "x",
+			anyStrings(levels), nil, filepath.Join(dir, "policy.json"),
+			filepath.Join(dir, "verifier.key.pem"), filepath.Join(dir, "vsa.json"))
+	}
+	rejects(t, sign(designTracks, "HSLSA_DESIGN_LEVEL_4"), "does not check Design L4")
+	// A level in a track the check did not cover, such as Firmware on a lot.
+	rejects(t, sign(lotTracks, "HSLSA_WAFER_LEVEL_2", "HSLSA_FIRMWARE_LEVEL_2"), "this check covers Wafer, Package/Test, Design, not the Firmware track")
+	rejects(t, sign(boardTracks, "HSLSA_ASSEMBLY_LEVEL_2", "HSLSA_DESIGN_LEVEL_2"), "not the Design track")
 	if _, err := os.Stat(filepath.Join(dir, "vsa.json")); err == nil {
 		t.Fatal("a VSA was written for a level the tool does not check")
 	}
+	must(t, sign(fpgaTracks, "HSLSA_ASSEMBLY_LEVEL_3", "HSLSA_FIRMWARE_LEVEL_3", "SLSA_BUILD_LEVEL_3", SimulatedLevel))
 }
 
 // Design L3 tamper tests. Each forges a record with a valid flow-platform

@@ -494,6 +494,17 @@ func (t *TrustRoot) Open(path, role, predicateType string) (Obj, error) {
 	if err != nil {
 		return nil, failf("%s: not a DSSE envelope: %v", name, err)
 	}
+	stmt, err := t.OpenEnvelope(raw, name, role, predicateType)
+	if err != nil {
+		return nil, err
+	}
+	return reveal(path, stmt)
+}
+
+// OpenEnvelope is Open for an envelope already read, such as one carried
+// inside another file; name is what messages call it. It does not reveal
+// withheld fields.
+func (t *TrustRoot) OpenEnvelope(raw Obj, name, role, predicateType string) (Obj, error) {
 	if S(raw, "payloadType") != PayloadType {
 		return nil, failf("%s: unexpected payload type %s", name, S(raw, "payloadType"))
 	}
@@ -534,5 +545,5 @@ func (t *TrustRoot) Open(path, role, predicateType string) (Obj, error) {
 	if predicateType != "" && S(stmt, "predicateType") != predicateType {
 		return nil, failf("%s: predicate type %s, want %s", name, S(stmt, "predicateType"), predicateType)
 	}
-	return reveal(path, stmt)
+	return stmt, nil
 }

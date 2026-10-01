@@ -42,7 +42,7 @@ func FabReleaseCheck(bundle string, trust *TrustRoot, policyPath, key string) er
 		return err
 	}
 	levels := O(policy, "claims")["design"]
-	if err := signVSA(design.Final, "hslsa:design:"+S(design.Final, "name"), levels,
+	if err := signVSA(designTracks, design.Final, "hslsa:design:"+S(design.Final, "name"), levels,
 		append([]Obj{design.Release}, design.Inputs...), policyPath, key,
 		filepath.Join(bundle, "att", FabReleaseCheckAtt)); err != nil {
 		return err

@@ -77,6 +77,8 @@ The data type identifier of an HSLSA record is its predicate type. Where several
 | Firmware review | The OCP S.A.F.E. short-form report's own CoRIM profile | None |
 | Firmware reference values | The HSLSA CoRIM profile, `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` | None |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | None |
+| Platform certificate (Assembly L3) | `https://github.com/Horiodino/hw-slsa/platform-certificate/v0.1` | None; it binds a board to the components placed on it, and names A1 |
+| Release log checkpoint (Firmware L3) | `https://github.com/Horiodino/hw-slsa/tlog-checkpoint/v0.1` | None; a signed tree head of the buyer's private release log, not a supply chain event |
 | Site key enrollment, key revocation | `https://github.com/Horiodino/hw-slsa/site-enrollment/v0.1`, `https://github.com/Horiodino/hw-slsa/key-revocation/v0.1` | None; these are the buyer's own trust root records, not supply chain events, and stay with the buyer |
 | Verification summary | `https://slsa.dev/verification_summary/v1` | None; a receipt record is one whose subject is `urn:hslsa:receipt:<lot-id>` |
 

@@ -646,7 +646,8 @@ func FPGABitstream(bundle, lockPath, key string) error {
 
 // FPGAFirmware builds PicoSoC's firmware from the pinned sources the way
 // picosoc/Makefile does for the iCEBreaker, and signs its provenance and SBOM.
-func FPGAFirmware(bundle, lockPath, key, cache string) error {
+// With isolate the compiler runs in the sandbox, with no network (SLSA Build L3).
+func FPGAFirmware(bundle, lockPath, key, cache string, isolate bool) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
@@ -682,21 +683,20 @@ func FPGAFirmware(bundle, lockPath, key, cache string) error {
 			return err
 		}
 	}
+	var sb *Sandbox
+	if isolate {
+		if sb, err = NewSandbox(); err != nil {
+			return err
+		}
+	}
 	steps := [][]string{
 		{prefix + "cpp", "-P", "-DICEBREAKER", "-o", "icebreaker_sections.lds", "sections.lds"},
 		append(append([]string{prefix + "gcc"}, Strs(fw, "cflags")...), "-o", "firmware.elf", "start.s", "firmware.c"),
 		{prefix + "objcopy", "-O", "binary", "firmware.elf", FPGAFWImage},
 	}
-	var log strings.Builder
-	for _, st := range steps {
-		p, err := runCmd(work, nil, st[0], st[1:]...)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(&log, "$ %s\n%s%s", strings.Join(st, " "), p.Stdout, p.Stderr)
-		if p.Code != 0 {
-			return fmt.Errorf("firmware: %s failed:\n%s", st[0], log.String())
-		}
+	buildLog, err := fwBuild(sb, work, nil, steps)
+	if err != nil {
+		return fmt.Errorf("firmware: %w", err)
 	}
 	art := filepath.Join(bundle, "artifacts")
 	if err := os.MkdirAll(art, 0o755); err != nil {
@@ -705,17 +705,17 @@ func FPGAFirmware(bundle, lockPath, key, cache string) error {
 	if err := copyFile(filepath.Join(work, FPGAFWImage), filepath.Join(art, FPGAFWImage)); err != nil {
 		return err
 	}
-	image, err := fileRD(filepath.Join(art, FPGAFWImage), "")
+	image, err := imageRD(filepath.Join(art, FPGAFWImage))
 	if err != nil {
 		return err
 	}
 	var tools []Obj
 	for _, t := range []string{"gcc", "cpp", "objcopy"} {
-		o, err := tool(prefix+t, "--version")
+		o, err := toolDep(prefix+t, "--version")
 		if err != nil {
 			return err
 		}
-		tools = append(tools, Obj{"name": o["name"], "uri": "file:" + prefix + t, "digest": o["digest"], "annotations": Obj{"version": o["version"]}})
+		tools = append(tools, o)
 	}
 	sbom := Obj{
 		"bomFormat":   "CycloneDX",
@@ -747,7 +747,7 @@ func FPGAFirmware(bundle, lockPath, key, cache string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(art, "firmware-build.log"), []byte(log.String()), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(art, "firmware-build.log"), []byte(buildLog), 0o644); err != nil {
 		return err
 	}
 	logRD, err := fileRD(filepath.Join(art, "firmware-build.log"), "")
@@ -765,6 +765,7 @@ func FPGAFirmware(bundle, lockPath, key, cache string) error {
 				"target": FPGAFWImage, "version": get(fw, "version"), "svn": get(fw, "svn"),
 				"cflags": get(fw, "cflags"), "linkerScript": "picosoc/sections.lds with -DICEBREAKER",
 			},
+			"internalParameters":   isolationParams(sb, nil),
 			"resolvedDependencies": append(deps, tools...),
 		},
 		"runDetails": run,

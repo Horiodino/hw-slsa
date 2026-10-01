@@ -28,7 +28,7 @@ var TrackTitle = map[string]string{
 
 // levelUnchecked is the lowest level of each track this tool cannot check
 // yet; a claim at or above it is refused.
-var levelUnchecked = map[string]int{"DESIGN": 4, "WAFER": 4, "PACKAGE_TEST": 4, "ASSEMBLY": 4, "FIRMWARE": 3}
+var levelUnchecked = map[string]int{"DESIGN": 4, "WAFER": 4, "PACKAGE_TEST": 4, "ASSEMBLY": 4, "FIRMWARE": 4}
 
 // parseClaim reads one verifiedLevels value: an HSLSA track level, an SLSA
 // build level (track ""), or HSLSA_SIMULATED (ok false, no error).
@@ -81,6 +81,35 @@ func checkClaimList(levels any) error {
 	}
 	if slsa > best {
 		return failf("claims SLSA Build L%d but no Design or Firmware level of at least L%d in the same list", slsa, slsa)
+	}
+	return nil
+}
+
+// The tracks each VSA covers: what the check behind it verified.
+var (
+	designTracks = []string{"DESIGN"}
+	lotTracks    = []string{"WAFER", "PACKAGE_TEST", "DESIGN"}
+	boardTracks  = []string{"ASSEMBLY"}
+	fpgaTracks   = []string{"ASSEMBLY", "FIRMWARE"}
+	fwTracks     = []string{"FIRMWARE"}
+	deviceTracks = []string{"FIRMWARE", "WAFER", "PACKAGE_TEST", "DESIGN"}
+)
+
+// claimsInTracks refuses a level in a track the check did not cover: a lot
+// receipt check, say, cannot state a Firmware level, whatever the policy claims.
+func claimsInTracks(levels any, tracks []string) error {
+	for _, c := range Strs(Obj{"v": levels}, "v") {
+		track, _, ok, err := parseClaim(c)
+		if err != nil {
+			return err
+		}
+		if ok && track != "" && !contains(tracks, track) {
+			var names []string
+			for _, t := range tracks {
+				names = append(names, TrackTitle[t])
+			}
+			return failf("claim %s: this check covers %s, not the %s track", c, strings.Join(names, ", "), TrackTitle[track])
+		}
 	}
 	return nil
 }

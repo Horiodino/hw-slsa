@@ -66,7 +66,7 @@ func rotPart(entries []Obj, label string) (Obj, error) {
 // FPGABoardProduce copies the board owner's design bundle into the board
 // bundle and signs the board chain, with the images in flash and the root of
 // trust that verifies them in the board HBOM.
-func FPGABoardProduce(bundle, rotBundle, designBundle, scenarioPath, designPath, policyPath, keys string) error {
+func FPGABoardProduce(bundle, rotBundle, designBundle, scenarioPath, designPath, policyPath, keys string, phys *BoardParts) error {
 	design := filepath.Join(bundle, FPGADesignDir)
 	if err := os.RemoveAll(design); err != nil {
 		return err
@@ -100,7 +100,7 @@ func FPGABoardProduce(bundle, rotBundle, designBundle, scenarioPath, designPath,
 		}
 		return nil
 	}
-	return boardProduceWith(bundle, rotBundle, scenarioPath, designPath, policyPath, keys, nil, extend)
+	return boardProduceWith(bundle, rotBundle, scenarioPath, designPath, policyPath, keys, phys, extend)
 }
 
 // rotUnitOn is the root of trust unit the EMS placed on a board, from its build records.
@@ -195,12 +195,20 @@ func FPGAProvision(bundle, devices, boards, scenarioPath, keys string) error {
 			return err
 		}
 		board := filepath.Join(boards, serial)
-		if err := os.RemoveAll(board); err != nil {
-			return err
-		}
-		rotDir := filepath.Join(board, "rot")
-		if err := copyTree(filepath.Join(devices, unit), rotDir); err != nil {
-			return fmt.Errorf("board %s: root of trust %s: %v", serial, unit, err)
+		rotDir := filepath.Join(board, rotRef)
+		if hasDie(rotDir) {
+			// The EMS placed the part itself (Assembly L3), so it is on the board already.
+			if err := os.RemoveAll(filepath.Join(board, FlashImage)); err != nil {
+				return err
+			}
+		} else {
+			if err := os.RemoveAll(board); err != nil {
+				return err
+			}
+			rotDir = filepath.Join(board, "rot")
+			if err := copyTree(filepath.Join(devices, unit), rotDir); err != nil {
+				return fmt.Errorf("board %s: root of trust %s: %v", serial, unit, err)
+			}
 		}
 		// Burn the owner fuses, write the flash, then read both back.
 		fuses, err := ReadObj(filepath.Join(rotDir, "fuses.json"))
@@ -267,7 +275,8 @@ func FPGAProvision(bundle, devices, boards, scenarioPath, keys string) error {
 		if err != nil {
 			return err
 		}
-		ueid := hex.EncodeToString(rotUEID(unit))
+		kind, raw, _ := UEID(cert)
+		ueid := hex.EncodeToString(append([]byte{kind}, raw...))
 		checks := []Obj{
 			check("image-provenance-verified", provOK, errDetail(provErr, "fw-flash provenance signed by the firmware platform names this image")),
 			check("image-readback", readback == S(flashRD, "digest", "sha256"), ""),
@@ -365,7 +374,11 @@ func FPGABoot(board string, sim *SoCSim, out string) error {
 		return err
 	}
 	flashPath := filepath.Join(board, FlashImage)
-	released, err := RoTBoot(filepath.Join(board, "rot"), flashPath, out)
+	rotDir, err := rotDirOf(board)
+	if err != nil {
+		return err
+	}
+	released, err := RoTBoot(rotDir, flashPath, out)
 	if err != nil {
 		return err
 	}
@@ -389,6 +402,22 @@ func FPGABoot(board string, sim *SoCSim, out string) error {
 		rec["soc"] = Obj{"simulated": "RTL", "finished": run.Finished, "uartBanner": run.BannerSeen}
 	}
 	return WriteJSON(filepath.Join(out, BootRecord), rec)
+}
+
+// rotDirOf is the root of trust on a board: rot/ where the EMS's station put
+// a copy of the unit, or the placement holding the part the EMS placed.
+func rotDirOf(board string) (string, error) {
+	if _, err := os.Stat(filepath.Join(board, "rot")); err == nil {
+		return filepath.Join(board, "rot"), nil
+	}
+	found, err := filepath.Glob(filepath.Join(board, "*", "fuses.json"))
+	if err != nil {
+		return "", err
+	}
+	if len(found) != 1 {
+		return "", fmt.Errorf("%s: no root of trust on the board", board)
+	}
+	return filepath.Dir(found[0]), nil
 }
 
 // FPGABootAll boots every board listed in boardsPath; the SoC runs the
@@ -618,7 +647,7 @@ func rotUnitCheck(r *RoTResult, unit string) (Obj, *x509.Certificate, error) {
 	var fw Obj
 	for _, w := range Objs(hp, "images") {
 		want := withProvenance[S(w, "name")]
-		if want == nil || !jsonEqual(get(w, "digest"), get(want, "digest")) {
+		if want == nil || S(w, "digest", "sha256") != S(want, "digest", "sha256") {
 			return nil, nil, failf("%s: provisioning record wrote other firmware than the image with provenance", label)
 		}
 		if !Truthy(w["provenanceVerified"]) {
@@ -659,6 +688,10 @@ func rotUnitCheck(r *RoTResult, unit string) (Obj, *x509.Certificate, error) {
 	}
 	if d, err := spkiDigest(cert.PublicKey); err != nil || d != S(firstSubject(rec), "digest", "sha256") {
 		return nil, nil, failf("%s: provisioning record subject is not this IDevID key", label)
+	}
+	// A unit named by its certificate was provisioned with that certificate.
+	if trackClaim(r.Policy, "PACKAGE_TEST") >= 3 && sha256Bytes(cert.Raw) != unit {
+		return nil, nil, failf("%s: provisioned with IDevID certificate sha256:%s, not the one the unit is named by", label, short(sha256Bytes(cert.Raw)))
 	}
 	return rec, cert, nil
 }
@@ -958,7 +991,11 @@ func FPGADeviceCheck(u *BoardUnit, rot *RoTResult, images *FPGAImages, policy Ob
 	if err := checkSignedBy(certs["platform"], certs["alias"], label+" platform"); err != nil {
 		return err
 	}
-	want := rotUEID(u.RoTUnit)
+	k, raw, ok := UEID(u.IDevID)
+	if !ok {
+		return failf("%s: the root of trust's IDevID certificate carries no UEID", label)
+	}
+	want := append([]byte{k}, raw...)
 	for _, name := range []string{"alias", "platform"} {
 		kind, raw, ok := UEID(certs[name])
 		if !ok || !bytes.Equal(append([]byte{kind}, raw...), want) {
@@ -1004,16 +1041,14 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 	if err != nil {
 		return err
 	}
-	var received []string
-	if boardsPath != "" {
-		if received, err = ReadUnits(boardsPath); err != nil {
-			return err
-		}
+	received, boardsDir, err := receivedBoardsAt(boardsPath)
+	if err != nil {
+		return err
 	}
 	if err := gapError("FPGA board check", fpgaGaps(bundle)); err != nil {
 		return err
 	}
-	board, err := BoardCheck(bundle, trust, policyPath, received)
+	board, err := checkBoard(bundle, trust, policyPath, received, boardsDir)
 	if err != nil {
 		return err
 	}
@@ -1059,6 +1094,12 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 	}
 	printSimulated(append(append([]string{}, board.Simulated...), provSim...))
 	sim := len(board.Simulated) > 0 || len(provSim) > 0
+	var fwL3Inputs []Obj
+	if trackClaim(policy, "FIRMWARE") >= 3 {
+		if fwL3Inputs, err = fpgaFirmwareL3(bundle, trust, policy, rot, units, received, bootsDir); err != nil {
+			return err
+		}
+	}
 	if bootsDir != "" {
 		for _, serial := range received {
 			if err := FPGADeviceCheck(units[serial], rot, images, policy, filepath.Join(bootsDir, serial)); err != nil {
@@ -1079,12 +1120,12 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 	for _, in := range append([]Obj{design.Release}, design.Inputs...) {
 		designInputs = append(designInputs, Obj{"name": FPGADesignDir + "/" + S(in, "name"), "digest": get(in, "digest")})
 	}
-	if err := signVSA(design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"], designInputs, policyPath, vsaKey, out("design.vsa.intoto.json")); err != nil {
+	if err := signVSA(designTracks, design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"], designInputs, policyPath, vsaKey, out("design.vsa.intoto.json")); err != nil {
 		return err
 	}
-	common := append(append(append([]Obj{}, board.Inputs...), images.Inputs...), rot.Inputs...)
+	common := append(append(append(append([]Obj{}, board.Inputs...), images.Inputs...), rot.Inputs...), fwL3Inputs...)
 	common = append(common, designInputs[0])
-	if err := signVSA(board.Lot, S(board.Lot, "name"), vsaLevels(claims["board"], sim), append(common, provInputs...), policyPath, vsaKey, out("board.vsa.intoto.json")); err != nil {
+	if err := signVSA(fpgaTracks, board.Lot, S(board.Lot, "name"), vsaLevels(claims["board"], sim), append(common, provInputs...), policyPath, vsaKey, out("board.vsa.intoto.json")); err != nil {
 		return err
 	}
 	n := 0
@@ -1093,7 +1134,7 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 		for _, serial := range received {
 			u := units[serial]
 			subject := rd(boardURN(mfr, serial), sha256Bytes(u.IDevID.Raw))
-			if err := signVSA(subject, S(subject, "name"), vsaLevels(claims["device"], sim), append(append([]Obj{}, u.Inputs...), common...), policyPath, vsaKey,
+			if err := signVSA(fpgaTracks, subject, S(subject, "name"), vsaLevels(claims["device"], sim), append(append([]Obj{}, u.Inputs...), common...), policyPath, vsaKey,
 				out("board-"+serial+".vsa.intoto.json")); err != nil {
 				return err
 			}

@@ -1,0 +1,45 @@
+{
+  "simulated": {"simulator": "hand-written scenario and the EXR-01 model in tools/hslsa/rot.go", "standsIn": "the root of trust vendor's fab, sort, packaging and final test, and the EXR-01 part itself, whose die identity from wafer sort is a software model of a DICE engine"},
+  "note": "The root of trust vendor's lot at Wafer L3 and Package/Test L3: every passing die gets an identity at wafer sort, endorsed by the vendor's identity CA, and the part's ROM uses it as its IDevID. EXR-01 is a simulated part whose die is the PicoRV32 example's design under another name; everything about it that makes it a root of trust (secure-boot ROM, UDS, DICE identity, firmware) is modeled in tools/hslsa/rot.go.",
+  "product": {
+    "name": "exr01-root-of-trust",
+    "level": "package",
+    "partNumber": "EXR-01",
+    "revision": "A0",
+    "manufacturer": {"name": "Example RoT Co", "country": "US"},
+    "deviceIdentity": {"scheme": "DICE", "serial": "per unit; the shipped lot lists every unit's identity certificate digest"}
+  },
+  "fab": {
+    "id": "skywater",
+    "site": {"name": "Example Wafer Fab", "country": "US"},
+    "processNode": "SKY130 (130 nm CMOS)",
+    "maskSetId": "MS-EXAMPLE-0101"
+  },
+  "waferLot": {"lotId": "LOT-EXR-A", "wafers": ["W01"]},
+  "sort": {
+    "site": {"name": "Example Sort House", "country": "US"},
+    "program": {"name": "exr01-probe", "version": "1.0.0"},
+    "grid": [3, 3],
+    "failedDies": [["W01", 1, 1]]
+  },
+  "packaging": {
+    "site": {"name": "Example OSAT", "country": "US"},
+    "packageType": "QFN-32 5x5 mm",
+    "assemblyLot": "ASM-EXR-01",
+    "serialPrefix": "EXR01-A0-",
+    "units": 8
+  },
+  "transfers": true,
+  "identity": {"rootOfTrust": "dice", "ca": "Example RoT Co EXR-01 IDevID CA", "model": "EXR-01"},
+  "finalTest": {
+    "site": {"name": "Example Test House", "country": "US"},
+    "program": {"name": "exr01-ft", "version": "1.0.0"},
+    "lotId": "ASM-EXR-01",
+    "failedUnits": ["EXR01-A0-00005"]
+  },
+  "provisioning": {
+    "id": "urn:hslsa:station:example-test-house:ps-02",
+    "site": {"name": "Example Test House", "country": "US"},
+    "signer": "test-site"
+  }
+}

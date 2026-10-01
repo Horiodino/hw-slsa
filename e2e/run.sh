@@ -206,6 +206,7 @@ shuttle() {
 # token under <dir> stands in for the HSM.
 softhsm_token() {
   [[ -z "${HSLSA_PKCS11_TOKEN:-}" ]] || return 0
+  SOFTHSM_OWNED=1
   export HSLSA_PKCS11_TOKEN=hslsa-e2e
   export HSLSA_PKCS11_MODULE=${HSLSA_PKCS11_MODULE:-$(ls /usr/lib/softhsm/libsofthsm2.so /usr/lib/*/softhsm/libsofthsm2.so 2>/dev/null | head -1)}
   export HSLSA_PKCS11_PIN
@@ -215,6 +216,13 @@ softhsm_token() {
   printf 'directories.tokendir = %s\nobjectstore.backend = file\nlog.level = ERROR\n' "$1/tokens" > "$SOFTHSM2_CONF"
   softhsm2-util --init-token --free --label "$HSLSA_PKCS11_TOKEN" --pin "$HSLSA_PKCS11_PIN" \
     --so-pin "$(od -An -N8 -tx8 /dev/urandom | tr -d ' ')" > /dev/null
+}
+
+# softhsm_done: forget a throwaway token once its directory is gone, so a
+# later stage in the same run (all) makes its own.
+softhsm_done() {
+  [[ -n "${SOFTHSM_OWNED:-}" ]] || return 0
+  unset HSLSA_PKCS11_TOKEN HSLSA_PKCS11_PIN SOFTHSM2_CONF SOFTHSM_OWNED
 }
 
 # The release and the lot again, with the tapeout authority's and every site's
@@ -251,6 +259,7 @@ hsm() {
   done
   echo "ok: release and lot signed with HSM-held keys, and the check passes"
   rm -rf "$hb/keys" "$hb/tokens"
+  softhsm_done
 }
 
 # Wafer L3 and Package/Test L3 (docs/levels.md): the lot again, under a
@@ -352,6 +361,7 @@ l3() {
   refuses "sites accredited under schemes the policy does not list" "which the policy's accreditations do not list" hslsa verify --bundle "$b" \
     --policy "$l/other-accreditation.json" --trust-root "$l/trust-root.json"
   rm -rf "$k" "$l/tokens"
+  softhsm_done
 }
 
 # Design L3 makes an independent rerun of the equivalence proof possible: the

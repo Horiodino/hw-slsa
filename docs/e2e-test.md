@@ -33,10 +33,10 @@ The verifier only emits VSAs when every check passes, and it claims the levels i
 
 | VSA subject | `verifiedLevels` |
 | --- | --- |
-| Released design (netlist digest) | `HSLSA_DESIGN_LEVEL_2`, `SLSA_BUILD_LEVEL_2` |
-| Shipped lot (`urn:hslsa:lot:ASM-EXAMPLE-17`, lot digest) | `HSLSA_WAFER_LEVEL_2`, `HSLSA_PACKAGE_TEST_LEVEL_2`, `HSLSA_DESIGN_LEVEL_2` |
+| Released design (netlist digest) | `HSLSA_DESIGN_LEVEL_3`, `SLSA_BUILD_LEVEL_3` |
+| Shipped lot (`urn:hslsa:lot:ASM-EXAMPLE-17`, lot digest) | `HSLSA_WAFER_LEVEL_2`, `HSLSA_PACKAGE_TEST_LEVEL_2`, `HSLSA_DESIGN_LEVEL_3` |
 
-Design reaches L2: every step runs on GitHub Actions and is signed by the flow platform's key, the source freeze is a signed, reviewed tag, and the one third-party IP block arrives with signed provenance. It stops short of L3 because the steps are not isolated from each other or the network, the signing key is reachable from the job that runs the tools, and there is no equivalence record. Wafer and Package/Test reach L2 because each site signs with its own key, units are named with genealogy, and final test signs the shipped lot digest.
+Design reaches L3. At L2: every step runs on GitHub Actions and is signed by the flow platform's key, the source freeze is a signed, reviewed tag, and the one third-party IP block arrives with signed provenance. At L3: simulation, synthesis and the equivalence step run their tools in a sandbox with no network and no signing key in reach, every tool is pinned with its package by the policy, and the `signoff` step records a formal equivalence proof between the frozen RTL and the netlist, which `e2e/run.sh rerun` runs again independently ([levels.md](levels.md#design-l3)). Wafer and Package/Test reach L2 because each site signs with its own key, units are named with genealogy, and final test signs the shipped lot digest; `e2e/run.sh l3` makes the same lot again at Wafer L3 and Package/Test L3 ([levels.md](levels.md#wafer-l3-and-packagetest-l3)).
 
 ## What the tamper tests prove
 
@@ -49,7 +49,7 @@ Design reaches L2: every step runs on GitHub Actions and is signed by the flow p
 - validly signed lies: a failed gate, a record whose `hwFlow.step` is not the step it claims to be, an unapproved tool, a step that does not consume the frozen source, a release of an artifact the flow did not build, a packaging record that names another design, a yield record that hides a failed unit, an HBOM that names another lot or does not match its schema
 - the HBOM renderings: one edited after signing, one missing, one listed outside the bundle, and a CycloneDX rendering put where the SPDX one should be ([`tools/hslsa/render_test.go`](../tools/hslsa/render_test.go), which also checks that every HBOM field reaches both formats and that the official schemas reject bad renderings)
 
-The verify job also runs slsa-verifier four times expecting failure: a level above the claim, an SLSA build level above the claim (L3), another subject's digest, and another verifier's key.
+The verify job also runs slsa-verifier four times expecting failure: a level the lot was not verified at, a design level above the claim (L4), another subject's digest, and another verifier's key.
 
 ## HBOM renderings
 

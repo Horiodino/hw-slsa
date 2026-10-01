@@ -477,9 +477,13 @@ func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded, OnBehalf: onBehalf, Exports: exports, Simulated: sim}, nil
 }
 
-// signVSA signs a SLSA Verification Summary Attestation for one subject.
-func signVSA(subject Obj, resourceURI string, levels any, inputs []Obj, policyPath, key, out string) error {
+// signVSA signs a SLSA Verification Summary Attestation for one subject,
+// stating levels in tracks, the tracks the check behind it covered.
+func signVSA(tracks []string, subject Obj, resourceURI string, levels any, inputs []Obj, policyPath, key, out string) error {
 	if err := checkClaimList(levels); err != nil {
+		return err
+	}
+	if err := claimsInTracks(levels, tracks); err != nil {
 		return err
 	}
 	policyDigest, err := sha256File(policyPath)
@@ -567,12 +571,12 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 	}
 	if vsaKey != "" {
 		claims := O(policy, "claims")
-		if err := signVSA(design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"],
+		if err := signVSA(designTracks, design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"],
 			append([]Obj{design.Release}, design.Inputs...), policyPath, vsaKey,
 			filepath.Join(vsaDir, "design.vsa.intoto.json")); err != nil {
 			return nil, nil, err
 		}
-		if err := signVSA(lot.Lot, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0),
+		if err := signVSA(lotTracks, lot.Lot, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0),
 			append(append([]Obj{}, lot.Inputs...), design.Release), policyPath, vsaKey,
 			filepath.Join(vsaDir, "lot.vsa.intoto.json")); err != nil {
 			return nil, nil, err

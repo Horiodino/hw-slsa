@@ -30,6 +30,22 @@ import (
 // DesignSteps are the PicoRV32 example's design steps before the release.
 var DesignSteps = []string{"source-freeze", "simulation", "synthesis", "signoff"}
 
+// optionalSteps are design steps a flow may leave out: the equivalence proof
+// is only required where the policy asks for it (Design L3).
+var optionalSteps = map[string]bool{"signoff": true}
+
+// stepsRun is DesignSteps without the optional steps the bundle has no record of.
+func stepsRun(bundle string) []string {
+	var out []string
+	for _, s := range DesignSteps {
+		if _, err := os.Stat(filepath.Join(bundle, "att", AttName(s))); err != nil && optionalSteps[s] {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
 // AttName is the envelope file name for a design step.
 func AttName(step string) string {
 	for i, s := range DesignSteps {
@@ -793,7 +809,7 @@ func DesignRelease(bundle, lockPath, key, trustRoot, policyPath string) error {
 	// synthesized netlist stands in for the GDS.
 	final := filepath.Join(bundle, "artifacts", S(lock, "synthesis", "top")+".netlist.v")
 	kind := "gate-level netlist (stands in for GDS until steps 3 to 7 run)"
-	steps := DesignSteps
+	steps := stepsRun(bundle)
 	if rel := O(lock, "release"); rel != nil {
 		final = filepath.Join(bundle, "artifacts", S(rel, "artifact"))
 		kind = S(rel, "kind")

@@ -265,14 +265,3 @@ func TestReviewCheckFindsReportPerImage(t *testing.T) {
 	_, err = ReviewCheck(bundle, trust, policy, images)
 	rejects(t, err, "firmware review: review/notes.txt: not a signed S.A.F.E. report")
 }
-
-func TestFirmwareL3ClaimRefused(t *testing.T) {
-	images := []ReviewImage{{"caliptra-rom", nil}, {"caliptra-fmc", nil}, {"caliptra-runtime", nil}}
-	policy := Obj{"claims": Obj{"firmware": []any{"HSLSA_FIRMWARE_LEVEL_2"}}}
-	must(t, requireFirmwareL3Rules(policy, images))
-	policy = Obj{"claims": Obj{"firmware": []any{"HSLSA_FIRMWARE_LEVEL_3"}},
-		"firmware": Obj{"review": Obj{"images": []any{"caliptra-fmc", "caliptra-runtime"}}}}
-	rejects(t, requireFirmwareL3Rules(policy, images), "policy claims Firmware L3 but does not require a S.A.F.E. review of caliptra-rom")
-	O(policy, "firmware", "review")["images"] = []any{"caliptra-rom", "caliptra-fmc", "caliptra-runtime"}
-	rejects(t, requireFirmwareL3Rules(policy, images), "policy claims Firmware L3, but the reference tool does not yet check SLSA Build L3 or transparency log inclusion")
-}

@@ -1,0 +1,27 @@
+{
+  "note": "The board buyer's policy for the root of trust's own chain at Wafer L3 and Package/Test L3, so that the test house that provisions each unit is rated L3 in its own track, as Firmware L3 for the board asks. Its design section is the PicoRV32 example's, since EXR-01's die is that design. The firmware block holds the root of trust firmware to Firmware L3: built isolated with the pinned Go toolchain, reviewed, and in the buyer's release log.",
+  "simulated": {"accept": true, "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."},
+  "design": {
+    "requiredSteps": ["source-freeze", "simulation", "synthesis"],
+    "consumes": {"simulation": ["source-freeze"], "synthesis": ["source-freeze"]},
+    "finalArtifactFrom": "synthesis",
+    "allowedTools": ["iverilog", "vvp", "yosys"],
+    "source": {"tagSigner": "source-owner", "reviewer": "source-reviewer"},
+    "thirdPartyIP": [{"name": "picorv32", "signer": "ip-vendor", "files": ["picorv32.v"]}]
+  },
+  "manufacturing": {"requireTransfers": true},
+  "accreditations": ["dmea-trusted-supplier", "iso-iec-20243"],
+  "firmware": {
+    "provisioningSigner": "test-site",
+    "toolPins": [
+      {"name": "go", "sha256": "9347e73e5188af1ef4c2046cbc9c985473f0155c187d4005ae44c21b300062eb",
+       "toolchain": {"version": "1.25.14", "treeDigest": "394d0dc00dbd912c65fe1a7ef8c0f123df361a2ebf7c54bf098c2b5a6cd94921"}}
+    ],
+    "review": {"images": ["rot-fw"], "providers": ["review-provider"], "minScope": 1, "maxOpenIssueCVSS": 3.9},
+    "transparencyLog": {"origin": "Example Buyer firmware release log"}
+  },
+  "claims": {
+    "design": ["HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_2"],
+    "lot": ["HSLSA_WAFER_LEVEL_3", "HSLSA_PACKAGE_TEST_LEVEL_3", "HSLSA_DESIGN_LEVEL_2"]
+  }
+}

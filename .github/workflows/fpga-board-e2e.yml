@@ -8,8 +8,12 @@
 # the whole chain, signs VSAs and verifies them with slsa-verifier.
 #
 # Private by design, like the other examples: local ECDSA keys in DSSE
-# envelopes, no OIDC token, nothing sent to a transparency log. The boards are
-# simulated; a real board would run the boot step on the self-hosted runner.
+# envelopes, no OIDC token, nothing sent to a public transparency log (the
+# Firmware L3 job's release log is a private one, kept in the job). The boards
+# are simulated; a real board would run the boot step on the self-hosted runner.
+#
+# "l3" is the whole chain again at Firmware L3 and Assembly L3, with the root
+# of trust's lot at Wafer L3 and Package/Test L3, then what Firmware L3 refuses.
 name: FPGA board end-to-end
 
 on:
@@ -143,5 +147,63 @@ jobs:
         with:
           name: fpga-board-vsa
           path: out/fpga/vsa
+          if-no-files-found: error
+          retention-days: 14
+
+  l3:
+    name: Firmware L3 and Assembly L3 (whole chain, then refusals)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # The RISC-V GCC and binutils versions are pinned because the example's
+      # Firmware L3 policy pins these packages' binaries and files by digest
+      # (firmware.toolPins), as the Design L3 policy does for Yosys.
+      - name: Install the open FPGA tools, Icarus Verilog, a RISC-V GCC, SoftHSM2 and bubblewrap
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends yosys nextpnr-ice40 fpga-icestorm fpga-icestorm-chipdb \
+            iverilog gcc-riscv64-unknown-elf=13.2.0-11ubuntu1+12 binutils-riscv64-unknown-elf=2.42-1ubuntu1+6 softhsm2 bubblewrap
+      # Ubuntu 24.04 stops unprivileged processes from making user namespaces,
+      # which the sandbox the firmware builds run in needs.
+      - name: Allow the sandbox to make user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: The pins of the tools on this runner, to compare with the policies' toolPins
+        run: go run ./tools/hslsa/cmd/hslsa pin go riscv64-unknown-elf-gcc riscv64-unknown-elf-cpp riscv64-unknown-elf-objcopy
+      - name: Firmware L3 tests (log proofs, each refused record)
+        run: go test -count=1 -run 'TLog|Merkle|Inclusion|Consistency|FirmwareL3|ProvisioningSiteL3' ./tools/hslsa/
+      - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
+            "https://github.com/slsa-framework/slsa-verifier/releases/download/${SLSA_VERIFIER_VERSION}/slsa-verifier-linux-amd64"
+          echo "${SLSA_VERIFIER_SHA256}  $RUNNER_TEMP/slsa-verifier" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/slsa-verifier"
+          echo "SLSA_VERIFIER=$RUNNER_TEMP/slsa-verifier" >> "$GITHUB_ENV"
+      - name: The chain at Firmware L3, the buyer's check of the received boards, and what Firmware L3 refuses
+        run: e2e/fpga/run.sh l3 | tee l3.log
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## FPGA board at Firmware L3 and Assembly L3"
+            echo '```'
+            grep -E "^(==|ok:|FAIL|Firmware L3|Assembly L3|PASSED|board receipt|at-boot|transparency log|log check|consistency)" l3.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove private keys and the boards' secrets before upload
+        if: always()
+        run: rm -rf out/fpga/l3/keys out/fpga/l3/rot-keys out/fpga/l3/buyer out/fpga/l3/rot-parts out/fpga/l3/boards out/fpga/l3/received out/fpga/l3/tokens out/fpga/l3/softhsm2.conf out/fpga/l3/verifier
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fpga-board-l3
+          path: |
+            out/fpga/l3/board
+            out/fpga/l3/vsa
+            out/fpga/l3/release-log
           if-no-files-found: error
           retention-days: 14

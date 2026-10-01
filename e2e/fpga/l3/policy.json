@@ -1,0 +1,55 @@
+{
+  "note": "The buyer's policy for the FPGA board at Assembly L3 and Firmware L3: its shippers, the board owner's FPGA design and the images in the board's flash, and the root of trust that verifies them. The board owner is also the FPGA design house, so one buyer-run trust root covers both. Firmware L3: the SoC firmware is built isolated with the pinned RISC-V GCC and binutils packages and reviewed, every release is in the buyer's private release log, each board reports its measurements at boot under its root of trust's DICE identity, and the EMS that programs the boards and the test house that programs the root of trust are rated L3 in their own tracks.",
+  "simulated": {"accept": true, "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."},
+  "shippers": {
+    "Example Franchised Distributor": {
+      "role": "dist-franchised",
+      "authorizedFor": [
+        "Example RoT Co", "Lattice Semiconductor", "Winbond Electronics", "Texas Instruments", "Abracon", "Murata Electronics", "YAGEO"
+      ]
+    },
+    "Example PCB Fab": {"role": "pcb-fab", "authorizedFor": ["Example PCB Fab"]}
+  },
+  "requireAuthorizedChannel": true,
+  "accreditations": ["ipc-1791", "sae-as6496"],
+  "design": {
+    "requiredSteps": ["source-freeze", "simulation", "synthesis", "routing", "signoff", "bitstream"],
+    "consumes": {
+      "simulation": ["source-freeze"],
+      "synthesis": ["source-freeze"],
+      "routing": ["synthesis"],
+      "signoff": ["routing"],
+      "bitstream": ["routing"]
+    },
+    "finalArtifactFrom": "bitstream",
+    "allowedTools": ["iverilog", "vvp", "yosys", "nextpnr-ice40", "icetime", "icepack", "iceunpack"],
+    "source": {"tagSigner": "source-owner", "reviewer": "source-reviewer"},
+    "thirdPartyIP": [
+      {"name": "picorv32", "signer": "ip-vendor", "files": ["picorv32.v"]},
+      {"name": "picosoc", "signer": "ip-vendor", "files": ["picosoc/ice40up5k_spram.v", "picosoc/icebreaker.v", "picosoc/picosoc.v", "picosoc/simpleuart.v", "picosoc/spimemio.v"]}
+    ]
+  },
+  "firmware": {
+    "builder": "firmware-platform",
+    "imageSigner": "code-signer",
+    "provisioningSigner": "ems-site",
+    "minSvn": 1,
+    "requireSoCBoot": true,
+    "toolPins": [
+      {"name": "riscv64-unknown-elf-gcc", "sha256": "8c7a8599f3e56e6abe23d4d54025f77ad03efd4113394eac16f1d6060b626974",
+       "package": {"name": "gcc-riscv64-unknown-elf", "version": "13.2.0-11ubuntu1+12", "treeDigest": "fe1d8f174010759d2fa0e01243b9d4a4511c1bce967fd16fcfbd5ef301a0704c"}},
+      {"name": "riscv64-unknown-elf-cpp", "sha256": "4a4e982cde6108a8b7d7e4c44a976125bbf7317651cb85056bbdd8823281187e",
+       "package": {"name": "gcc-riscv64-unknown-elf", "version": "13.2.0-11ubuntu1+12", "treeDigest": "fe1d8f174010759d2fa0e01243b9d4a4511c1bce967fd16fcfbd5ef301a0704c"}},
+      {"name": "riscv64-unknown-elf-objcopy", "sha256": "d4afe748d23929c4d42d349bffd1c9fd753bff6b28564121349b2ef0c0624b4a",
+       "package": {"name": "binutils-riscv64-unknown-elf", "version": "2.42-1ubuntu1+6", "treeDigest": "1c1dc81907665da198c83bbe3c3f62888a1c531ff705815a0dc278cfa87a8f21"}}
+    ],
+    "review": {"images": ["picosoc-fw.bin"], "providers": ["review-provider"], "minScope": 1, "maxOpenIssueCVSS": 3.9},
+    "transparencyLog": {"origin": "Example Buyer firmware release log"}
+  },
+  "rootOfTrust": {"mpn": "EXR-01", "mustGuard": ["U1"]},
+  "claims": {
+    "design": ["HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_2"],
+    "board": ["HSLSA_ASSEMBLY_LEVEL_3", "HSLSA_FIRMWARE_LEVEL_3"],
+    "device": ["HSLSA_ASSEMBLY_LEVEL_3", "HSLSA_FIRMWARE_LEVEL_3"]
+  }
+}

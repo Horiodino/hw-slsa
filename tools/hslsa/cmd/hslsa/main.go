@@ -4,6 +4,7 @@ package main
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -52,6 +53,8 @@ var commands = map[string]command{
 	"pilot":         {"a buyer-run pilot: enroll or revoke site keys, build the trust root from them, measure a lot", pilot},
 	"kit":           {"sign the pilot kit's provenance, or check a kit against it", kit},
 	"sim":           {"simulated hardware: the virtual shuttle makes a lot's supplier exports by simulating the released netlist", sim},
+	"pin":           {"print the toolPins entries for tools on this machine, for a policy to pin", pinCmd},
+	"tlog":          {"the buyer's private transparency log for firmware releases: add records, sign checkpoints, prove and check", tlogCmd},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -831,10 +834,11 @@ func fpga(args []string) error {
 		bundle, src := f.str("bundle", "", true), f.str("src", "the root of trust firmware's Go package", true)
 		key, cs := f.str("key", "", true), f.str("code-signer", "", true)
 		svn := f.Int64("svn", 1, "security version")
+		isolate := f.Bool("isolate", false, "build in a sandbox with no network and no signing key in reach (SLSA Build L3)")
 		if err := f.parse(rest); err != nil {
 			return err
 		}
-		return hslsa.RoTFirmware(*bundle, *src, *key, *cs, *svn)
+		return hslsa.RoTFirmware(*bundle, *src, *key, *cs, *svn, *isolate)
 	case "rot-job":
 		bundle, scenario := f.str("bundle", "", true), f.str("scenario", "", true)
 		export := f.str("export", "the station's export directory, where its job file goes", true)
@@ -859,13 +863,14 @@ func fpga(args []string) error {
 	case "firmware":
 		bundle, lock, key := f.str("bundle", "", true), f.str("lock", "", true), f.str("key", "", true)
 		cache := f.str("cache", "", false)
+		isolate := f.Bool("isolate", false, "build in a sandbox with no network and no signing key in reach (SLSA Build L3)")
 		if err := f.parse(rest); err != nil {
 			return err
 		}
 		if *cache == "" {
 			*cache = ".hslsa-cache"
 		}
-		return hslsa.FPGAFirmware(*bundle, *lock, *key, *cache)
+		return hslsa.FPGAFirmware(*bundle, *lock, *key, *cache, *isolate)
 	case "design":
 		bundle, lock, key := f.str("bundle", "", true), f.str("lock", "", true), f.str("key", "", true)
 		if err := f.parse(rest); err != nil {
@@ -887,10 +892,23 @@ func fpga(args []string) error {
 		bundle, rot, design := f.str("bundle", "", true), f.str("rot-bundle", "", true), f.str("design-bundle", "", true)
 		scenario, designPath := f.str("scenario", "", true), f.str("design", "the released board design", true)
 		policy, keys := f.str("policy", "", true), f.str("keys", "", true)
+		chipParts := f.str("chip-parts", "Assembly L3: directory of the root of trust parts shipped to the EMS, one per marked serial, which the EMS challenges before placement", false)
+		boardsOut := f.str("boards-out", "Assembly L3: directory to put the built boards in, one per serial", false)
+		setPartRoots := partRootFlags(f)
 		if err := f.parse(rest); err != nil {
 			return err
 		}
-		return hslsa.FPGABoardProduce(*bundle, *rot, *design, *scenario, *designPath, *policy, *keys)
+		if err := setPartRoots(); err != nil {
+			return err
+		}
+		var phys *hslsa.BoardParts
+		if *chipParts != "" {
+			if err := need(boardsOut, "boards-out", "the parts are challenged (--chip-parts)"); err != nil {
+				return err
+			}
+			phys = &hslsa.BoardParts{Chips: *chipParts, Boards: *boardsOut}
+		}
+		return hslsa.FPGABoardProduce(*bundle, *rot, *design, *scenario, *designPath, *policy, *keys, phys)
 	case "provision":
 		bundle, devices := f.str("bundle", "", true), f.str("devices", "the root of trust units as shipped", true)
 		boards, scenario, keys := f.str("boards", "directory for the programmed boards", true), f.str("scenario", "", true), f.str("keys", "", true)
@@ -1113,11 +1131,27 @@ func corimCmd(args []string) error {
 }
 
 func safeCmd(args []string) error {
-	act, rest, err := action(args, "sign", "show", "check")
+	act, rest, err := action(args, "sign", "show", "check", "simulate")
 	if err != nil {
 		return err
 	}
 	f := newFlags("safe " + act)
+	if act == "simulate" {
+		bundle := f.str("bundle", "", true)
+		record := f.str("record", "the firmware record naming the image, relative to the bundle (att/...)", true)
+		image := f.str("image", "the image's subject name in the record", true)
+		vendor, product := f.str("vendor", "the device vendor the report names", true), f.str("product", "the product the report names", true)
+		version := f.str("version", "the firmware version the report names", true)
+		key := f.str("key", "the review provider's private key", true)
+		format := f.str("format", "jws or corim", false)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		if *format == "" {
+			*format = hslsa.SFRFormatJWS
+		}
+		return hslsa.SimulateReview(*bundle, *record, *image, *vendor, *product, *version, *key, *format)
+	}
 	report := f.str("report", "sign: the JSON short-form report; show, check: the signed report", true)
 	key := f.str("key", "sign: the review provider's private key", act == "sign")
 	format := f.str("format", "sign: jws or corim", act == "sign")
@@ -1190,6 +1224,90 @@ func safeCmd(args []string) error {
 		return err
 	}
 	fmt.Printf("review check: PASSED, signed by a %s key, %s\n", role, r.Provider)
+	return nil
+}
+
+func pinCmd(args []string) error {
+	f := newFlags("pin")
+	versionArg := f.str("version-arg", "the argument that makes the tools print their version (default --version)", false)
+	if err := f.parse(args); err != nil {
+		return err
+	}
+	if f.NArg() == 0 {
+		return usageError{"usage: hslsa pin [--version-arg ARG] <tool>..."}
+	}
+	if *versionArg == "" {
+		*versionArg = "--version"
+	}
+	var pins []hslsa.Obj
+	for _, name := range f.Args() {
+		pin, err := hslsa.ToolPin(name, *versionArg)
+		if err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		pins = append(pins, pin)
+	}
+	data, err := json.MarshalIndent(pins, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
+}
+
+func tlogCmd(args []string) error {
+	act, rest, err := action(args, "init", "add", "checkpoint", "consistency", "check", "verify-consistency")
+	if err != nil {
+		return err
+	}
+	f := newFlags("tlog " + act)
+	logDir := f.str("log", "the log's directory", act != "check" && act != "verify-consistency")
+	origin := f.str("origin", "init: the log's name; check: the log the record must be in", act == "init" || act == "check")
+	key := f.str("key", "add, checkpoint: the log's private key", act == "add" || act == "checkpoint")
+	record := f.str("record", "add, check: the signed record (its proof is written beside it)", act == "add" || act == "check")
+	out := f.str("out", "checkpoint, consistency: where to write it", act == "checkpoint" || act == "consistency")
+	from := f.str("from", "consistency: the older tree size", act == "consistency")
+	trust := f.str("trust-root", "check, verify-consistency: trust root holding the log's key", act == "check" || act == "verify-consistency")
+	role := f.str("role", "check, verify-consistency: the log's role (default "+hslsa.TLogRole+")", false)
+	older := f.str("older", "verify-consistency: the checkpoint seen before", act == "verify-consistency")
+	newer := f.str("newer", "verify-consistency: the checkpoint seen now", act == "verify-consistency")
+	proof := f.str("proof", "verify-consistency: the consistency proof between them", false)
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	if *role == "" {
+		*role = hslsa.TLogRole
+	}
+	switch act {
+	case "init":
+		return hslsa.TLogInit(*logDir, *origin)
+	case "add":
+		return hslsa.TLogAdd(*logDir, *key, *record)
+	case "checkpoint":
+		return hslsa.TLogCheckpoint(*logDir, *key, *out)
+	case "consistency":
+		n, err := strconv.Atoi(*from)
+		if err != nil {
+			return usageError{"--from takes a tree size"}
+		}
+		return hslsa.TLogConsistency(*logDir, n, *out)
+	}
+	t, err := hslsa.LoadTrustRoot(*trust)
+	if err != nil {
+		return err
+	}
+	if act == "verify-consistency" {
+		if err := hslsa.TLogVerifyConsistency(t, *role, *older, *newer, *proof); err != nil {
+			return err
+		}
+		fmt.Println("consistency check: PASSED, the newer checkpoint extends the older")
+		return nil
+	}
+	cp, err := hslsa.CheckLogged(t, *record, *role, *origin, filepath.Base(*record))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("log check: PASSED, in %q at tree size %d\n", cp.Origin, cp.Size)
 	return nil
 }
 

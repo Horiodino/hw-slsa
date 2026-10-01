@@ -214,10 +214,16 @@ func rotName(kind string, ueid []byte) ([]byte, error) {
 
 // RoT vendor: firmware
 
+// RoTFWModule is the module path the RoT firmware is built as.
+const RoTFWModule = "example.com/exr01/rot-fw"
+
 // RoTFirmware builds the RoT's runtime firmware from src with the Go
 // toolchain, has the code signer sign it for the ROM, and signs its SLSA
-// provenance, SBOM and CoRIM with the firmware platform's key.
-func RoTFirmware(bundle, src, key, codeSigner string, svn int64) error {
+// provenance, SBOM and CoRIM with the firmware platform's key. The build
+// runs in a fresh directory holding only the sources and a go.mod, so it
+// gives the same image wherever it runs; with isolate it runs in the
+// sandbox, with no network (SLSA Build L3).
+func RoTFirmware(bundle, src, key, codeSigner string, svn int64, isolate bool) error {
 	started := Now()
 	art, err := filepath.Abs(filepath.Join(bundle, "artifacts"))
 	if err != nil {
@@ -226,22 +232,64 @@ func RoTFirmware(bundle, src, key, codeSigner string, svn int64) error {
 	if err := os.MkdirAll(art, 0o755); err != nil {
 		return err
 	}
-	image := filepath.Join(art, RoTFWImage)
+	goroot, goDep, err := goToolchain()
+	if err != nil {
+		return err
+	}
+	goVersion := S(goDep, "annotations", "version")
+	work, err := os.MkdirTemp("", "hslsa-rot-fw-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(work)
+	files, err := filepath.Glob(filepath.Join(src, "*.go"))
+	if err != nil {
+		return err
+	}
+	sort.Strings(files)
+	var deps []Obj
+	for _, f := range files {
+		if err := copyFile(f, filepath.Join(work, filepath.Base(f))); err != nil {
+			return err
+		}
+		d, err := sha256File(f)
+		if err != nil {
+			return err
+		}
+		deps = append(deps, rd(filepath.ToSlash(filepath.Join(filepath.Base(filepath.Dir(f)), filepath.Base(f))), d))
+	}
+	gomod := "module " + RoTFWModule + "\n\ngo 1.25\n"
+	if err := os.WriteFile(filepath.Join(work, "go.mod"), []byte(gomod), 0o644); err != nil {
+		return err
+	}
+	deps = append(deps, rd("go.mod", sha256Bytes([]byte(gomod))))
+	var sb *Sandbox
+	out := filepath.Join(work, RoTFWImage)
+	if isolate {
+		if sb, err = NewSandbox(); err != nil {
+			return err
+		}
+		sb.ReadOnly = []string{goroot}
+		out = SandboxWork + "/" + RoTFWImage
+	}
 	ldflags := "-s -w -buildid="
-	env := append(os.Environ(), "CGO_ENABLED=0")
-	proc, err := runCmd(src, env, "go", "build", "-trimpath", "-buildvcs=false", "-ldflags="+ldflags, "-o", image, ".")
-	if err != nil {
+	env := []string{"CGO_ENABLED=0", "GOFLAGS=-mod=mod", "GOPROXY=off", "GOTOOLCHAIN=local", "GOTELEMETRY=off",
+		"GOCACHE=" + filepath.Join(work, ".cache"), "GOPATH=" + filepath.Join(work, ".gopath")}
+	if isolate {
+		env = []string{"CGO_ENABLED=0", "GOFLAGS=-mod=mod", "GOPROXY=off", "GOTOOLCHAIN=local", "GOTELEMETRY=off",
+			"GOCACHE=/tmp/go-cache", "GOPATH=/tmp/go"}
+	}
+	if _, err := fwBuild(sb, work, env, [][]string{{filepath.Join(goroot, "bin", "go"), "build", "-trimpath", "-buildvcs=false", "-ldflags=" + ldflags, "-o", out, "."}}); err != nil {
+		return fmt.Errorf("rot firmware: %w", err)
+	}
+	image := filepath.Join(art, RoTFWImage)
+	if err := copyFile(filepath.Join(work, RoTFWImage), image); err != nil {
 		return err
 	}
-	if proc.Code != 0 {
-		return fmt.Errorf("rot firmware: go build failed: %s", proc.Stderr)
-	}
-	goTool, err := tool("go", "version")
-	if err != nil {
+	if err := os.Chmod(image, 0o755); err != nil {
 		return err
 	}
-	goVersion := strings.TrimPrefix(strings.Fields(S(goTool, "version") + " x x")[2], "go")
-	imageRD, err := fileRD(image, "")
+	imageRD, err := imageRD(image)
 	if err != nil {
 		return err
 	}
@@ -305,23 +353,10 @@ func RoTFirmware(bundle, src, key, codeSigner string, svn int64) error {
 		return err
 	}
 
-	var deps []Obj
-	files, err := filepath.Glob(filepath.Join(src, "*.go"))
-	if err != nil {
-		return err
-	}
-	sort.Strings(files)
-	for _, f := range files {
-		d, err := sha256File(f)
-		if err != nil {
-			return err
-		}
-		deps = append(deps, rd(filepath.ToSlash(filepath.Join(filepath.Base(filepath.Dir(f)), filepath.Base(f))), d))
-	}
 	if gh := githubSourceDep(); gh != nil {
 		deps = append(deps, gh)
 	}
-	deps = append(deps, Obj{"name": "go", "uri": "pkg:golang/go@" + goVersion, "digest": get(goTool, "digest")})
+	deps = append(deps, goDep)
 	run := builder()
 	O(run, "metadata")["startedOn"] = started
 	O(run, "metadata")["finishedOn"] = Now()
@@ -332,9 +367,9 @@ func RoTFirmware(bundle, src, key, codeSigner string, svn int64) error {
 			"externalParameters": Obj{
 				"target": RoTFWImage, "package": ".", "svn": svn,
 				"goos": runtime.GOOS, "goarch": runtime.GOARCH,
-				"flags": []any{"-trimpath", "-buildvcs=false", "-ldflags=" + ldflags},
+				"flags": []any{"-trimpath", "-buildvcs=false", "-ldflags=" + ldflags}, "module": RoTFWModule,
 			},
-			"internalParameters":   Obj{"CGO_ENABLED": "0"},
+			"internalParameters":   isolationParams(sb, Obj{"CGO_ENABLED": "0", "GOPROXY": "off", "GOTOOLCHAIN": "local"}),
 			"resolvedDependencies": deps,
 		},
 		"runDetails": run,
@@ -355,19 +390,7 @@ func RoTFirmware(bundle, src, key, codeSigner string, svn int64) error {
 // RoTCSR is the part's ROM answering the test station: a CSR for its IDevID
 // key, which it derives from the UDS in its fuses and never exports.
 func RoTCSR(devDir string) ([]byte, error) {
-	fuses, err := ReadObj(filepath.Join(devDir, "fuses.json"))
-	if err != nil {
-		return nil, err
-	}
-	uds, err := hex.DecodeString(S(fuses, "uds"))
-	if err != nil || len(uds) == 0 {
-		return nil, errors.New("rot: no UDS in the fuses")
-	}
-	ueid, err := hex.DecodeString(S(fuses, "ueid"))
-	if err != nil {
-		return nil, err
-	}
-	idevid, err := deriveKey(uds, "IDevID")
+	idevid, ueid, _, err := rotSecrets(devDir)
 	if err != nil {
 		return nil, err
 	}
@@ -382,6 +405,37 @@ func RoTCSR(devDir string) ([]byte, error) {
 	return x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
 		RawSubject: name, ExtraExtensions: []pkix.Extension{ext}, SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}, idevid)
+}
+
+// rotSecrets is what the part's ROM derives its keys from. A part from a
+// lot with die identities (Wafer L3) has the DICE engine dieid.go models,
+// whose UDS was burned at wafer sort: its IDevID key and UEID are the die's,
+// and its CDIs chain from the die's CDI. Any other part has the UDS its test
+// station had the die generate into its fuses.
+func rotSecrets(devDir string) (idevid *ecdsa.PrivateKey, ueid, cdi []byte, err error) {
+	if die, err := loadDie(devDir); err == nil {
+		key, err := die.idevid()
+		return key, die.UEID(), die.cdi(), err
+	}
+	fuses, err := ReadObj(filepath.Join(devDir, "fuses.json"))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	uds, err := hex.DecodeString(S(fuses, "uds"))
+	if err != nil || len(uds) == 0 {
+		return nil, nil, nil, errors.New("rot: no UDS in the fuses")
+	}
+	if ueid, err = hex.DecodeString(S(fuses, "ueid")); err != nil {
+		return nil, nil, nil, err
+	}
+	key, err := deriveKey(uds, "IDevID")
+	return key, ueid, uds, err
+}
+
+// hasDie says whether the part in devDir has a die identity from wafer sort.
+func hasDie(devDir string) bool {
+	_, err := os.Stat(filepath.Join(devDir, dieFile))
+	return err == nil
 }
 
 // RoTProvAtt is the RoT vendor's provisioning record for one unit.
@@ -483,11 +537,7 @@ func RoTStation(bundle, devices, keysDir, export string) error {
 	if err != nil {
 		return err
 	}
-	caKey, err := loadECKey(filepath.Join(keysDir, "identity-ca.key.pem"))
-	if err != nil {
-		return err
-	}
-	caName, err := os.ReadFile(filepath.Join(keysDir, "identity-ca.name.txt"))
+	genealogy, err := ReadObj(filepath.Join(art, "genealogy.json"))
 	if err != nil {
 		return err
 	}
@@ -510,28 +560,48 @@ func RoTStation(bundle, devices, keysDir, export string) error {
 		return err
 	}
 
+	var ca *rotCA
 	for i, unit := range shipped {
 		socket := i%xg8Sockets + 1
+		// A unit named by its certificate (a lot with die identities) is in
+		// the directory of its marked serial, where packaging put it.
 		dev := filepath.Join(devices, unit)
+		if serial := S(genealogy, "units", unit, "serial"); serial != "" {
+			dev = filepath.Join(devices, serial)
+		}
+		die := hasDie(dev)
 		if err := os.MkdirAll(filepath.Join(dev, "flash"), 0o755); err != nil {
 			return err
 		}
 		if err := log.row(socket, unit, "BEGIN", "", job.values["job"]["id"], true); err != nil {
 			return err
 		}
-		// The die's TRNG fills the UDS fuses; the station never sees the value.
-		uds, err := randomHex(32)
-		if err != nil {
-			return err
-		}
-		if err := WriteJSON(filepath.Join(dev, "fuses.json"), Obj{"serial": unit, "uds": uds}); err != nil {
-			return err
-		}
-		if err := log.row(socket, unit, "KEY_GEN", "uds", "uds:"+unit, true); err != nil {
-			return err
+		ueid := rotUEID(unit)
+		if die {
+			// The die has had its UDS since wafer sort; the station reads its UEID.
+			_, id, _, err := rotSecrets(dev)
+			if err != nil {
+				return err
+			}
+			ueid = id
+			if err := WriteJSON(filepath.Join(dev, "fuses.json"), Obj{"serial": unit}); err != nil {
+				return err
+			}
+		} else {
+			// The die's TRNG fills the UDS fuses; the station never sees the value.
+			uds, err := randomHex(32)
+			if err != nil {
+				return err
+			}
+			if err := WriteJSON(filepath.Join(dev, "fuses.json"), Obj{"serial": unit, "uds": uds}); err != nil {
+				return err
+			}
+			if err := log.row(socket, unit, "KEY_GEN", "uds", "uds:"+unit, true); err != nil {
+				return err
+			}
 		}
 		public := Obj{
-			"ueid":            hex.EncodeToString(rotUEID(unit)),
+			"ueid":            hex.EncodeToString(ueid),
 			"vendor_key_hash": vendorHash,
 			"lifecycle":       "production",
 			"debug_locked":    true,
@@ -592,18 +662,33 @@ func RoTStation(bundle, devices, keysDir, export string) error {
 			}
 		}
 		// The part's ROM derives its IDevID key from the UDS and answers with a
-		// CSR; the vendor's identity CA endorses it and the station stores the certificate.
+		// CSR; the vendor's identity CA endorses it and the station stores the
+		// certificate. A die with an identity from sort already holds its
+		// certificate, which the station reads from the part.
 		csrDER, err := RoTCSR(dev)
 		if err != nil {
 			return err
 		}
-		csr, err := x509.ParseCertificateRequest(csrDER)
-		if err != nil {
-			return err
-		}
-		certDER, err := Endorse(csr, caKey, strings.TrimSpace(string(caName)))
-		if err != nil {
-			return err
+		var certDER []byte
+		if die {
+			d, err := loadDie(dev)
+			if err != nil {
+				return err
+			}
+			certDER = d.Cert
+		} else {
+			if ca == nil {
+				if ca, err = loadRoTCA(keysDir); err != nil {
+					return err
+				}
+			}
+			csr, err := x509.ParseCertificateRequest(csrDER)
+			if err != nil {
+				return err
+			}
+			if certDER, err = Endorse(csr, ca.key, ca.name); err != nil {
+				return err
+			}
 		}
 		csrFile, certFile := "identity/"+unit+".csr.der", "identity/"+unit+".crt.der"
 		if err := os.WriteFile(filepath.Join(export, csrFile), csrDER, 0o644); err != nil {
@@ -628,6 +713,24 @@ func RoTStation(bundle, devices, keysDir, export string) error {
 	}
 	fmt.Printf("station ps-02: %d units programmed, export in %s\n", len(shipped), export)
 	return nil
+}
+
+// rotCA is the vendor's identity CA at the test station, for parts without a die identity.
+type rotCA struct {
+	key  *ecdsa.PrivateKey
+	name string
+}
+
+func loadRoTCA(keysDir string) (*rotCA, error) {
+	key, err := loadECKey(filepath.Join(keysDir, "identity-ca.key.pem"))
+	if err != nil {
+		return nil, err
+	}
+	name, err := os.ReadFile(filepath.Join(keysDir, "identity-ca.name.txt"))
+	if err != nil {
+		return nil, err
+	}
+	return &rotCA{key: key, name: strings.TrimSpace(string(name))}, nil
 }
 
 // RoTHBOM signs the RoT's chip HBOM with its firmware listed.
@@ -662,13 +765,9 @@ func RoTBoot(devDir, flashPath, outDir string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	uds, err := hex.DecodeString(S(fuses, "uds"))
-	if err != nil || len(uds) == 0 {
-		return held("no UDS in the fuses")
-	}
-	ueid, err := hex.DecodeString(S(fuses, "ueid"))
+	idevid, ueid, cdi, err := rotSecrets(devDir)
 	if err != nil {
-		return held("unreadable UEID fuse")
+		return held("no device secret: %v", err)
 	}
 	image, err := os.ReadFile(filepath.Join(devDir, "flash", RoTFWImage))
 	if err != nil {
@@ -699,12 +798,8 @@ func RoTBoot(devDir, flashPath, outDir string) (bool, error) {
 		return held("firmware SVN %d is below the anti-rollback fuse %d", svn, minSVN)
 	}
 
-	// DICE: the IDevID key comes from the UDS; the alias key from a CDI over the measurement.
-	idevid, err := deriveKey(uds, "IDevID")
-	if err != nil {
-		return false, err
-	}
-	mac := hmac.New(sha256.New, uds)
+	// DICE: the alias key comes from a CDI over the firmware's measurement.
+	mac := hmac.New(sha256.New, cdi)
 	mac.Write([]byte("CDI"))
 	mac.Write([]byte(measurement))
 	alias, err := deriveKey(mac.Sum(nil), "alias")

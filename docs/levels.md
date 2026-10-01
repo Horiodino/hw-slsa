@@ -8,10 +8,11 @@ Everything in the examples is simulated: the sites, their HSMs (SoftHSM), the ac
 
 A buyer's policy names the levels it claims in `claims`. Each check runs the extra requirements of a level whenever the policy claims that level in that track, and fails if one is not met. A VSA states only claimed levels, and only after the check passed, so it never states a level the check did not establish.
 
-Two guards stop a claim the tool cannot stand behind (`tools/hslsa/levels.go`):
+Three guards stop a claim the tool cannot stand behind (`tools/hslsa/levels.go`):
 
 - A claim of a level the tool does not check yet is refused before any record is read, and again when a VSA is signed. Today that is L4 in every track.
 - `SLSA_BUILD_LEVEL_n` needs a Design or Firmware level of at least n in the same list, since Design Ln and Firmware Ln meet SLSA Build Ln and not the other way round.
+- A VSA states levels only in the tracks its check covers: a lot receipt check cannot state a Firmware or Assembly level, whatever the policy claims.
 
 ### Buyer-run trust roots record how keys are held
 
@@ -61,11 +62,26 @@ What the tool does (`tools/hslsa/boardl3.go`):
 - After A1 the board owner's platform CA (role `platform-ca`) signs a platform certificate per board: the board's serial and every component on it, by certificate digest where the part has an identity and by lot otherwise.
 - At receipt, `hslsa board verify --boards DIR` challenges the identity parts on each received board, and each must answer with the certificate its platform certificate names.
 
-The board receipt check at Assembly L3 requires the EMS and every shipper to sign at accredited sites, every identity part on every board to have answered at build, a platform certificate for every board that names exactly what was placed on it, and the challenge at receipt. Example: `e2e/board/run.sh l3`, on the L3 chip lot, with three refusals: a chip swapped for another genuine one after build, a board whose chip was taken off, and serials typed into a list. Tests: `boardl3_test.go`.
+The board receipt check at Assembly L3 requires the EMS and every shipper to sign at accredited sites, every identity part on every board to have answered at build, a platform certificate for every board that names exactly what was placed on it, and the challenge at receipt. Example: `e2e/board/run.sh l3`, on the L3 chip lot, with three refusals: a chip swapped for another genuine one after build, serials typed into a list, and an EMS enrolled with no accreditation. Tests: `boardl3_test.go`, which also takes a chip off a board.
 
 ### Firmware L3
 
-Being built: SLSA Build L3 for every image (isolated builds, provenance signed outside the build), the S.A.F.E. review check that already exists, release inclusion in a private RFC 9162 transparency log, the at-boot check made mandatory, and every provisioning site rated at least L3 in its own track. Until it is done, a Firmware L3 claim is refused.
+What the spec asks: SLSA Build L3 for every image; every image independently reviewed, shown by a signed OCP S.A.F.E. report; releases in a transparency log, which may be private; the device reports measurements under a DICE or Caliptra class identity that match the attested image digests; and every site that provisions the device rated at least L3 in its own track (rule 2).
+
+What the tool does (`tools/hslsa/fwl3.go`, `fwbuild.go`, `tlog.go`):
+
+- `--isolate` on a firmware build (`hslsa fpga firmware`, `hslsa fpga rot-firmware`) runs the compiler in the same bubblewrap sandbox as an isolated design step: no network, a fresh working directory with only the pinned sources, `/usr` read-only, no signing key in reach. The image is hashed and the record signed outside the sandbox, and the record says so in `buildDefinition.internalParameters.isolation` and `.network`.
+- Every tool is a resolved dependency with its binary digest: a Debian package's tool with the digest of every file of the package, and the Go toolchain with one digest over everything a build runs or reads in its GOROOT. The policy pins them in `firmware.toolPins`; `hslsa pin <tool>...` prints the pins for the tools on a machine. Every input is named by digest.
+- Images carry a SHA-384 digest as well, the one a S.A.F.E. report names them by. `hslsa safe simulate` signs a simulated report as a review provider would ([firmware review](caliptra-e2e.md#firmware-review-simulated)); the policy's `firmware.review` says which images need one and from which providers.
+- `hslsa tlog` is a private transparency log: an append-only list of release records under RFC 9162 Merkle hashing, with checkpoints signed by the log operator's key (role `transparency-log`). `tlog add` puts a record in the log and writes its inclusion proof beside it (`<record>.tlog.json`); `tlog check` checks one; `tlog consistency` and `tlog verify-consistency` show that the log today extends the log a buyer saw before, so a release cannot be swapped after it was logged. Nothing goes to a public log.
+- The at-boot check becomes mandatory: the buyer passes what each received device returned at boot, and its reported measurements must match the attested images under its DICE identity.
+- Rule 2: for every provisioning record, the stage it was made at (`wafer-sort`, `final-test` or `board-programming`) names a track, the policy must claim L3 in that track, and the site's key must meet that track's L3 key rule (HSM custody and accreditation for Wafer and Package/Test, accreditation for Assembly).
+
+The Firmware L3 check (`firmwareL3`) refuses a build that ran step code without the sandbox, with the network open or a key mounted; an input not pinned by digest; a tool not on the pin list or from another package or toolchain than the pinned one; a release not in the log the policy names, or whose log entry is another record; an image the policy does not require a review of, or with no accepted report; no boot evidence; and a provisioning site rated below L3 in its own track.
+
+Example: `e2e/fpga/run.sh l3` makes the FPGA board's whole chain again at L3. The root of trust's lot is at Wafer L3 and Package/Test L3 (its ROM uses the die identity from wafer sort as its IDevID), the board at Assembly L3 (the EMS challenges each root of trust before placement), both firmware builds run isolated with pinned tools, a review lab signs a report for each, and every release is logged. The buyer checks the two boards it received with their boot evidence, and slsa-verifier checks the VSAs at `HSLSA_FIRMWARE_LEVEL_3`. It then shows seven refusals: a flash image not in the log, releases in a log the buyer does not read, firmware built with a compiler the policy does not pin, firmware no lab reviewed, boards with no boot evidence, a root of trust provisioned at a test house rated below L3, and a log that rewrote a release it had shown. Tests: `fwl3_test.go` (each refusal on a forged but validly signed record) and `tlog_test.go` (the RFC 6962 test vectors, inclusion and consistency proofs, tampered proofs and a forked log).
+
+The Caliptra example's policy stays at Firmware L2: its firmware is built by the Caliptra build scripts outside the sandbox, so a Firmware L3 claim on it is refused, and `caliptra_test.go` checks that.
 
 ## L4 defense profile
 

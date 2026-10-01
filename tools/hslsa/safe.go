@@ -620,23 +620,6 @@ func trackClaim(policy Obj, track string) int {
 	return level
 }
 
-// requireFirmwareL3Rules refuses a Firmware L3 claim. The review check runs
-// whenever the policy configures it, but L3 also needs SLSA Build L3 and
-// releases in a transparency log, which this tool does not check yet.
-func requireFirmwareL3Rules(policy Obj, images []ReviewImage) error {
-	level := trackClaim(policy, "FIRMWARE")
-	if level < 3 {
-		return nil
-	}
-	required := Strs(policy, "firmware", "review", "images")
-	for _, im := range images {
-		if !slices.Contains(required, im.Name) {
-			return failf("policy claims Firmware L%d but does not require a S.A.F.E. review of %s", level, im.Name)
-		}
-	}
-	return failf("policy claims Firmware L%d, but the reference tool does not yet check SLSA Build L3 or transparency log inclusion", level)
-}
-
 // Producing reports
 
 // SignSFR signs a JSON short-form report in the given form with signer.
@@ -897,27 +880,7 @@ func CaliptraReview(bundle, lockPath, key string) error {
 		if S(s, "digest", "sha384") == "" {
 			return fmt.Errorf("firmware provenance has no sha384 digest for %s", name)
 		}
-		report := Obj{
-			"review_framework_version": "1.1",
-			"device": Obj{
-				"vendor": "CHIPS Alliance", "product": "Caliptra", "category": "SIMULATED review of " + S(s, "name"),
-				"repo_tag":   S(lock, "caliptraSw", "repo") + "/tree/" + S(lock, "caliptraSw", "commit"),
-				"fw_version": tag, "fw_hash_sha2_384": S(s, "digest", "sha384"), "fw_hash_sha2_512": "",
-			},
-			"audit": Obj{
-				"srp": SimulatedProvider, "methodology": "none (simulated)",
-				"completion_date": time.Now().UTC().Format(sfrDate), "report_version": "1.0",
-				"scope_number": int64(1), "cvss_version": "3.1",
-				"issues": []any{Obj{
-					"title":       "SIMULATED low-severity issue",
-					"cvss_score":  "1.6",
-					"cvss_vector": "CVSS:3.1/AV:P/AC:H/PR:H/UI:N/S:U/C:L/I:N/A:N",
-					"cwe":         "CWE-1188",
-					"description": "Not a finding. It exercises the verifier's check of open issues against policy.",
-					"cve":         nil,
-				}},
-			},
-		}
+		report := simulatedReport("CHIPS Alliance", "Caliptra", s, S(lock, "caliptraSw", "repo")+"/tree/"+S(lock, "caliptraSw", "commit"), tag)
 		format, ext := SFRFormatCoRIM, ".sfr.cose"
 		if name == "caliptra-rom" {
 			format, ext = SFRFormatJWS, ".sfr.jws"
@@ -931,5 +894,71 @@ func CaliptraReview(bundle, lockPath, key string) error {
 		}
 		fmt.Printf("review: signed a simulated S.A.F.E. report (%s) for %s sha384:%s\n", format, name, S(s, "digest", "sha384"))
 	}
+	return nil
+}
+
+// simulatedReport is a S.A.F.E. short-form report for the image subject
+// that no review provider wrote: the examples sign it with a key the trust
+// root lists as a review provider, to exercise the review check.
+func simulatedReport(vendor, product string, image Obj, repoTag, version string) Obj {
+	return Obj{
+		"review_framework_version": "1.1",
+		"device": Obj{
+			"vendor": vendor, "product": product, "category": "SIMULATED review of " + S(image, "name"),
+			"repo_tag": repoTag, "fw_version": version,
+			"fw_hash_sha2_384": S(image, "digest", "sha384"), "fw_hash_sha2_512": S(image, "digest", "sha512"),
+		},
+		"audit": Obj{
+			"srp": SimulatedProvider, "methodology": "none (simulated)",
+			"completion_date": time.Now().UTC().Format(sfrDate), "report_version": "1.0",
+			"scope_number": int64(1), "cvss_version": "3.1",
+			"issues": []any{Obj{
+				"title":       "SIMULATED low-severity issue",
+				"cvss_score":  "1.6",
+				"cvss_vector": "CVSS:3.1/AV:P/AC:H/PR:H/UI:N/S:U/C:L/I:N/A:N",
+				"cwe":         "CWE-1188",
+				"description": "Not a finding. It exercises the verifier's check of open issues against policy.",
+				"cve":         nil,
+			}},
+		},
+	}
+}
+
+// SimulateReview signs a simulated S.A.F.E. report for the image a firmware
+// record names, into the bundle's review directory as <image>.sfr.jws or
+// .sfr.cose. The record must give the image's SHA-384 digest.
+func SimulateReview(bundle, record, imageName, vendor, product, version, key, format string) error {
+	stmt, err := DecodeEnvelope(filepath.Join(bundle, record))
+	if err != nil {
+		return err
+	}
+	var image Obj
+	for _, sub := range Objs(stmt, "subject") {
+		if S(sub, "name") == imageName {
+			image = sub
+		}
+	}
+	if image == nil || S(image, "digest", "sha384") == "" {
+		return fmt.Errorf("%s names no %s with a sha384 digest", record, imageName)
+	}
+	signer, err := LoadSigner(key)
+	if err != nil {
+		return err
+	}
+	data, err := SignSFR(simulatedReport(vendor, product, image, record, version), signer, format)
+	if err != nil {
+		return err
+	}
+	ext := ".sfr.jws"
+	if format == SFRFormatCoRIM {
+		ext = ".sfr.cose"
+	}
+	if err := os.MkdirAll(filepath.Join(bundle, ReviewDir), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(bundle, ReviewDir, imageName+ext), data, 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("review: signed a simulated S.A.F.E. report (%s) for %s sha384:%s\n", format, imageName, S(image, "digest", "sha384")[:16])
 	return nil
 }

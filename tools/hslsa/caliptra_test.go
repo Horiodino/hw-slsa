@@ -563,13 +563,18 @@ func TestReviewIssueAbovePolicy(t *testing.T) {
 	rejects(t, calCheck(t, work, nil, path), `open issue "SIMULATED low-severity issue" scores CVSS 1.6, above the policy's 1`)
 }
 
-func TestFirmwareL3NotClaimable(t *testing.T) {
+// The Caliptra example's builds are not isolated and its releases are in
+// no log, so Firmware L3 is refused for each of the rules it does not meet.
+func TestFirmwareL3NotMet(t *testing.T) {
 	work := calWork(t)
 	policy := ok(ReadObj(calPolicy))
 	O(policy, "claims")["firmware"] = []any{"HSLSA_FIRMWARE_LEVEL_3"}
 	path := filepath.Join(t.TempDir(), "policy.json")
 	must(t, WriteJSON(path, policy))
-	rejects(t, calCheck(t, work, nil, path), "policy claims Firmware L3, but the reference tool does not yet check SLSA Build L3 or transparency log inclusion")
+	rejects(t, calCheck(t, work, nil, path), "the policy names no transparency log")
+	O(policy, "firmware")["transparencyLog"] = Obj{"origin": "example log"}
+	must(t, WriteJSON(path, policy))
+	rejects(t, calCheck(t, work, nil, path), "SLSA Build L3: no internalParameters.isolation")
 }
 
 func TestROMHexRoundTrip(t *testing.T) {

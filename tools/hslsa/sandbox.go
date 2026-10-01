@@ -107,20 +107,27 @@ func IsolatedNetwork() Obj {
 
 // isolationOK is the Design L3 test of one record's hwFlow.isolation.
 func isolationOK(stmt Obj, label string) error {
-	iso := O(stmt, "predicate", "hwFlow", "isolation")
+	return isolationBlockOK(O(stmt, "predicate", "hwFlow"), "hwFlow", label, true)
+}
+
+// isolationBlockOK tests the isolation and network blocks of a record
+// under block (named where in messages). A design step may reach declared
+// license servers; a firmware build may not.
+func isolationBlockOK(block Obj, where, label string, licenseServers bool) error {
+	iso := O(block, "isolation")
 	switch {
 	case iso == nil:
-		return failf("%s: no hwFlow.isolation, so the record does not say the step ran isolated", label)
+		return failf("%s: no %s.isolation, so the record does not say the step ran isolated", label, where)
 	case get(iso, "freshWorkdir") != true || get(iso, "stepsShareNoFiles") != true:
 		return failf("%s: the step did not run in a fresh working directory of its own", label)
 	case get(iso, "signingKeyMounted") != false || get(iso, "signedOutsideStep") != true:
 		return failf("%s: the signing key was within reach of the step", label)
-	case S(iso, "network") != "none" && S(iso, "network") != "license-server":
+	case S(iso, "network") != "none" && !(licenseServers && S(iso, "network") == "license-server"):
 		return failf("%s: the sandbox allowed network access %q", label, S(iso, "network"))
 	}
-	mode := S(stmt, "predicate", "hwFlow", "network", "mode")
+	mode := S(block, "network", "mode")
 	if (S(iso, "network") == "none") != (mode == "isolated") {
-		return failf("%s: hwFlow.isolation (network %s) and hwFlow.network (mode %s) disagree", label, S(iso, "network"), mode)
+		return failf("%s: %s.isolation (network %s) and %s.network (mode %s) disagree", label, where, S(iso, "network"), where, mode)
 	}
 	return nil
 }

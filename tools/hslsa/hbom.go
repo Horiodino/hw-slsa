@@ -194,7 +194,7 @@ func BuildChipHBOM(bundle, lockPath, scenarioPath, key string, w *Withholding, f
 		return err
 	}
 	src := O(lock, "source")
-	flow, err := flowEntries(bundle, append(append([]string{}, DesignSteps...), "release"))
+	flow, err := flowEntries(bundle, append(stepsRun(bundle), "release"))
 	if err != nil {
 		return err
 	}

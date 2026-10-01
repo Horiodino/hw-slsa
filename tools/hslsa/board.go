@@ -324,7 +324,7 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 	}
 	receiptName := ReceiptAtt(S(chipLine.line, "lot"))
 	chipSim := len(simulatedRecords(bundle, checked)) > 0
-	if err := signVSA(receipt, S(chipLot, "name"), vsaLevels(get(chipPolicy, "claims", "lot"), chipSim), checked, filepath.Join(chip, "policy.json"),
+	if err := signVSA(lotTracks, receipt, S(chipLot, "name"), vsaLevels(get(chipPolicy, "claims", "lot"), chipSim), checked, filepath.Join(chip, "policy.json"),
 		filepath.Join(keys, emsRole+".key.pem"), filepath.Join(bundle, "att", receiptName)); err != nil {
 		return err
 	}
@@ -913,26 +913,35 @@ func readPolicy(path string) Obj {
 	return p
 }
 
-// BoardVerify runs the board receipt check, then signs the board VSA when vsaKey is set.
-func BoardVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, vsaKey, vsaDir string) (*LotResult, error) {
+// receivedBoardsAt reads the boards a buyer received: a file of serials, or
+// the boards themselves, one directory per board named by its serial, which
+// it also returns.
+func receivedBoardsAt(boardsPath string) ([]string, string, error) {
 	var received []string
-	boardsDir := ""
 	if info, err := os.Stat(boardsPath); err == nil && info.IsDir() {
-		// The boards themselves: one directory per board, named by its serial.
 		entries, err := os.ReadDir(boardsPath)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		for _, e := range entries {
 			if e.IsDir() {
 				received = append(received, e.Name())
 			}
 		}
-		boardsDir = boardsPath
-	} else if boardsPath != "" {
-		if received, err = ReadUnits(boardsPath); err != nil {
-			return nil, err
-		}
+		return received, boardsPath, nil
+	}
+	if boardsPath == "" {
+		return nil, "", nil
+	}
+	received, err := ReadUnits(boardsPath)
+	return received, "", err
+}
+
+// BoardVerify runs the board receipt check, then signs the board VSA when vsaKey is set.
+func BoardVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, vsaKey, vsaDir string) (*LotResult, error) {
+	received, boardsDir, err := receivedBoardsAt(boardsPath)
+	if err != nil {
+		return nil, err
 	}
 	result, err := checkBoard(bundle, trust, policyPath, received, boardsDir)
 	if err != nil {
@@ -958,7 +967,7 @@ func BoardVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, vsaKey
 		}
 		claims := get(pol, "claims", "board")
 		out := filepath.Join(vsaDir, "board.vsa.intoto.json")
-		if err := signVSA(lot, S(lot, "name"), vsaLevels(claims, len(result.Simulated) > 0), result.Inputs, policyPath, vsaKey, out); err != nil {
+		if err := signVSA(boardTracks, lot, S(lot, "name"), vsaLevels(claims, len(result.Simulated) > 0), result.Inputs, policyPath, vsaKey, out); err != nil {
 			return nil, err
 		}
 		fmt.Printf("VSA written to %s: board %s\n", out, pyList(vsaLevels(claims, len(result.Simulated) > 0)))

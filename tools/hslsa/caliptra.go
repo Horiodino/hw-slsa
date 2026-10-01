@@ -1843,8 +1843,12 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 		fmt.Printf("firmware review: PASSED, an accepted S.A.F.E. report for %s, from %s\n",
 			strings.Join(Strs(policy, "firmware", "review", "images"), ", "), strings.Join(rev.Providers, ", "))
 	}
-	if err := requireFirmwareL3Rules(policy, images); err != nil {
-		return err
+	if trackClaim(policy, "FIRMWARE") >= 3 {
+		in, err := caliptraFirmwareL3(bundle, trust, policy, units)
+		if err != nil {
+			return err
+		}
+		fw.Inputs = append(fw.Inputs, in...)
 	}
 	var devices []*DeviceResult
 	for _, u := range units {
@@ -1872,23 +1876,23 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 	}
 	claims := O(policy, "claims")
 	out := func(name string) string { return filepath.Join(vsaDir, name) }
-	if err := signVSA(design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"],
+	if err := signVSA(designTracks, design.Final, "hslsa:design:"+S(design.Final, "name"), claims["design"],
 		append([]Obj{design.Release}, design.Inputs...), policyPath, vsaKey, out("design.vsa.intoto.json")); err != nil {
 		return err
 	}
 	lotInputs := append(append([]Obj{}, lot.Inputs...), design.Release)
-	if err := signVSA(lot.Lot, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0), lotInputs, policyPath, vsaKey, out("lot.vsa.intoto.json")); err != nil {
+	if err := signVSA(lotTracks, lot.Lot, S(lot.Lot, "name"), vsaLevels(claims["lot"], len(lot.Simulated) > 0), lotInputs, policyPath, vsaKey, out("lot.vsa.intoto.json")); err != nil {
 		return err
 	}
 	fwSubject := rd(S(fw.Bundle, "name"), S(fw.Bundle, "digest", "sha256"))
-	if err := signVSA(fwSubject, "hslsa:firmware:"+S(fw.Bundle, "name"), claims["firmware"], fw.Inputs,
+	if err := signVSA(fwTracks, fwSubject, "hslsa:firmware:"+S(fw.Bundle, "name"), claims["firmware"], fw.Inputs,
 		policyPath, vsaKey, out("firmware.vsa.intoto.json")); err != nil {
 		return err
 	}
 	for i, unit := range units {
 		dev := devices[i]
 		inputs := append(append(append(append([]Obj{}, dev.Inputs...), fw.Inputs...), lot.Inputs...), design.Release)
-		if err := signVSA(dev.Unit, S(dev.Unit, "name"), vsaLevels(claims["device"], len(simulatedRecords(bundle, inputs)) > 0), inputs, policyPath, vsaKey,
+		if err := signVSA(deviceTracks, dev.Unit, S(dev.Unit, "name"), vsaLevels(claims["device"], len(simulatedRecords(bundle, inputs)) > 0), inputs, policyPath, vsaKey,
 			out("device-"+unit+".vsa.intoto.json")); err != nil {
 			return err
 		}

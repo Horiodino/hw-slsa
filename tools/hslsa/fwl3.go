@@ -147,6 +147,9 @@ func buildL3(stmt Obj, pins []Obj, where string) error {
 // tree where the pin names one.
 func fwToolPinned(d Obj, pins []Obj, where string) error {
 	name := S(d, "name")
+	// A policy may pin one binary more than once, for each toolchain tree
+	// it accepts; any pin that matches in full passes.
+	var mismatch error
 	for _, p := range pins {
 		if S(p, "name") != name || S(p, "sha256") != S(d, "digest", "sha256") {
 			continue
@@ -154,17 +157,22 @@ func fwToolPinned(d Obj, pins []Obj, where string) error {
 		if pp := O(p, "package"); pp != nil {
 			dp := O(d, "annotations", "package")
 			if S(dp, "name") != S(pp, "name") || S(dp, "version") != S(pp, "version") || S(dp, "treeDigest", "sha256") != S(pp, "treeDigest") {
-				return failf("%s: SLSA Build L3: tool %s is the pinned binary, but its package %s %s (files sha256:%s) is not the pinned one", where, name,
+				mismatch = failf("%s: SLSA Build L3: tool %s is the pinned binary, but its package %s %s (files sha256:%s) is not the pinned one", where, name,
 					S(dp, "name"), S(dp, "version"), short(S(dp, "treeDigest", "sha256")))
+				continue
 			}
 		}
 		if pt := O(p, "toolchain"); pt != nil {
 			dt := O(d, "annotations", "toolchain")
 			if S(dt, "treeDigest", "sha256") != S(pt, "treeDigest") {
-				return failf("%s: SLSA Build L3: %s is the pinned binary, but its toolchain (files sha256:%s) is not the pinned one", where, name, short(S(dt, "treeDigest", "sha256")))
+				mismatch = failf("%s: SLSA Build L3: %s is the pinned binary, but its toolchain (files sha256:%s) is not the pinned one", where, name, short(S(dt, "treeDigest", "sha256")))
+				continue
 			}
 		}
 		return nil
+	}
+	if mismatch != nil {
+		return mismatch
 	}
 	return failf("%s: SLSA Build L3: tool %s sha256:%s is not on the policy's pinned tool list (firmware.toolPins)", where, name, short(S(d, "digest", "sha256")))
 }

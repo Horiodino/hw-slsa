@@ -260,6 +260,8 @@ func toolPinned(t Obj, pins []Obj, label string) error {
 	if S(t, "digest", "sha256") == "" {
 		return failf("%s: tool %s is not pinned by digest", label, name)
 	}
+	// One binary may be pinned more than once, for each package it accepts.
+	var mismatch error
 	for _, p := range pins {
 		if S(p, "name") != name || S(p, "sha256") != S(t, "digest", "sha256") {
 			continue
@@ -272,7 +274,10 @@ func toolPinned(t Obj, pins []Obj, label string) error {
 		if S(tp, "name") == S(pp, "name") && S(tp, "version") == S(pp, "version") && S(tp, "treeDigest", "sha256") == S(pp, "treeDigest") {
 			return nil
 		}
-		return failf("%s: tool %s is the pinned binary, but its package %s %s (files sha256:%s) is not the pinned one", label, name, S(tp, "name"), S(tp, "version"), short(S(tp, "treeDigest", "sha256")))
+		mismatch = failf("%s: tool %s is the pinned binary, but its package %s %s (files sha256:%s) is not the pinned one", label, name, S(tp, "name"), S(tp, "version"), short(S(tp, "treeDigest", "sha256")))
+	}
+	if mismatch != nil {
+		return mismatch
 	}
 	return failf("%s: tool %s sha256:%s is not on the policy's pinned tool list (design.toolPins)", label, name, short(S(t, "digest", "sha256")))
 }

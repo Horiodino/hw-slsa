@@ -15,7 +15,9 @@
     "provisioningSigner": "test-site",
     "toolPins": [
       {"name": "go", "sha256": "9347e73e5188af1ef4c2046cbc9c985473f0155c187d4005ae44c21b300062eb",
-       "toolchain": {"version": "1.25.14", "treeDigest": "394d0dc00dbd912c65fe1a7ef8c0f123df361a2ebf7c54bf098c2b5a6cd94921"}}
+       "toolchain": {"version": "1.25.14", "treeDigest": "394d0dc00dbd912c65fe1a7ef8c0f123df361a2ebf7c54bf098c2b5a6cd94921"}},
+      {"name": "go", "sha256": "9347e73e5188af1ef4c2046cbc9c985473f0155c187d4005ae44c21b300062eb",
+       "toolchain": {"version": "1.25.14", "treeDigest": "b36b9a0c59882869661c10742fefb2a30bd3994f0d52435c682c12bec3b3dbf9"}}
     ],
     "review": {"images": ["rot-fw"], "providers": ["review-provider"], "minScope": 1, "maxOpenIssueCVSS": 3.9},
     "transparencyLog": {"origin": "Example Buyer firmware release log"}

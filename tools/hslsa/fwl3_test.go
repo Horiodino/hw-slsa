@@ -103,6 +103,23 @@ func TestFirmwareL3Passes(t *testing.T) {
 	}
 }
 
+// A policy may accept one compiler binary under more than one toolchain tree
+// (the buyer's own build machine and a CI runner, say); either passes.
+func TestFirmwareL3AcceptsAnyPinnedTree(t *testing.T) {
+	work, trust, policy := fwl3Work(t)
+	pins := O(policy, "firmware")["toolPins"].([]any)
+	other := Obj{"name": "go", "sha256": strings.Repeat("a", 64), "toolchain": Obj{"treeDigest": strings.Repeat("f", 64)}}
+	O(policy, "firmware")["toolPins"] = []any{other, pins[0]}
+	if err := fwl3Check(t, work, trust, policy); err != nil {
+		t.Fatalf("a matching second pin was refused: %v", err)
+	}
+	O(policy, "firmware")["toolPins"] = []any{other}
+	err := fwl3Check(t, work, trust, policy)
+	if err == nil || !strings.Contains(err.Error(), "its toolchain (files sha256:bbbbbbbbbbbbbbbb) is not the pinned one") {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestFirmwareL3Rejects(t *testing.T) {
 	build := func(s Obj) Obj { return O(s, "predicate", "buildDefinition") }
 	cases := map[string]struct {

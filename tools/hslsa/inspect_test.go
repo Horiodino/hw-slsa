@@ -133,10 +133,11 @@ func forgeInspection(t *testing.T, bundle string, mutate func(hw Obj)) {
 	})
 }
 
-func TestChipL4Passes(t *testing.T) {
-	bundle := chipL4Bundle(t)
-	trust := ok(LoadTrustRoot(filepath.Join(bundle, "trust-root.json")))
-	policy := chipL4Policy(t)
+// lotInputs runs the tapeout and lot receipt checks on the received parts
+// and returns the names of the records the lot VSA lists as its inputs.
+func lotInputs(t *testing.T, bundle, trustPath string, policy Obj) []string {
+	t.Helper()
+	trust := ok(LoadTrustRoot(trustPath))
 	design := ok(TapeoutCheck(bundle, trust, policy, true))
 	units := ok(ChallengeParts(trust, received(bundle)))
 	res := ok(lotCheck(bundle, trust, policy, design, units, true))
@@ -144,6 +145,12 @@ func TestChipL4Passes(t *testing.T) {
 	for _, in := range res.Inputs {
 		names = append(names, S(in, "name"))
 	}
+	return names
+}
+
+func TestChipL4Passes(t *testing.T) {
+	bundle := chipL4Bundle(t)
+	names := lotInputs(t, bundle, filepath.Join(bundle, "trust-root.json"), chipL4Policy(t))
 	for _, want := range []string{"att/" + InspectionCommitmentAtt, "att/" + InspectionAtt} {
 		if !contains(names, want) {
 			t.Fatalf("the lot VSA's inputs %v leave out %s", names, want)
@@ -158,6 +165,53 @@ func TestChipL4Passes(t *testing.T) {
 		if fileExists(filepath.Join(filepath.Dir(bundle), "parts", S(s, "serial"))) {
 			t.Fatalf("sampled part %s was not destroyed", S(s, "serial"))
 		}
+	}
+}
+
+// TestChipL4Accepts: lots that meet Wafer L4 and Package/Test L4 in other
+// ways than the fixture's still pass, so the checks ask for what the spec
+// asks and no more. Under an L4 policy the lot VSA must list the inspection.
+func TestChipL4Accepts(t *testing.T) {
+	cases := map[string]struct {
+		edit func(t *testing.T, bundle string, policy Obj) (trust string)
+		l4   bool
+	}{
+		"a-policy-asking-fewer-samples-than-the-lab-took": {func(t *testing.T, b string, p Obj) string {
+			O(p, "inspection")["minSample"] = 2
+			return ""
+		}, true},
+		"a-policy-naming-no-layers-or-regions": {func(t *testing.T, b string, p Obj) string {
+			delete(O(p, "inspection"), "layers")
+			delete(O(p, "inspection"), "regions")
+			return ""
+		}, true},
+		"another-independent-lab": {func(t *testing.T, b string, _ Obj) string {
+			return ok(l4TrustRoot(chipKeys(b), b, "enrollments-second-lab", [2]string{"Example Second Lab", "duns:100000042"}))
+		}, true},
+		"a-buyer-at-wafer-l3-and-package-test-l3": {func(t *testing.T, b string, p Obj) string {
+			l3 := ok(ReadObj(l3Policy))
+			for k := range p {
+				delete(p, k)
+			}
+			for k, v := range l3 {
+				p[k] = v
+			}
+			return ""
+		}, false},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			bundle := chipL4Bundle(t)
+			policy := chipL4Policy(t)
+			trust := c.edit(t, bundle, policy)
+			if trust == "" {
+				trust = filepath.Join(bundle, "trust-root.json")
+			}
+			names := lotInputs(t, bundle, trust, policy)
+			if c.l4 && !contains(names, "att/"+InspectionAtt) {
+				t.Fatalf("the lot passed, but its VSA's inputs %v leave out the inspection", names)
+			}
+		})
 	}
 }
 

@@ -167,7 +167,7 @@ You need Go at the version in [`go.mod`](go.mod) (the `toolchain` line; `go` dow
 ```sh
 go build -o bin/hslsa ./tools/hslsa/cmd/hslsa   # or: go run ./tools/hslsa/cmd/hslsa <command>
 bin/hslsa help                                  # list the commands
-go test ./...                                   # unit and tamper tests
+go test ./...                                   # valid chains accepted, broken or forged ones refused
 ```
 
 What CI's lint job runs, and what to run before you push:
@@ -222,7 +222,7 @@ One binary, built from [`tools/hslsa/cmd/hslsa`](tools/hslsa/cmd/hslsa/main.go).
 | Pilot | `pilot enroll`, `pilot revoke`, `pilot trust-root`, `pilot measure`, `kit sign`, `kit verify` |
 | Utilities | `lot-digest`, `subject`, `render` |
 
-The library code sits beside it in [`tools/hslsa/`](tools/hslsa): `verify.go` holds the receipt checks, `design.go` and `openlane.go` the design steps, `mfg.go` the manufacturing records, `hbom.go` and `render*.go` the HBOM, `pilot*.go` and `kit.go` the pilot, and each `*_test.go` the tamper tests for that area, which forge or break a link and require the check to fail for the stated reason.
+The library code sits beside it in [`tools/hslsa/`](tools/hslsa): `verify.go` holds the receipt checks, `design.go` and `openlane.go` the design steps, `mfg.go` the manufacturing records, `hbom.go` and `render*.go` the HBOM, `pilot*.go` and `kit.go` the pilot, and each `*_test.go` the tests for that area: some build a valid chain and require the check to pass, and the tamper tests forge or break a link and require it to fail for the stated reason.
 
 ## Worked examples
 

@@ -136,6 +136,61 @@ func TestFirmwareL4Passes(t *testing.T) {
 	}
 }
 
+// TestFirmwareL4Accepts: releases that meet Firmware L4 in other ways than
+// the fixture's still pass.
+func TestFirmwareL4Accepts(t *testing.T) {
+	// withCarol enrolls a third approver, from the buyer, and has her approve
+	// both release records.
+	withCarol := func(t *testing.T, w string) *TrustRoot {
+		keys := filepath.Join(w, "keys")
+		must(t, makeKeys(keys, filepath.Join(w, "pub"), "approver-carol"))
+		org := map[string][2]string{"approver-carol": {"Example Buyer", "duns:100000001"}}
+		for k, v := range fwl4Org {
+			org[k] = v
+		}
+		for _, rec := range []string{"att/fw.intoto.json", "att/image.intoto.json"} {
+			must(t, ReleaseApprove(filepath.Join(w, "bundle"), rec, "Carol", filepath.Join(keys, "approver-carol.key.pem"), ""))
+		}
+		return fwl4Enroll(t, w, "enrollments-carol", org)
+	}
+	cases := map[string]func(t *testing.T, work string, policy Obj) *TrustRoot{
+		"three-approvers-where-the-policy-asks-two": func(t *testing.T, w string, _ Obj) *TrustRoot {
+			return withCarol(t, w)
+		},
+		"a-policy-asking-three-approvers-and-three-approved": func(t *testing.T, w string, p Obj) *TrustRoot {
+			O(p, "firmware", "release")["minApprovers"] = 3
+			return withCarol(t, w)
+		},
+		"rebuilt-by-another-rebuilder-on-another-builder": func(t *testing.T, w string, _ Obj) *TrustRoot {
+			b := filepath.Join(w, "bundle")
+			must(t, FirmwareRebuild(b, "att/fw.intoto.json", []string{"fw.bin"}, filepath.Join(w, "keys", RebuilderRole+".key.pem"),
+				filepath.Join(b, "att", FWRebuildAtt("fw.intoto.json")), func(tmp, scratch string) error {
+					return fwl4Build(tmp, scratch, "https://second-rebuilder.example.org/builders/go@v1", "firmware")
+				}))
+			org := map[string][2]string{}
+			for k, v := range fwl4Org {
+				org[k] = v
+			}
+			org[RebuilderRole] = [2]string{"Example Second Rebuild Co", "duns:100000054"}
+			return fwl4Enroll(t, w, "enrollments-second-rebuilder", org)
+		},
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			work, _, policy := fwl4Work(t)
+			trust := edit(t, work, policy)
+			inputs := ok(fwl4Check(t, work, trust, policy))
+			var names []string
+			for _, in := range inputs {
+				names = append(names, S(in, "name"))
+			}
+			if !contains(names, "att/rebuild-fw.intoto.json") {
+				t.Fatalf("the release passed, but the inputs %v leave out the rebuild", names)
+			}
+		})
+	}
+}
+
 func TestFirmwareL4Rejects(t *testing.T) {
 	b := func(w string) string { return filepath.Join(w, "bundle") }
 	rebuild := func(w string) string { return filepath.Join(b(w), "att", "rebuild-fw.intoto.json") }

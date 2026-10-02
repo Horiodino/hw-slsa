@@ -56,7 +56,12 @@ jobs:
           unformatted=$(gofmt -l .)
           [[ -z $unformatted ]] || { echo "gofmt needed: $unformatted"; exit 1; }
           go vet ./...
-      - run: go test ./...
+      # The summary names the tests that hand the checks valid records and
+      # require them to pass, besides counting those that break or forge one.
+      # Without the e2e bundles the chain tests skip here; the produce and
+      # verify jobs run them.
+      - name: Unit tests
+        run: e2e/unit-tests.sh "Unit tests" ./...
       - name: Known vulnerabilities in the Go toolchain and modules (govulncheck; v1.8 needs Go 1.26)
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
       - name: Validate the committed HBOM examples against their schema
@@ -87,10 +92,10 @@ jobs:
         run: e2e/run.sh produce
       - name: Design L3, as an independent party, prove the netlist equal to the RTL again
         run: e2e/run.sh rerun
-      - name: Design L3 tests, a netlist altered under forged records, caught by the rerun
+      - name: Design L3 and L4 tests with Yosys, the rerun catching an altered netlist and the second builder's rebuild
         env:
           HSLSA_REQUIRE_YOSYS: "1"
-        run: go test -count=1 -run 'RerunEquivalence' ./tools/hslsa/
+        run: e2e/unit-tests.sh "Design L3 and L4 tests, with Yosys" -count=1 -run 'RerunEquivalence|DesignL4|DesignRebuild' ./tools/hslsa/
       - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
         run: |
           curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
@@ -201,8 +206,8 @@ jobs:
             echo "== $bom"
             "$RUNNER_TEMP/cyclonedx" validate --input-file "$bom" --input-format json --input-version v1_6 --fail-on-errors
           done
-      - name: Tamper tests
-        run: go test -v -count=1 ./tools/hslsa/ | tee tamper.log
+      - name: Chain tests on the produced bundles, valid records accepted and broken or forged ones refused
+        run: e2e/unit-tests.sh "Chain tests on the produced bundles" -count=1 ./tools/hslsa/
       - name: Summary
         if: always()
         run: |
@@ -210,10 +215,6 @@ jobs:
             echo "## HSLSA end-to-end"
             echo '```'
             cat verify.log 2>/dev/null || true
-            echo '```'
-            echo "### Tamper tests"
-            echo '```'
-            grep -E "^(--- |ok|FAIL)" tamper.log 2>/dev/null || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -168,6 +168,55 @@ func TestDesignL4Passes(t *testing.T) {
 	}
 }
 
+// TestDesignL4Accepts: designs that meet Design L4 in other ways than the
+// fixture's still pass.
+func TestDesignL4Accepts(t *testing.T) {
+	// thirdReview adds a third reviewer's approval, then freezes, releases and
+	// rebuilds again over the three reviews, under policy p.
+	thirdReview := func(t *testing.T, b string, p Obj) {
+		keys, tr := chipKeys(b), filepath.Join(b, "trust-root.json")
+		pol := writePolicy(t, filepath.Dir(b), p)
+		must(t, SourceReview(b, e2eLock, filepath.Join(keys, "third-reviewer.key.pem"), "Example Third Reviewer <third-reviewer@example.com>"))
+		must(t, SourceFreezeL2(b, e2eLock, filepath.Join(keys, "flow-platform.key.pem"), e2eCache(), tr, pol))
+		must(t, DesignRelease(b, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), tr, pol))
+		must(t, rebuildAs(b, rebuilderID))
+	}
+	cases := map[string]func(t *testing.T, bundle string, policy Obj){
+		"three-reviewers-where-the-policy-asks-two": func(t *testing.T, b string, p Obj) {
+			thirdReview(t, b, p)
+		},
+		"a-policy-asking-three-reviewers-and-three-reviewed": func(t *testing.T, b string, p Obj) {
+			O(p, "design", "source")["minReviewers"] = 3
+			thirdReview(t, b, p)
+		},
+		"rebuilt-again-on-another-builder": func(t *testing.T, b string, _ Obj) {
+			must(t, rebuildAs(b, "https://rebuild.example.org/builders/picorv32@v2"))
+		},
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			bundle := designL4Bundle(t)
+			policy := designL4Policy(t)
+			edit(t, bundle, policy)
+			trust := ok(LoadTrustRoot(filepath.Join(bundle, "trust-root.json")))
+			design := ok(TapeoutCheck(bundle, trust, policy, true))
+			found := false
+			for _, in := range design.Inputs {
+				found = found || S(in, "name") == "att/"+DesignRebuildAtt
+			}
+			if !found {
+				t.Fatal("the design passed, but its VSA's inputs leave out the rebuild record")
+			}
+		})
+	}
+	// A buyer at Design L3 is not asked for the rebuild, and the design an L4
+	// buyer accepts passes L3 too.
+	t.Run("a-buyer-at-design-l3", func(t *testing.T) {
+		bundle := designL4Bundle(t)
+		must(t, designL4Check(t, bundle, filepath.Join(bundle, "trust-root.json"), designL3Policy(t)))
+	})
+}
+
 // forgeRebuild re-signs the rebuild record after mutate with the rebuilder's key.
 func forgeRebuild(t *testing.T, bundle string, mutate func(Obj)) {
 	t.Helper()

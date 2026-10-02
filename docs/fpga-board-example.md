@@ -102,9 +102,9 @@ Then it shows what Firmware L3 refuses: a flash image not in the log, releases i
 
 Then it shows what L4 refuses: a flash image only one person approved, SoC firmware nobody else rebuilt, a rebuild by the board owner itself, boards inspected by the EMS's own lab, and a root of trust provisioned at a test house the buyer rates below L4. The same CI job runs it after `l3`.
 
-## What the tamper tests prove
+## What the tests prove
 
-[`tools/hslsa/fpga_test.go`](../tools/hslsa/fpga_test.go) breaks the chain in 20 ways on a copy of the produced example, with the keys the run made, and requires each to fail for the stated reason. Four of them change a programmed board and power it on again, so the root of trust itself has to refuse:
+`TestFPGAChainPasses` checks the produced chain as is and requires it to pass. [`tools/hslsa/fpga_test.go`](../tools/hslsa/fpga_test.go) then breaks the chain in 20 ways on a copy of the produced example, with the keys the run made, and requires each to fail for the stated reason. Four of them change a programmed board and power it on again, so the root of trust itself has to refuse:
 
 - one bit flipped in the bitstream in flash;
 - a boot manifest signed by another key, over the same images;

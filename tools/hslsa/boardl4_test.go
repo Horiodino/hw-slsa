@@ -143,6 +143,26 @@ func TestBoardL3PolicyAcceptsInspectedLot(t *testing.T) {
 	must(t, boardL4Check(t, work, "", boardL3Policy, ""))
 }
 
+// TestBoardL4Accepts: board lots that meet Assembly L4 in other ways than
+// the fixture's still pass.
+func TestBoardL4Accepts(t *testing.T) {
+	cases := map[string]func(t *testing.T, work string) (trust, policy string){
+		"a-policy-asking-fewer-samples-than-the-lab-took": func(t *testing.T, w string) (string, string) {
+			return "", boardL4PolicyWith(t, func(p Obj) { O(p, "inspection")["minSample"] = 1 })
+		},
+		"another-independent-lab": func(t *testing.T, w string) (string, string) {
+			return ok(boardTrustRoot(w, "second-lab", boardL4Roles, boardL4Org([2]string{"Example Second Lab", "duns:100000042"}))), ""
+		},
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			work := boardL4Work(t)
+			trust, policy := edit(t, work)
+			must(t, boardL4Check(t, work, trust, policy, ""))
+		})
+	}
+}
+
 func TestBoardL4Rejects(t *testing.T) {
 	cases := map[string]struct {
 		edit   func(t *testing.T, work string) (trust, policy, boards string)

@@ -3,7 +3,7 @@
 # "produce" plays the root of trust vendor, the board owner (FPGA design house
 # and firmware team) and the EMS: it builds the iCE40 bitstream with open
 # tools, signs every record, programs the boards, powers on the received ones
-# and runs the tamper tests while the keys still exist. "verify" is the buyer:
+# and runs the board tests while the keys still exist. "verify" is the buyer:
 # it gets only the board bundle and what the boards returned at boot, checks
 # the whole chain, signs VSAs and verifies them with slsa-verifier.
 #
@@ -82,8 +82,8 @@ jobs:
         run: e2e/fpga/run.sh produce | tee produce.log
       - name: Power on the received boards
         run: e2e/fpga/run.sh boot | tee -a produce.log
-      - name: Tamper tests
-        run: go test -v -count=1 -run 'FPGA|RoT|Board|ASC|UART|FlashHex|SoC|Provisioning|Released|Unreadable|HBOMLists|NoRoT' ./tools/hslsa/ | tee tamper.log
+      - name: Board tests, the valid chain accepted and broken or forged records refused
+        run: e2e/unit-tests.sh "FPGA board tests" -count=1 -run 'FPGA|RoT|Board|ASC|UART|FlashHex|SoC|Provisioning|Released|Unreadable|HBOMLists|NoRoT' ./tools/hslsa/
       - name: Remove private keys and the boards' secrets before upload
         run: rm -rf out/fpga/keys out/fpga/rot-keys out/fpga/rot-devices out/fpga/boards
       - name: Summary
@@ -93,10 +93,6 @@ jobs:
             echo "## FPGA board: produce and boot"
             echo '```'
             cat produce.log 2>/dev/null || true
-            echo '```'
-            echo "### Tamper tests"
-            echo '```'
-            grep -E "^(--- |ok|FAIL)" tamper.log 2>/dev/null || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -179,7 +175,7 @@ jobs:
       - name: The pins of the tools on this runner, to compare with the policies' toolPins
         run: go run ./tools/hslsa/cmd/hslsa pin go riscv64-unknown-elf-gcc riscv64-unknown-elf-cpp riscv64-unknown-elf-objcopy
       - name: Firmware L3 and L4 tests (log proofs, each refused record, a root of trust rebuild in the sandbox)
-        run: go test -count=1 -run 'TLog|Merkle|Inclusion|Consistency|FirmwareL3|ProvisioningSiteL3|FirmwareL4|ProvisioningSiteL4|ROMFrozen|RoTFirmwareRebuild' ./tools/hslsa/
+        run: e2e/unit-tests.sh "Firmware L3 and L4 tests" -count=1 -run 'TLog|Merkle|Inclusion|Consistency|FirmwareL3|ProvisioningSiteL3|FirmwareL4|ProvisioningSiteL4|ROMFrozen|RoTFirmwareRebuild' ./tools/hslsa/
       - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
         run: |
           curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \

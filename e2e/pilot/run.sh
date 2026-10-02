@@ -102,8 +102,11 @@ chip() {
   local rev=$PILOT/revoked && mkdir -p "$rev" && cp "$ent"/*.intoto.json "$rev/"
   hslsa pilot revoke --buyer-key "$PILOT/buyer/buyer-root.key.pem" --pub "$osat/osat-site.pub.pem" \
     --reason "key reported lost by the site" --out "$rev/revoke-osat-site.intoto.json" > /dev/null
-  hslsa pilot trust-root --buyer-pub "$PILOT/buyer/buyer-root.pub.pem" --enrollments "$rev" --out "$PILOT/revoked.json" \
-    | grep -q "excluded osat-site.*revoked" || { echo "FAIL: revoked key not excluded" >&2; exit 1; }
+  # Read the whole listing before matching: grep -q in a pipe would stop at the
+  # match, and the tool, still writing, would die of SIGPIPE under pipefail.
+  local listing
+  listing=$(hslsa pilot trust-root --buyer-pub "$PILOT/buyer/buyer-root.pub.pem" --enrollments "$rev" --out "$PILOT/revoked.json")
+  grep -q "excluded osat-site.*revoked" <<< "$listing" || { echo "FAIL: revoked key not excluded" >&2; exit 1; }
   refuses "packaging signed by a revoked key" hslsa verify "${check[@]}" --trust-root "$PILOT/revoked.json"
   refuses "a measured lot that fails its check, without saying so" hslsa pilot measure "${check[@]}" \
     --trust-root "$PILOT/revoked.json" --out "$PILOT/report-revoked"

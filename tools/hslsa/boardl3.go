@@ -41,6 +41,9 @@ func PlatformCertAtt(serial string) string { return "platform-" + serial + ".int
 // designator.
 type BoardParts struct {
 	Chips, Boards string
+	// Commitment is the inspection lab's commitment to its sampling seed,
+	// which A1 consumes as it seals the board lot (Assembly L4); empty for none.
+	Commitment string
 }
 
 // partAnswer is the EMS's challenge to one chip at build.

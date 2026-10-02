@@ -55,6 +55,7 @@ var commands = map[string]command{
 	"sim":           {"simulated hardware: the virtual shuttle makes a lot's supplier exports by simulating the released netlist", sim},
 	"pin":           {"print the toolPins entries for tools on this machine, for a policy to pin", pinCmd},
 	"tlog":          {"the buyer's private transparency log for firmware releases: add records, sign checkpoints, prove and check", tlogCmd},
+	"inspect":       {"an independent lab's L4 inspection: commit to a sampling seed before the lot is sealed, then inspect the sample it draws", inspectCmd},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -280,9 +281,30 @@ func trustRoot(args []string) error {
 }
 
 func design(args []string) error {
-	step, rest, err := action(args, "ip-release", "source-tag", "review", "source-freeze", "simulation", "synthesis", "signoff", "release", "rerun-equivalence")
+	step, rest, err := action(args, "ip-release", "source-tag", "review", "source-freeze", "simulation", "synthesis", "signoff", "release", "rerun-equivalence", "rebuild")
 	if err != nil {
 		return err
+	}
+	if step == "rebuild" {
+		f := newFlags("design rebuild")
+		bundle := f.str("bundle", "the design bundle whose release to rebuild", true)
+		lock := f.str("lock", "the design's inputs lock", true)
+		key := f.str("key", "the second builder's key (role rebuilder)", true)
+		cache := f.str("cache", "where the second builder keeps the sources it fetches", false)
+		out := f.str("out", "the rebuild record to write (default <bundle>/att/"+hslsa.DesignRebuildAtt+")", false)
+		builderID := f.str("builder-id", "the second builder's id, which must not be the flow's", true)
+		isolate := f.Bool("isolate", false, "run the tools in a sandbox, as a Design L3 flow does")
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		if *cache == "" {
+			*cache = ".hslsa-cache"
+		}
+		if *out == "" {
+			*out = filepath.Join(*bundle, "att", hslsa.DesignRebuildAtt)
+		}
+		os.Setenv("HSLSA_BUILDER_ID", *builderID)
+		return hslsa.DesignRebuild(*bundle, *lock, *key, *cache, *out, *isolate)
 	}
 	if step == "rerun-equivalence" {
 		f := newFlags("design rerun-equivalence")
@@ -306,6 +328,7 @@ func design(args []string) error {
 	trust := f.str("trust-root", "", false)
 	policy := f.str("policy", "", false)
 	isolate := f.Bool("isolate", false, "run the step's tools in a sandbox of their own, with no network and no signing key in reach (Design L3)")
+	reviewer := f.str("reviewer", "review: who approves, as \"Name <email>\" (default: the lock's freeze.reviewer); a second reviewer's approval goes beside the first", false)
 	if err := f.parse(rest); err != nil {
 		return err
 	}
@@ -318,7 +341,7 @@ func design(args []string) error {
 	case "source-tag":
 		return hslsa.SourceTag(*bundle, *lock, *key, *cache)
 	case "review":
-		return hslsa.SourceReview(*bundle, *lock, *key)
+		return hslsa.SourceReview(*bundle, *lock, *key, *reviewer)
 	case "source-freeze":
 		if *trust == "" && *policy == "" {
 			return hslsa.SourceFreeze(*bundle, *lock, *key, *cache)
@@ -384,6 +407,7 @@ func mfg(args []string) error {
 	hold := f.str("withhold", "fields and files to withhold (JSON); disclosures go to the bundle's disclosures directory", false)
 	sign := f.str("sign", "comma-separated roles to sign for; records of other roles must already be in the bundle (default: every role)", false)
 	devices := f.str("devices", "directory that holds the parts, when the scenario provisions unit identities", false)
+	commitment := f.str("inspection-commitment", "L4: the inspection lab's commitment to its sampling seed, which final test consumes as it seals the lot", false)
 	if err := f.parse(args); err != nil {
 		return err
 	}
@@ -391,7 +415,7 @@ func mfg(args []string) error {
 	if err != nil {
 		return err
 	}
-	return hslsa.MfgWith(*bundle, *scenario, *keys, w, splitList(*sign), *devices)
+	return hslsa.MfgInspected(*bundle, *scenario, *keys, w, splitList(*sign), *devices, *commitment)
 }
 
 func fabCheck(args []string) error {
@@ -779,6 +803,7 @@ func board(args []string) error {
 	keys := f.str("keys", "produce: directory of <role>.key.pem", false)
 	chipParts := f.str("chip-parts", "produce, Assembly L3: directory of the chips shipped to the EMS, one per marked serial, which the EMS challenges before placement", false)
 	boardsOut := f.str("boards-out", "produce, Assembly L3: directory to put the built boards in, one per serial", false)
+	commitment := f.str("inspection-commitment", "produce, Assembly L4: the inspection lab's commitment to its sampling seed, which A1 consumes as it seals the board lot", false)
 	trust := f.str("trust-root", "verify: trust root for the board's signers", false)
 	boards := f.str("boards", "verify: file with the serials of the boards received, or a directory of the boards received, whose identity parts must answer a challenge", false)
 	vsaKey := f.str("vsa-key", "", false)
@@ -801,7 +826,7 @@ func board(args []string) error {
 				return err
 			}
 			return hslsa.BoardProduceParts(*bundle, *chip, *scenario, *designPath, *policy, *keys,
-				&hslsa.BoardParts{Chips: *chipParts, Boards: *boardsOut})
+				&hslsa.BoardParts{Chips: *chipParts, Boards: *boardsOut, Commitment: *commitment})
 		}
 		return hslsa.BoardProduce(*bundle, *chip, *scenario, *designPath, *policy, *keys)
 	}
@@ -894,6 +919,7 @@ func fpga(args []string) error {
 		policy, keys := f.str("policy", "", true), f.str("keys", "", true)
 		chipParts := f.str("chip-parts", "Assembly L3: directory of the root of trust parts shipped to the EMS, one per marked serial, which the EMS challenges before placement", false)
 		boardsOut := f.str("boards-out", "Assembly L3: directory to put the built boards in, one per serial", false)
+		commitment := f.str("inspection-commitment", "Assembly L4: the inspection lab's commitment to its sampling seed, which A1 consumes as it seals the board lot", false)
 		setPartRoots := partRootFlags(f)
 		if err := f.parse(rest); err != nil {
 			return err
@@ -906,7 +932,7 @@ func fpga(args []string) error {
 			if err := need(boardsOut, "boards-out", "the parts are challenged (--chip-parts)"); err != nil {
 				return err
 			}
-			phys = &hslsa.BoardParts{Chips: *chipParts, Boards: *boardsOut}
+			phys = &hslsa.BoardParts{Chips: *chipParts, Boards: *boardsOut, Commitment: *commitment}
 		}
 		return hslsa.FPGABoardProduce(*bundle, *rot, *design, *scenario, *designPath, *policy, *keys, phys)
 	case "provision":
@@ -1253,6 +1279,41 @@ func pinCmd(args []string) error {
 	}
 	fmt.Println(string(data))
 	return nil
+}
+
+func inspectCmd(args []string) error {
+	act, rest, err := action(args, "commit", "lot", "boards")
+	if err != nil {
+		return err
+	}
+	f := newFlags("inspect " + act)
+	plan := f.str("plan", "the lab's inspection plan (JSON): lab, tracks, sample size, technique, regions and layers", true)
+	key := f.str("key", "the lab's key (role inspection-lab)", true)
+	switch act {
+	case "commit":
+		lot := f.str("lot", "the lot to inspect, as its URN or lot id", true)
+		seedOut := f.str("seed-out", "where the lab keeps its seed until it inspects", true)
+		out := f.str("out", "the signed commitment, which the party that seals the lot consumes", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.InspectionCommit(*plan, *lot, *key, *seedOut, *out)
+	case "lot":
+		bundle := f.str("bundle", "the chip bundle of the shipped lot", true)
+		parts := f.str("parts", "the shipped parts, one directory per marked serial; the lab destroys the ones it samples", true)
+		seed := f.str("seed", "the seed the lab committed to", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.InspectLot(*bundle, *parts, *plan, *seed, *key)
+	}
+	bundle := f.str("bundle", "the board bundle", true)
+	boards := f.str("boards", "the built boards, one directory per serial", true)
+	seed := f.str("seed", "the seed the lab committed to", true)
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	return hslsa.InspectBoards(*bundle, *boards, *plan, *seed, *key)
 }
 
 func tlogCmd(args []string) error {

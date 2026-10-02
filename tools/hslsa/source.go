@@ -443,13 +443,20 @@ func SourceTag(bundle, lockPath, key, cache string) error {
 	return nil
 }
 
-// SourceReview plays the reviewer: it signs an approval of the tagged commit.
-func SourceReview(bundle, lockPath, key string) error {
+// SourceReview plays a reviewer: it signs an approval of the tagged commit.
+// reviewer is who approves, as "Name <email>"; empty means the lock's
+// reviewer. The lock's reviewer's approval is source-review.intoto.json; a
+// further reviewer's (Design L4 asks for two) goes beside it, named after
+// that reviewer.
+func SourceReview(bundle, lockPath, key, reviewer string) error {
 	lock, err := ReadObj(lockPath)
 	if err != nil {
 		return err
 	}
 	fr := O(lock, "freeze")
+	if reviewer == "" {
+		reviewer = S(fr, "reviewer")
+	}
 	raw, err := os.ReadFile(filepath.Join(bundle, "artifacts", sourceGitDir, "commit"))
 	if err != nil {
 		return err
@@ -457,7 +464,7 @@ func SourceReview(bundle, lockPath, key string) error {
 	commitID := gitObjectID("commit", raw)
 	pred := Obj{
 		"repo":       S(fr, "repo"),
-		"reviewer":   S(fr, "reviewer"),
+		"reviewer":   reviewer,
 		"author":     gitHeaders(raw)["author"],
 		"decision":   "approved",
 		"scope":      "full tree",
@@ -471,18 +478,47 @@ func SourceReview(bundle, lockPath, key string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := Sign(stmt, signer, filepath.Join(bundle, "att", reviewAtt)); err != nil {
+	name := reviewAtt
+	if identEmail(reviewer) != identEmail(S(fr, "reviewer")) {
+		name = reviewAttOf(reviewer)
+	}
+	if _, err := Sign(stmt, signer, filepath.Join(bundle, "att", name)); err != nil {
 		return err
 	}
-	fmt.Printf("source-review: commit %s approved by %s\n", commitID, identEmail(S(fr, "reviewer")))
+	fmt.Printf("source-review: commit %s approved by %s\n", commitID, identEmail(reviewer))
 	return nil
+}
+
+// reviewAttOf names the review file of a reviewer other than the lock's.
+func reviewAttOf(reviewer string) string {
+	name := strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '.' || r == '-' {
+			return r
+		}
+		return '-'
+	}, strings.ToLower(identEmail(reviewer)))
+	return "source-review-" + name + ".intoto.json"
+}
+
+// reviewFiles lists the source reviews in a bundle, the lock reviewer's first.
+func reviewFiles(bundle string) []string {
+	more, _ := filepath.Glob(filepath.Join(bundle, "att", "source-review-*.intoto.json"))
+	var out []string
+	if fileExists(filepath.Join(bundle, "att", reviewAtt)) {
+		out = append(out, reviewAtt)
+	}
+	for _, m := range more {
+		out = append(out, filepath.Base(m))
+	}
+	return out
 }
 
 // Checks, shared by the source freeze step's gates and the buyer's tapeout check
 
-// checkSourceTag verifies the signed tag and the review, and that archive holds
-// exactly the tagged tree. It returns the commit, the tag name and the review envelope.
-func checkSourceTag(bundle string, trust *TrustRoot, rules Obj, archive string) (string, string, Obj, error) {
+// checkSourceTag verifies the signed tag and the reviews, and that archive
+// holds exactly the tagged tree. It returns the commit, the tag name and the
+// review envelopes.
+func checkSourceTag(bundle string, trust *TrustRoot, rules Obj, archive string) (string, string, []Obj, error) {
 	dir := filepath.Join(bundle, "artifacts", sourceGitDir)
 	read := func(name string) ([]byte, error) {
 		b, err := os.ReadFile(filepath.Join(dir, name))
@@ -542,21 +578,63 @@ func checkSourceTag(bundle string, trust *TrustRoot, rules Obj, archive string) 
 		return "", "", nil, failf("%s does not match the tree of signed tag %s", filepath.Base(archive), th["tag"])
 	}
 
-	reviewer := S(rules, "reviewer")
-	rev, err := trust.Open(filepath.Join(bundle, "att", reviewAtt), reviewer, SourceReviewType)
+	reviews, err := checkReviews(bundle, trust, rules, commitID, ch["author"], th["tag"])
 	if err != nil {
 		return "", "", nil, err
 	}
-	if S(firstSubject(rev), "digest", "gitCommit") != commitID {
-		return "", "", nil, failf("source review covers a different commit than tag %s", th["tag"])
+	return commitID, th["tag"], reviews, nil
+}
+
+// checkReviews verifies every source review in the bundle: each is signed by
+// a key of the reviewer role, approves the tagged commit, and is not by its
+// author; no two share a key or a reviewer. At least rules.minReviewers
+// (default one) must approve: two at Design L4, so no one person can freeze
+// the source alone.
+func checkReviews(bundle string, trust *TrustRoot, rules Obj, commitID, author, tag string) ([]Obj, error) {
+	role := S(rules, "reviewer")
+	need := int64(1)
+	if n, ok := Int(rules, "minReviewers"); ok && n > need {
+		need = n
 	}
-	if S(rev, "predicate", "decision") != "approved" {
-		return "", "", nil, failf("source review did not approve commit %s", commitID)
+	files := reviewFiles(bundle)
+	if len(files) == 0 {
+		return nil, failf("missing attestation %s", reviewAtt)
 	}
-	if identEmail(S(rev, "predicate", "reviewer")) == identEmail(ch["author"]) {
-		return "", "", nil, failf("source review: reviewer is the commit's author")
+	keys, people := map[string]string{}, map[string]string{}
+	var envs []Obj
+	for _, name := range files {
+		path := filepath.Join(bundle, "att", name)
+		rev, err := trust.Open(path, role, SourceReviewType)
+		if err != nil {
+			return nil, err
+		}
+		if S(firstSubject(rev), "digest", "gitCommit") != commitID {
+			return nil, failf("source review covers a different commit than tag %s", tag)
+		}
+		if S(rev, "predicate", "decision") != "approved" {
+			return nil, failf("source review did not approve commit %s", commitID)
+		}
+		who := identEmail(S(rev, "predicate", "reviewer"))
+		if who == identEmail(author) {
+			return nil, failf("source review: reviewer is the commit's author")
+		}
+		k, err := trust.SignerKey(path, role)
+		if err != nil {
+			return nil, err
+		}
+		if other, ok := keys[k.ID]; ok {
+			return nil, failf("source review %s is signed with the same %s key as %s; each review needs its reviewer's own key", name, role, other)
+		}
+		if other, ok := people[who]; ok {
+			return nil, failf("source review %s is by %s, who also signed %s", name, who, other)
+		}
+		keys[k.ID], people[who] = name, name
+		envs = append(envs, envRD(bundle, name))
 	}
-	return commitID, th["tag"], envRD(bundle, reviewAtt), nil
+	if int64(len(envs)) < need {
+		return nil, failf("source review: %d reviewer(s) approved commit %s; the policy requires %d (design.source.minReviewers)", len(envs), commitID, need)
+	}
+	return envs, nil
 }
 
 // checkIP verifies each required IP block's vendor provenance and that the
@@ -592,7 +670,7 @@ func checkIP(bundle string, trust *TrustRoot, blocks []Obj, archive string) ([]O
 // the record to consume the tagged commit, the review and the IP provenance.
 func checkSourceFreezeL2(bundle string, trust *TrustRoot, pol, stmt Obj) error {
 	archive := filepath.Join(bundle, "artifacts", S(firstSubject(stmt), "name"))
-	commitID, _, review, err := checkSourceTag(bundle, trust, O(pol, "source"), archive)
+	commitID, _, reviews, err := checkSourceTag(bundle, trust, O(pol, "source"), archive)
 	if err != nil {
 		return err
 	}
@@ -608,7 +686,7 @@ func checkSourceFreezeL2(bundle string, trust *TrustRoot, pol, stmt Obj) error {
 	if !found {
 		return failf("%s: chain broken, resolvedDependencies do not include the tagged commit %s", label, commitID)
 	}
-	if err := requireLink(stmt, label, []Obj{review}, "source review"); err != nil {
+	if err := requireLink(stmt, label, reviews, "source review"); err != nil {
 		return err
 	}
 	return requireLink(stmt, label, ips, "IP provenance")
@@ -627,13 +705,14 @@ func sourceFreezeL2Inputs(bundle, trustRoot, policyPath, repo, archive string) (
 	}
 	pol := O(policy, "design")
 	var deps, checks []Obj
-	commitID, tag, review, err := checkSourceTag(bundle, trust, O(pol, "source"), archive)
+	commitID, tag, reviews, err := checkSourceTag(bundle, trust, O(pol, "source"), archive)
 	if err != nil && !IsVerificationError(err) {
 		return nil, nil, err
 	}
 	checks = append(checks, check("signed-reviewed-tag", err == nil, errDetail(err, "tag signed by "+S(pol, "source", "tagSigner")+", commit reviewed by "+S(pol, "source", "reviewer"))))
 	if err == nil {
-		deps = append(deps, Obj{"uri": "git+" + repo + "@refs/tags/" + tag, "digest": Obj{"gitCommit": commitID}}, review)
+		deps = append(deps, Obj{"uri": "git+" + repo + "@refs/tags/" + tag, "digest": Obj{"gitCommit": commitID}})
+		deps = append(deps, reviews...)
 	}
 	ips, err := checkIP(bundle, trust, Objs(pol, "thirdPartyIP"), archive)
 	if err != nil && !IsVerificationError(err) {

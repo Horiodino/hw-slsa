@@ -199,6 +199,13 @@ func TapeoutCheck(bundle string, trust *TrustRoot, policy Obj, release bool) (*D
 	if err := designL3(bundle, policy, stmts, final); err != nil {
 		return nil, err
 	}
+	rebuild, err := designL4(bundle, trust, policy, final)
+	if err != nil {
+		return nil, err
+	}
+	if rebuild != nil {
+		stepEnvs = append(stepEnvs, rebuild)
+	}
 	return &DesignResult{Final: final, Release: envRD(bundle, AttName("release")), Inputs: stepEnvs}, nil
 }
 
@@ -458,6 +465,10 @@ func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	if err := chipL3(bundle, trust, policy, design, stmts, units, challenged); err != nil {
 		return nil, err
 	}
+	inspected, err := chipL4(bundle, trust, policy, design, stmts, lotRD, shipped, units)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, unit := range units {
 		if !contains(shipped, unit) {
@@ -469,6 +480,7 @@ func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 		inputs = append(inputs, envRD(bundle, MfgAtt[s]))
 	}
 	inputs = append(inputs, transfers...)
+	inputs = append(inputs, inspected...)
 	inputs = append(inputs, envRD(bundle, "hbom.intoto.json"))
 	sim, err := simulatedCheck(bundle, policy, inputs, "lot receipt check")
 	if err != nil {

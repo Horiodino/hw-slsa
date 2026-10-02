@@ -26,7 +26,7 @@ import (
 const SimulatedLevel = "HSLSA_SIMULATED"
 
 // simulatedBlocks are the predicate blocks a record's hardware facts sit in.
-var simulatedBlocks = []string{"hwMfg", "hwProvision"}
+var simulatedBlocks = []string{"hwMfg", "hwProvision", "hwInspection"}
 
 // checkSimulated checks a simulated block before it goes into a record: it
 // names the simulator and what it stands in for.

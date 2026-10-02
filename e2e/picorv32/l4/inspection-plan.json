@@ -1,0 +1,14 @@
+{
+  "note": "Simulated: the lab stands in for an independent failure-analysis lab. It reads each sampled part's die.json, where a real lab would delayer and image the die and decapsulate and X-ray the package.",
+  "lab": {"name": "Example Failure Analysis Lab", "country": "US"},
+  "tracks": ["WAFER", "PACKAGE_TEST"],
+  "sampleSize": 5,
+  "technique": "delayering with SEM imaging of metal 1 to metal 5 and polysilicon; decapsulation and 2D X-ray of the package",
+  "regions": ["core", "register-file"],
+  "layers": ["met1", "met2", "met3", "met4", "met5", "poly"],
+  "destructive": true,
+  "simulated": {
+    "simulator": "hslsa inspect lot, reading each sampled part's simulated die (tools/hslsa/inspect.go)",
+    "standsIn": "an independent lab's delayering, SEM imaging, decapsulation and X-ray of sampled units"
+  }
+}

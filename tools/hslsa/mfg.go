@@ -70,6 +70,9 @@ type mfgKeys struct {
 	// devices is where the parts are, when the scenario provisions unit
 	// identities (mfgid.go).
 	devices string
+	// commitment is the inspection lab's commitment to its seed (inspect.go),
+	// which final test consumes as it seals the lot.
+	commitment string
 }
 
 func (k *mfgKeys) signs(role string) bool { return k.only == nil || k.only[role] }
@@ -261,7 +264,14 @@ func MfgAs(bundle, scenarioPath, keysDir string, w *Withholding, roles []string)
 // is the directory that holds the parts, one directory per die and then per
 // unit, which wafer sort fills and final test challenges.
 func MfgWith(bundle, scenarioPath, keysDir string, w *Withholding, roles []string, devices string) error {
-	keys := &mfgKeys{dir: keysDir, devices: devices}
+	return MfgInspected(bundle, scenarioPath, keysDir, w, roles, devices, "")
+}
+
+// MfgInspected is MfgWith for a lot an independent lab will inspect (L4):
+// final test consumes the lab's commitment to its sampling seed, at
+// commitment, as it seals the lot.
+func MfgInspected(bundle, scenarioPath, keysDir string, w *Withholding, roles []string, devices, commitment string) error {
+	keys := &mfgKeys{dir: keysDir, devices: devices, commitment: commitment}
 	if len(roles) > 0 {
 		if w != nil && (len(w.Fields) > 0 || len(w.SaltFiles) > 0) {
 			return fmt.Errorf("signing only some roles' records cannot withhold fields yet: each run rewrites the data files")
@@ -555,6 +565,15 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 	f4Deps, err := attachExports(bundle, scenarioDir, sc, "final-test", []Obj{t3, packaged}, f4HW)
 	if err != nil {
 		return err
+	}
+	if keys.signs(MfgSigner["final-test"]) {
+		commit, err := consumeCommitment(bundle, keys.commitment, S(shippedLot, "name"))
+		if err != nil {
+			return err
+		}
+		if commit != nil {
+			f4Deps = append(f4Deps, commit)
+		}
 	}
 	_, err = mfgRecord(bundle, "final-test", f4Subjects,
 		Obj{"lotId": S(ft, "lotId"), "testProgram": get(ft, "program")},

@@ -27,11 +27,17 @@ var boardL3Org = map[string][3]string{
 }
 
 func boardL3TrustRoot(work, name string, org map[string][3]string) (string, error) {
+	return boardTrustRoot(work, name, boardL3Roles, org)
+}
+
+// boardTrustRoot enrolls each of roles' keys in work/keys, under org's
+// company and accreditation where org lists the role.
+func boardTrustRoot(work, name string, roles []string, org map[string][3]string) (string, error) {
 	keys, dir := filepath.Join(work, "keys"), filepath.Join(work, name)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	for _, role := range boardL3Roles {
+	for _, role := range roles {
 		e := Enrollment{Role: role, OrgName: "Example Open Silicon Group", OrgID: "duns:100000002", Site: "Example Design Center",
 			Custody: "file", NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(90 * 24 * time.Hour)}
 		if o, ok := org[role]; ok {

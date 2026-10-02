@@ -29,13 +29,12 @@ func TestClaimGuards(t *testing.T) {
 		levels []string
 		reason string
 	}{
-		"unknown-track":          {[]string{"HSLSA_FAB_LEVEL_2"}, "not a level this framework defines"},
-		"level-five":             {[]string{"HSLSA_DESIGN_LEVEL_5"}, "levels run from 0 to 4"},
-		"padded-level":           {[]string{"HSLSA_DESIGN_LEVEL_02"}, "levels run from 0 to 4"},
-		"slsa-level-four":        {[]string{"SLSA_BUILD_LEVEL_4"}, "SLSA build levels run from 0 to 3"},
-		"slsa-above-design":      {[]string{"HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_3"}, "claims SLSA Build L3 but no Design or Firmware level of at least L3"},
-		"slsa-alone":             {[]string{"SLSA_BUILD_LEVEL_1"}, "claims SLSA Build L1 but no Design or Firmware level"},
-		"unchecked-design-level": {[]string{"HSLSA_DESIGN_LEVEL_" + strconv.Itoa(levelUnchecked["DESIGN"])}, "does not check Design L"},
+		"unknown-track":     {[]string{"HSLSA_FAB_LEVEL_2"}, "not a level this framework defines"},
+		"level-five":        {[]string{"HSLSA_DESIGN_LEVEL_5"}, "levels run from 0 to 4"},
+		"padded-level":      {[]string{"HSLSA_DESIGN_LEVEL_02"}, "levels run from 0 to 4"},
+		"slsa-level-four":   {[]string{"SLSA_BUILD_LEVEL_4"}, "SLSA build levels run from 0 to 3"},
+		"slsa-above-design": {[]string{"HSLSA_DESIGN_LEVEL_2", "SLSA_BUILD_LEVEL_3"}, "claims SLSA Build L3 but no Design or Firmware level of at least L3"},
+		"slsa-alone":        {[]string{"SLSA_BUILD_LEVEL_1"}, "claims SLSA Build L1 but no Design or Firmware level"},
 	}
 	for _, track := range LevelTracks {
 		if n := levelUnchecked[track]; n <= 4 {
@@ -65,7 +64,13 @@ func TestVSARefusesUncheckedLevel(t *testing.T) {
 			anyStrings(levels), nil, filepath.Join(dir, "policy.json"),
 			filepath.Join(dir, "verifier.key.pem"), filepath.Join(dir, "vsa.json"))
 	}
-	rejects(t, sign(designTracks, "HSLSA_DESIGN_LEVEL_4"), "does not check Design L4")
+	for _, track := range LevelTracks {
+		if n := levelUnchecked[track]; n <= 4 {
+			level := "HSLSA_" + track + "_LEVEL_" + strconv.Itoa(n)
+			rejects(t, sign(LevelTracks, level), "does not check "+TrackTitle[track]+" L"+strconv.Itoa(n))
+		}
+	}
+	rejects(t, sign(designTracks, "HSLSA_DESIGN_LEVEL_5"), "levels run from 0 to 4")
 	// A level in a track the check did not cover, such as Firmware on a lot.
 	rejects(t, sign(lotTracks, "HSLSA_WAFER_LEVEL_2", "HSLSA_FIRMWARE_LEVEL_2"), "this check covers Wafer, Package/Test, Design, not the Firmware track")
 	rejects(t, sign(boardTracks, "HSLSA_ASSEMBLY_LEVEL_2", "HSLSA_DESIGN_LEVEL_2"), "not the Design track")

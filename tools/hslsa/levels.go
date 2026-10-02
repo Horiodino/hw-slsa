@@ -28,7 +28,7 @@ var TrackTitle = map[string]string{
 
 // levelUnchecked is the lowest level of each track this tool cannot check
 // yet; a claim at or above it is refused.
-var levelUnchecked = map[string]int{"DESIGN": 4, "WAFER": 4, "PACKAGE_TEST": 4, "ASSEMBLY": 4, "FIRMWARE": 4}
+var levelUnchecked = map[string]int{"DESIGN": 5, "WAFER": 5, "PACKAGE_TEST": 5, "ASSEMBLY": 5, "FIRMWARE": 4}
 
 // parseClaim reads one verifiedLevels value: an HSLSA track level, an SLSA
 // build level (track ""), or HSLSA_SIMULATED (ok false, no error).

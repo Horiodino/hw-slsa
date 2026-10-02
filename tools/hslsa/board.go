@@ -372,6 +372,11 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 			result = "fail"
 		}
 		builds[serial] = Obj{"placements": placements, "result": result}
+		if phys != nil {
+			if err := writeBoardPhysical(phys.Boards, serial, boardDesign, lines); err != nil {
+				return err
+			}
+		}
 		serials = append(serials, serial)
 	}
 	if err := WriteJSON(filepath.Join(art, BoardBuild), builds); err != nil {
@@ -430,6 +435,13 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 		relRD(bundle, chipRel+"/att/mfg-f4-final-test.intoto.json"),
 		relRD(bundle, "att/"+receiptName),
 		chipLot, design)
+	if phys != nil && phys.Commitment != "" {
+		commit, err := consumeCommitment(bundle, phys.Commitment, S(boardLot, "name"))
+		if err != nil {
+			return err
+		}
+		deps = append(deps, commit)
+	}
 	if _, err := boardRecord(bundle, "board-assembly", BoardA1, subjects,
 		Obj{"id": S(asm, "boardLot"), "boardDesign": BoardDesign}, deps,
 		markSimulated(Obj{
@@ -807,6 +819,11 @@ func checkBoard(bundle string, trust *TrustRoot, policyPath string, received []s
 			inputs = append(inputs, relRD(bundle, "att/"+PlatformCertAtt(s)))
 		}
 	}
+	inspected, err := boardL4(bundle, trust, pol, a1, lotSubj, boards, received)
+	if err != nil {
+		return nil, err
+	}
+	inputs = append(inputs, inspected...)
 	inputs = append([]Obj{relRD(bundle, "att/"+BoardHBOM)}, inputs...)
 	sim, err := simulatedCheck(bundle, pol, inputs, "board receipt check")
 	if err != nil {
@@ -911,6 +928,31 @@ func receiptCheck(bundle string, trust *TrustRoot, chip, rel string, lot Obj, un
 func readPolicy(path string) Obj {
 	p, _ := ReadObj(path)
 	return p
+}
+
+// writeBoardPhysical writes what is on a built board, as the board itself
+// would show it to an X-ray and a microscope: each position's part, with
+// the marking it carries. It is the physical board, not a record.
+func writeBoardPhysical(boardsDir, serial string, boardDesign Obj, lines map[string]shipLine) error {
+	placements := Obj{}
+	for _, item := range Objs(boardDesign, "bom") {
+		sl := lines[S(item, "mpn")]
+		for _, ref := range Strs(item, "refDes") {
+			placements[ref] = Obj{
+				"manufacturer": get(sl.line, "manufacturer"), "mpn": get(sl.line, "mpn"),
+				"lot": get(sl.line, "lot"), "dateCode": get(sl.line, "dateCode"),
+			}
+		}
+	}
+	dir := filepath.Join(boardsDir, serial)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return WriteJSON(filepath.Join(dir, BoardPhysical), Obj{
+		"note":       "Simulated board: what an X-ray and the parts' markings show. This file is the physical board, not a record.",
+		"serial":     serial,
+		"placements": placements,
+	})
 }
 
 // receivedBoardsAt reads the boards a buyer received: a file of serials, or

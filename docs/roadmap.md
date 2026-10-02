@@ -9,7 +9,7 @@ The phases are ordered by dependency, not by date. Each ends with an exit criter
 What works today, all in CI with local keys:
 
 - The four examples (PicoRV32, board, OpenLane 2, Caliptra) sign every record, run the tapeout, lot receipt, board receipt and at-boot checks, and pass their VSAs through slsa-verifier.
-- Verified levels: Design L1, Wafer L2, Package/Test L2, Assembly L2, Firmware L2. Since spec revision 16, L3 in every track ([levels.md](levels.md)): Design L3 in the PicoRV32 example, Wafer L3 and Package/Test L3 on a second run of its lot, Assembly L3 on the board example, and Assembly L3 and Firmware L3 on the FPGA board, all on simulated manufacturing.
+- Verified levels: Design L1, Wafer L2, Package/Test L2, Assembly L2, Firmware L2. Since spec revision 16, L3 in every track ([levels.md](levels.md)): Design L3 in the PicoRV32 example, Wafer L3 and Package/Test L3 on a second run of its lot, Assembly L3 on the board example, and Assembly L3 and Firmware L3 on the FPGA board, all on simulated manufacturing. Since revision 17, L4 in every track: Design L4, Wafer L4 and Package/Test L4 on a third run of the PicoRV32 lot, Assembly L4 on the board example, and Assembly L4 and Firmware L4 on the FPGA board, with the rebuilder and the inspection lab simulated as separate companies.
 
 What the assessment found missing or weak:
 
@@ -124,7 +124,9 @@ In the pilot:
 
 ## Running alongside: the L4 defense profile
 
-L4 is expensive and mostly matters to defense and root-of-trust buyers, so it runs as research alongside the phases rather than blocking them:
+L4 is expensive and mostly matters to defense and root-of-trust buyers, so it runs as research alongside the phases rather than blocking them. The reference tool checks L4 in every track since spec revision 17 ([levels.md](levels.md#l4-defense-profile)); what is left is evidence from real parties:
+
+- A real second builder and a real lab, each under its own account and key, not simulated in the same job.
 
 - Sampling plans: what sample size makes an L4 claim meaningful for a given lot size.
 - Inspection limits: which attacks delayering and imaging find, and which they miss, with references.

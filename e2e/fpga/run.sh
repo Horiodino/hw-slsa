@@ -8,10 +8,12 @@
 #   e2e/fpga/run.sh verify    every buyer check, VSAs, slsa-verifier
 #   e2e/fpga/run.sh l3        the whole chain again at Firmware L3 and Assembly L3, with the root of
 #                             trust's lot at Wafer L3 and Package/Test L3, and what Firmware L3 refuses
+#   e2e/fpga/run.sh l4        the chain at Firmware L4 and Assembly L4, with the root of trust's lot at
+#                             Wafer L4 and Package/Test L4: an independent rebuilder and an inspection lab
 #
 # Needs: Go, yosys, nextpnr-ice40, icestorm (icepack, iceunpack, icetime and
-# its chip database), iverilog, a RISC-V GCC, git and ssh-keygen; l3 also
-# needs bubblewrap and SoftHSM2. Same privacy
+# its chip database), iverilog, a RISC-V GCC, git and ssh-keygen; l3 and l4
+# also need bubblewrap and SoftHSM2. Same privacy
 # rules as the other examples: local ECDSA P-256 keys in DSSE envelopes,
 # nothing uploaded to a transparency log.
 set -euo pipefail
@@ -372,11 +374,213 @@ l3() {
   rm -rf "$k" "$rk" "$buyer" "$l/tokens"
 }
 
+# Firmware L4 and Assembly L4 (docs/levels.md) on the FPGA board: the L3
+# chain again, plus an independent rebuilder who reproduces the root of trust
+# firmware, the SoC firmware and the bitstream bit for bit, two people who
+# approve each firmware release, and an independent lab that commits to a
+# seed before each lot is sealed: it delayers and images two units of the root
+# of trust's lot (Wafer L4 and Package/Test L4, which rule 2 asks of the test
+# house that provisions it) and X-rays two boards (Assembly L4, which rule 2
+# asks of the EMS). Runs on its own, without produce.
+l4() {
+  local l=$OUT/l4
+  rm -rf "${l:?}" && mkdir -p "$l"
+  local rot=$l/rot rk=$l/rot-keys design=$l/design k=$l/keys b=$l/board buyer=$l/buyer
+  local rb=$l/rebuilder lab=$l/lab
+  local log=$l/release-log origin="Example Buyer firmware release log"
+  mkdir -p "$rot" "$rk/pub" "$design" "$k/pub" "$b"
+  softhsm_token "$l"
+  hslsa keygen --out "$rk" ip-vendor source-owner source-reviewer flow-platform tapeout-authority product-owner \
+    firmware-platform code-signer approver-a approver-b
+  hslsa hsm keygen --token "$HSLSA_PKCS11_TOKEN" --out "$rk" fab-site sort-site osat-site test-site identity-ca > /dev/null
+  hslsa keygen --out "$k" ip-vendor source-owner source-reviewer flow-platform tapeout-authority \
+    firmware-platform code-signer board-owner ems-site dist-franchised pcb-fab platform-ca approver-a approver-b
+  hslsa keygen --out "$buyer" buyer-root transparency-log review-provider
+  hslsa keygen --out "$rb" rebuilder
+  hslsa keygen --out "$lab" inspection-lab
+
+  echo "== the buyer enrolls every key: the rebuilder and the lab each under its own company"
+  local not_after
+  not_after=$(date -u -d '+90 days' +%Y-%m-%d)
+  enroll() { # <dir> <keys> <key file> <role> <custody> <org> <org id> <site> [flags]
+    local dir=$1 keys=$2 file=$3 role=$4 custody=$5 org=$6 id=$7 site=$8; shift 8
+    mkdir -p "$dir"
+    hslsa pilot enroll --buyer-key "$buyer/buyer-root.key.pem" --pub "$keys/$file.pub.pem" --role "$role" \
+      --org-name "$org" --org-id "$id" --site "$site" --country US \
+      --custody "$custody" --not-after "$not_after" --out "$dir/$file.intoto.json" "$@" > /dev/null
+  }
+  # The buyer's release log, the review lab, the rebuilder and the inspection lab.
+  third_parties() { # <dir> <lab org> <lab org id> <rebuilder org> <rebuilder org id>
+    enroll "$1" "$buyer" transparency-log transparency-log file "Example Buyer" duns:100000040 "Example Buyer Release Log"
+    enroll "$1" "$buyer" review-provider review-provider file "Example Firmware Review Lab" duns:100000041 "Example Firmware Review Lab"
+    enroll "$1" "$lab" inspection-lab inspection-lab file "$2" "$3" "$2"
+    enroll "$1" "$rb" rebuilder rebuilder file "$4" "$5" "$4"
+  }
+  rot_enroll() { # <dir> <third_parties args>
+    local dir=$1 r; shift
+    for r in ip-vendor source-owner source-reviewer flow-platform tapeout-authority product-owner firmware-platform code-signer; do
+      enroll "$dir" "$rk" "$r" "$r" file "Example RoT Co" duns:100000031 "Example RoT Design Center"
+    done
+    enroll "$dir" "$rk" approver-a release-approver file "Example RoT Co" duns:100000031 "Example RoT Design Center"
+    enroll "$dir" "$rk" approver-b release-approver file "Example RoT Co" duns:100000031 "Example RoT Design Center"
+    enroll "$dir" "$rk" identity-ca identity-ca hsm "Example RoT Co" duns:100000031 "Example RoT Identity CA"
+    enroll "$dir" "$rk" fab-site fab-site hsm "Example Foundry" duns:100000011 "Example Wafer Fab" --accreditation dmea-trusted-supplier --accreditation-id DMEA-TF-0042
+    enroll "$dir" "$rk" sort-site sort-site hsm "Example Sort Services" duns:100000012 "Example Sort House" --accreditation iso-iec-20243 --accreditation-id OTTPS-0107
+    enroll "$dir" "$rk" osat-site osat-site hsm "Example OSAT Group" duns:100000013 "Example OSAT" --accreditation dmea-trusted-supplier --accreditation-id DMEA-TA-0213
+    enroll "$dir" "$rk" test-site test-site hsm "Example Test Services" duns:100000014 "Example Test House" --accreditation iso-iec-20243 --accreditation-id OTTPS-0233
+    third_parties "$dir" "$@"
+  }
+  board_enroll() { # <dir> <third_parties args>
+    local dir=$1 r; shift
+    for r in ip-vendor source-owner source-reviewer flow-platform tapeout-authority firmware-platform code-signer board-owner; do
+      enroll "$dir" "$k" "$r" "$r" file "Example Board Co" duns:100000026 "Example Board Design Center"
+    done
+    enroll "$dir" "$k" approver-a release-approver file "Example Board Co" duns:100000026 "Example Board Design Center"
+    enroll "$dir" "$k" approver-b release-approver file "Example Board Co" duns:100000026 "Example Board Design Center"
+    enroll "$dir" "$k" platform-ca platform-ca file "Example Board Co" duns:100000026 "Example Board Platform CA"
+    enroll "$dir" "$k" ems-site ems-site file "Example EMS" duns:100000021 "Example EMS" --accreditation ipc-1791 --accreditation-id IPC1791-0042
+    enroll "$dir" "$k" dist-franchised dist-franchised file "Example Franchised Distributor" duns:100000022 "Example Franchised Distributor" \
+      --accreditation sae-as6496 --accreditation-id AS6496-0311
+    enroll "$dir" "$k" pcb-fab pcb-fab file "Example PCB Fab" duns:100000024 "Example PCB Fab" --accreditation ipc-1791 --accreditation-id IPC1791-0057
+    third_parties "$dir" "$@"
+  }
+  local independent=("Example Failure Analysis Lab" duns:100000061 "Example Rebuild Services" duns:100000053)
+  rot_enroll "$l/rot-enrollments" "${independent[@]}"
+  hslsa pilot trust-root --buyer-pub "$buyer/buyer-root.pub.pem" --enrollments "$l/rot-enrollments" --out "$l/rot-trust-root.json" > /dev/null
+  board_enroll "$l/enrollments" "${independent[@]}"
+  hslsa pilot trust-root --buyer-pub "$buyer/buyer-root.pub.pem" --enrollments "$l/enrollments" --out "$l/trust-root.json" > /dev/null
+  hslsa tlog init --log "$log" --origin "$origin"
+  local logkey=(--log "$log" --key "$buyer/transparency-log.key.pem")
+  # approve <bundle> <keys> <record>: two people sign off a release record.
+  approve() {
+    hslsa release approve --bundle "$1" --record "$3" --approver "Example Release Manager A" --key "$2/approver-a.key.pem"
+    hslsa release approve --bundle "$1" --record "$3" --approver "Example Release Manager B" --key "$2/approver-b.key.pem"
+  }
+
+  echo "== the root of trust vendor: the lab commits to its seed, final test consumes the commitment as it seals the lot"
+  cp "$rk"/*.pub.pem "$rk/pub/"
+  hslsa trust-root --keys "$rk/pub" --out "$rot/trust-root.json"
+  cp "$HERE/l4/rot-policy.json" "$rot/policy.json"
+  rot_design "$rot" "$rk"
+  hslsa fab-check --bundle "$rot" --trust-root "$rot/trust-root.json" --policy "$HERE/rot/policy.json" --key "$rk/fab-site.key.pem"
+  hslsa inspect commit --plan "$HERE/l4/rot-inspection-plan.json" --key "$lab/inspection-lab.key.pem" --lot ASM-EXR-01 \
+    --seed-out "$lab/rot-seed.hex" --out "$lab/rot-commitment.intoto.json"
+  hslsa mfg --bundle "$rot" --scenario "$HERE/l3/rot-mfg-scenario.json" --keys "$rk" --devices "$l/rot-parts" \
+    --inspection-commitment "$lab/rot-commitment.intoto.json"
+  echo "== the root of trust firmware: built isolated, rebuilt bit for bit by the rebuilder, reviewed, approved by two people, logged"
+  hslsa fpga rot-firmware --bundle "$rot" --src "$HERE/rot/firmware" --key "$rk/firmware-platform.key.pem" \
+    --code-signer "$rk/code-signer.key.pem" --svn 1 --isolate
+  hslsa fpga rot-firmware-rebuild --bundle "$rot" --src "$HERE/rot/firmware" --key "$rb/rebuilder.key.pem" \
+    --builder-id https://rebuild.example.org/builders/exr-01-firmware --isolate
+  hslsa safe simulate --bundle "$rot" --record att/fw-rot.intoto.json --image rot-fw \
+    --vendor "Example RoT Co" --product EXR-01 --version 1 --key "$buyer/review-provider.key.pem"
+  approve "$rot" "$rk" att/fw-rot.intoto.json
+  hslsa tlog add "${logkey[@]}" --record "$rot/att/fw-rot.intoto.json"
+  rot_station "$rot" "$rk" "$l/rot-parts" "$l/rot-station" "$HERE/l3/rot-mfg-scenario.json"
+  echo "== the lab draws two units of the root of trust lot with its seed, inspects them and destroys them"
+  cp -r "$l/rot-parts" "$l/rot-parts-before"
+  hslsa inspect lot --plan "$HERE/l4/rot-inspection-plan.json" --key "$lab/inspection-lab.key.pem" --bundle "$rot" \
+    --parts "$l/rot-parts" --seed "$lab/rot-seed.hex"
+  # The vendor ships the five shipped units left to the EMS (EXR01-A0-00005 failed final test).
+  local left
+  left=$(ls "$l/rot-parts" | grep -vx EXR01-A0-00005 | jq -R . | jq -cs .)
+  jq --argjson units "$left" '.shipments[0].lines[0].units = $units' "$HERE/board-scenario.json" > "$l/board-scenario.json"
+
+  echo "== the board owner: the SoC firmware and the bitstream, each rebuilt bit for bit; every release approved by two people"
+  cp "$k"/*.pub.pem "$k/pub/"
+  hslsa trust-root --keys "$k/pub" --out "$design/trust-root.json"
+  cp "$HERE/l4/policy.json" "$design/policy.json"
+  board_design "$design" "$k" --isolate
+  hslsa fpga firmware-rebuild --bundle "$design" --lock "$HERE/inputs.lock.json" --key "$rb/rebuilder.key.pem" \
+    --cache "$l/rebuild-cache" --builder-id https://rebuild.example.org/builders/picosoc-firmware --isolate
+  hslsa design rebuild --bundle "$design" --lock "$HERE/inputs.lock.json" --key "$rb/rebuilder.key.pem" \
+    --cache "$l/rebuild-cache" --builder-id https://rebuild.example.org/builders/fpga-devb-bitstream
+  hslsa safe simulate --bundle "$design" --record att/fw-picosoc.intoto.json --image picosoc-fw.bin \
+    --vendor "Example Board Co" --product FPGA-DEVB-01 --version 1.0.0 --key "$buyer/review-provider.key.pem"
+  approve "$design" "$k" att/fw-picosoc.intoto.json
+  approve "$design" "$k" att/fw-flash.intoto.json
+  hslsa tlog add "${logkey[@]}" --record "$design/att/fw-picosoc.intoto.json"
+  hslsa tlog add "${logkey[@]}" --record "$design/att/fw-flash.intoto.json"
+
+  echo "== the lab commits to a seed for the board lot; the EMS builds the boards and consumes the commitment as it seals the lot"
+  hslsa inspect commit --plan "$HERE/l4/board-inspection-plan.json" --key "$lab/inspection-lab.key.pem" --lot BRD-EXAMPLE-FPGA-01 \
+    --seed-out "$lab/board-seed.hex" --out "$lab/board-commitment.intoto.json"
+  cp "$l/trust-root.json" "$b/trust-root.json" && cp "$HERE/l4/policy.json" "$b/policy.json"
+  local parts=(--part-trust-root "rot=$l/rot-trust-root.json" --part-policy "rot=$HERE/l4/rot-policy.json")
+  hslsa fpga produce --bundle "$b" --rot-bundle "$rot" --design-bundle "$design" --scenario "$l/board-scenario.json" \
+    --design "$HERE/board-design.json" --policy "$HERE/l4/policy.json" --keys "$k" \
+    --chip-parts "$l/rot-parts" --boards-out "$l/boards" --inspection-commitment "$lab/board-commitment.intoto.json" "${parts[@]}"
+  hslsa fpga provision --bundle "$b" --devices "$l/rot-parts" --boards "$l/boards" --scenario "$l/board-scenario.json" --keys "$k"
+  echo "== the lab X-rays the two boards its seed draws, checks every marking and challenges every identity part"
+  hslsa inspect boards --plan "$HERE/l4/board-inspection-plan.json" --key "$lab/inspection-lab.key.pem" --bundle "$b" \
+    --boards "$l/boards" --seed "$lab/board-seed.hex"
+  hslsa fpga boot --bundle "$b" --boards "$l/boards" --list "$HERE/received-boards.txt" --out "$l/boots"
+
+  echo "== the buyer receives two boards and checks them at Assembly L4 and Firmware L4"
+  mkdir -p "$l/received"
+  local s
+  while read -r s; do cp -r "$l/boards/$s" "$l/received/"; done < "$HERE/received-boards.txt"
+  hslsa keygen --out "$l/verifier" verifier
+  local check=(--bundle "$b" --trust-root "$l/trust-root.json" --boards "$l/received" --boots "$l/boots" "${parts[@]}")
+  hslsa fpga verify "${check[@]}" --policy "$b/policy.json" --vsa-key "$l/verifier/verifier.key.pem" --vsa-out "$l/vsa"
+  if command -v "${SLSA_VERIFIER:-slsa-verifier}" > /dev/null; then
+    local sv=${SLSA_VERIFIER:-slsa-verifier} keyid lot board
+    hslsa pubkey --key "$l/verifier/verifier.key.pem" --out "$l/vsa/verifier.pub.pem"
+    keyid=$(hslsa keyid --key "$l/vsa/verifier.pub.pem")
+    local common=(--verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1
+                  --public-key-path "$l/vsa/verifier.pub.pem" --public-key-id "$keyid")
+    lot=$(hslsa subject "$l/vsa/board.vsa.intoto.json")
+    echo "== slsa-verifier verify-vsa: the board lot at Assembly L4 and Firmware L4"
+    "$sv" verify-vsa "${common[@]}" --attestation-path "$l/vsa/board.vsa.intoto.json" --resource-uri "${lot% *}" \
+      --subject-digest "sha256:${lot#* }" --verified-level HSLSA_ASSEMBLY_LEVEL_4 --verified-level HSLSA_FIRMWARE_LEVEL_4
+    while read -r s; do
+      board=$(hslsa subject "$l/vsa/board-$s.vsa.intoto.json")
+      echo "== slsa-verifier verify-vsa: board $s at Firmware L4"
+      "$sv" verify-vsa "${common[@]}" --attestation-path "$l/vsa/board-$s.vsa.intoto.json" --resource-uri "${board% *}" \
+        --subject-digest "sha256:${board#* }" --verified-level HSLSA_FIRMWARE_LEVEL_4
+    done < "$HERE/received-boards.txt"
+  fi
+
+  echo "== what Firmware L4 and Assembly L4 refuse"
+  refuses() { # <what> <reason> <command...>: the command fails, and says why
+    local what=$1 reason=$2 out; shift 2
+    if out=$("$@" 2>&1); then echo "FAIL: accepted $what" >&2; exit 1; fi
+    grep -qF -- "$reason" <<< "$out" || { echo "FAIL: refused $what, but not because $reason: $out" >&2; exit 1; }
+    echo "ok: refuses $what"
+  }
+  # A release only one person approved.
+  mv "$b/design/att/approval-fw-flash-example-release-manager-b.intoto.json" "$l/approval-b.intoto.json"
+  refuses "a flash image only one person approved" "1 approver(s) signed off the release; the policy requires 2" \
+    hslsa fpga verify "${check[@]}" --policy "$b/policy.json"
+  mv "$l/approval-b.intoto.json" "$b/design/att/approval-fw-flash-example-release-manager-b.intoto.json"
+  # No one else rebuilt the SoC firmware: a closed binary stays at Firmware L3.
+  mv "$b/design/att/rebuild-fw-picosoc.intoto.json" "$l/rebuild.intoto.json"
+  refuses "SoC firmware nobody else rebuilt" "no independent rebuild (rebuild-fw-picosoc.intoto.json)" \
+    hslsa fpga verify "${check[@]}" --policy "$b/policy.json"
+  mv "$l/rebuild.intoto.json" "$b/design/att/rebuild-fw-picosoc.intoto.json"
+  # The rebuilder and the lab enrolled under the board owner's company.
+  board_enroll "$l/same-company" "Example Failure Analysis Lab" duns:100000061 "Example Board Co" duns:100000026
+  hslsa pilot trust-root --buyer-pub "$buyer/buyer-root.pub.pem" --enrollments "$l/same-company" --out "$l/same-company.json" > /dev/null
+  refuses "a rebuild by the board owner itself" "the organization that holds the firmware-platform key; L4 needs an independent party" \
+    hslsa fpga verify --bundle "$b" --trust-root "$l/same-company.json" --boards "$l/received" --boots "$l/boots" "${parts[@]}" --policy "$b/policy.json"
+  board_enroll "$l/ems-lab" "Example EMS" duns:100000021 "Example Rebuild Services" duns:100000053
+  hslsa pilot trust-root --buyer-pub "$buyer/buyer-root.pub.pem" --enrollments "$l/ems-lab" --out "$l/ems-lab.json" > /dev/null
+  refuses "boards inspected by the EMS's own lab" "the organization that holds the ems-site key; L4 needs an independent party" \
+    hslsa fpga verify --bundle "$b" --trust-root "$l/ems-lab.json" --boards "$l/received" --boots "$l/boots" "${parts[@]}" --policy "$b/policy.json"
+  # The root of trust's lot rated only Package/Test L3: its test house is not rated L4.
+  sed 's/HSLSA_PACKAGE_TEST_LEVEL_4/HSLSA_PACKAGE_TEST_LEVEL_3/' "$HERE/l4/rot-policy.json" > "$l/rot-pt-l3.json"
+  refuses "a root of trust provisioned at a test house rated below L4" "Firmware L4 needs every provisioning site at L4" \
+    hslsa fpga verify --bundle "$b" --trust-root "$l/trust-root.json" --boards "$l/received" --boots "$l/boots" \
+    --part-trust-root "rot=$l/rot-trust-root.json" --part-policy "rot=$l/rot-pt-l3.json" --policy "$b/policy.json"
+  rm -rf "${k:?}" "${rk:?}" "${buyer:?}" "${rb:?}" "${lab:?}" "${l:?}/tokens"
+}
+
 case "${1:-}" in
   produce) produce_rot; produce_design; produce_board ;;
   boot) boot ;;
   verify) verify ;;
   l3) l3 ;;
-  all) produce_rot; produce_design; produce_board; boot; verify; l3 ;;
-  *) echo "usage: $0 produce|boot|verify|l3|all" >&2; exit 2 ;;
+  l4) l4 ;;
+  all) produce_rot; produce_design; produce_board; boot; verify; l3; l4 ;;
+  *) echo "usage: $0 produce|boot|verify|l3|l4|all" >&2; exit 2 ;;
 esac

@@ -1096,7 +1096,7 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 	sim := len(board.Simulated) > 0 || len(provSim) > 0
 	var fwL3Inputs []Obj
 	if trackClaim(policy, "FIRMWARE") >= 3 {
-		if fwL3Inputs, err = fpgaFirmwareL3(bundle, trust, policy, rot, units, received, bootsDir); err != nil {
+		if fwL3Inputs, err = fpgaFirmwareLevels(bundle, trust, policy, design, rot, units, received, bootsDir); err != nil {
 			return err
 		}
 	}

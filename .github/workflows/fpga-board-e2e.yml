@@ -14,6 +14,9 @@
 #
 # "l3" is the whole chain again at Firmware L3 and Assembly L3, with the root
 # of trust's lot at Wafer L3 and Package/Test L3, then what Firmware L3 refuses.
+# The same job then makes it at Firmware L4 and Assembly L4: every image and
+# the bitstream rebuilt by an independent rebuilder, every release approved by
+# two people, and an independent lab inspecting seeded samples of both lots.
 name: FPGA board end-to-end
 
 on:
@@ -151,9 +154,9 @@ jobs:
           retention-days: 14
 
   l3:
-    name: Firmware L3 and Assembly L3 (whole chain, then refusals)
+    name: Firmware and Assembly L3 and L4 (whole chain, then refusals)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -175,8 +178,8 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: The pins of the tools on this runner, to compare with the policies' toolPins
         run: go run ./tools/hslsa/cmd/hslsa pin go riscv64-unknown-elf-gcc riscv64-unknown-elf-cpp riscv64-unknown-elf-objcopy
-      - name: Firmware L3 tests (log proofs, each refused record)
-        run: go test -count=1 -run 'TLog|Merkle|Inclusion|Consistency|FirmwareL3|ProvisioningSiteL3' ./tools/hslsa/
+      - name: Firmware L3 and L4 tests (log proofs, each refused record, a root of trust rebuild in the sandbox)
+        run: go test -count=1 -run 'TLog|Merkle|Inclusion|Consistency|FirmwareL3|ProvisioningSiteL3|FirmwareL4|ProvisioningSiteL4|ROMFrozen|RoTFirmwareRebuild' ./tools/hslsa/
       - name: Install slsa-verifier ${{ env.SLSA_VERIFIER_VERSION }}
         run: |
           curl -sSfL -o "$RUNNER_TEMP/slsa-verifier" \
@@ -186,6 +189,8 @@ jobs:
           echo "SLSA_VERIFIER=$RUNNER_TEMP/slsa-verifier" >> "$GITHUB_ENV"
       - name: The chain at Firmware L3, the buyer's check of the received boards, and what Firmware L3 refuses
         run: e2e/fpga/run.sh l3 | tee l3.log
+      - name: The chain at Firmware L4 and Assembly L4, and what they refuse
+        run: e2e/fpga/run.sh l4 | tee l4.log
       - name: Summary
         if: always()
         run: |
@@ -194,16 +199,27 @@ jobs:
             echo '```'
             grep -E "^(==|ok:|FAIL|Firmware L3|Assembly L3|PASSED|board receipt|at-boot|transparency log|log check|consistency)" l3.log 2>/dev/null || true
             echo '```'
+            echo "## FPGA board at Firmware L4 and Assembly L4"
+            echo '```'
+            grep -E "^(==|ok:|FAIL|Firmware L4|Assembly L4|Wafer L4|Design L4|PASSED|rebuild|approval|inspection|board receipt|at-boot)" l4.log 2>/dev/null || true
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Remove private keys and the boards' secrets before upload
         if: always()
-        run: rm -rf out/fpga/l3/keys out/fpga/l3/rot-keys out/fpga/l3/buyer out/fpga/l3/rot-parts out/fpga/l3/boards out/fpga/l3/received out/fpga/l3/tokens out/fpga/l3/softhsm2.conf out/fpga/l3/verifier
+        run: |
+          for d in out/fpga/l3 out/fpga/l4; do
+            rm -rf "$d/keys" "$d/rot-keys" "$d/buyer" "$d/rot-parts" "$d/rot-parts-before" "$d/boards" "$d/received" \
+              "$d/tokens" "$d/softhsm2.conf" "$d/verifier" "$d/rebuilder" "$d/lab"
+          done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: fpga-board-l3
+          name: fpga-board-l3-l4
           path: |
             out/fpga/l3/board
             out/fpga/l3/vsa
             out/fpga/l3/release-log
+            out/fpga/l4/board
+            out/fpga/l4/vsa
+            out/fpga/l4/release-log
           if-no-files-found: error
           retention-days: 14

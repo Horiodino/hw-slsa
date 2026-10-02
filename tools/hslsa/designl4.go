@@ -334,7 +334,23 @@ func designL4(bundle string, trust *TrustRoot, policy Obj, final Obj) (Obj, erro
 	if err := keyInHSM(trust, filepath.Join(bundle, "att", AttName("release")), "tapeout-authority", label+": the tapeout release"); err != nil {
 		return nil, err
 	}
-	return checkDesignRebuild(bundle, trust, policy, final, label)
+	rb, err := checkDesignRebuild(bundle, trust, policy, final, label)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := Int(policy, "design", "source", "minReviewers")
+	fmt.Printf("%s: PASSED, %s rebuilt bit for bit by %s; source approved by %d reviewers; tapeout key held in an HSM\n",
+		label, S(final, "name"), orgOf(trust, filepath.Join(bundle, "att", DesignRebuildAtt), RebuilderRole), n)
+	return rb, nil
+}
+
+// orgOf names the organization the key that signed path, for role, is enrolled under.
+func orgOf(trust *TrustRoot, path, role string) string {
+	k, err := trust.SignerKey(path, role)
+	if err != nil || trust.Enrolled[k.ID] == nil {
+		return "an unenrolled " + role
+	}
+	return S(trust.Enrolled[k.ID], "organization", "name")
 }
 
 // independentOf requires that the key of role that signed the record at path

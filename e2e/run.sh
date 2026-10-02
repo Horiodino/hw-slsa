@@ -9,6 +9,7 @@
 #   e2e/run.sh shuttle   after produce: a lot from the virtual shuttle, every die simulated gate-level
 #   e2e/run.sh rerun     after produce: prove the netlist equal to the RTL again, as an independent party would
 #   e2e/run.sh l3        after produce: the lot at Wafer L3 and Package/Test L3, under a buyer-run trust root
+#   e2e/run.sh l4        after produce: Design L4, and the lot at Wafer L4 and Package/Test L4, with a second builder and a lab
 #
 # Nothing here uploads to a transparency log: every signature is a DSSE
 # envelope made with a local ECDSA P-256 key.
@@ -364,6 +365,138 @@ l3() {
   softhsm_done
 }
 
+# L4 in every chip track (docs/levels.md): the L3 lot again, with Design L4
+# (a second reviewer, the tapeout key in the HSM, and a second builder of
+# another company rebuilding the release from the frozen source) and Wafer L4
+# and Package/Test L4 (an independent lab commits to a sampling seed before
+# final test seals the lot, then delayers, images and X-rays the units the
+# seed draws, destroying them). Runs after produce.
+l4() {
+  local l=$OUT/l4
+  rm -rf "${l:?}" && mkdir -p "$l"
+  cp -r "$BUNDLE" "$l/bundle" && cp -r "$KEYS" "$l/keys"
+  local b=$l/bundle k=$l/keys
+  local hsm_roles=(tapeout-authority fab-site sort-site osat-site test-site)
+  softhsm_token "$l"
+  for r in "${hsm_roles[@]}"; do rm "${k:?}/${r:?}.key.pem"; done
+  hslsa hsm keygen --token "$HSLSA_PKCS11_TOKEN" --out "$k" "${hsm_roles[@]}" identity-ca > /dev/null
+  hslsa keygen --out "$k" second-reviewer rebuilder inspection-lab > /dev/null
+
+  echo "== the buyer enrolls each key: the rebuilder and the lab each under its own company"
+  local not_after
+  not_after=$(date -u -d '+90 days' +%Y-%m-%d)
+  hslsa keygen --out "$l/buyer" buyer-root
+  enroll() { # <dir> <key file> <role> <custody> <org> <org id> <site> [flags]
+    local dir=$1 file=$2 role=$3 custody=$4 org=$5 id=$6 site=$7; shift 7
+    hslsa pilot enroll --buyer-key "$l/buyer/buyer-root.key.pem" --pub "$k/$file.pub.pem" --role "$role" \
+      --org-name "$org" --org-id "$id" --site "$site" --country US \
+      --custody "$custody" --not-after "$not_after" --out "$dir/$file.intoto.json" "$@" > /dev/null
+  }
+  enroll_all() { # <dir> <lab org> <lab org id> <rebuilder org> <rebuilder org id>
+    mkdir -p "$1"
+    local r
+    for r in ip-vendor source-owner source-reviewer flow-platform product-owner; do
+      enroll "$1" "$r" "$r" file "Example Open Silicon Group" duns:100000002 "Example Design Center"
+    done
+    enroll "$1" second-reviewer source-reviewer file "Example Open Silicon Group" duns:100000002 "Example Design Center"
+    enroll "$1" tapeout-authority tapeout-authority hsm "Example Open Silicon Group" duns:100000002 "Example Design Center"
+    enroll "$1" identity-ca identity-ca hsm "Example Open Silicon Group" duns:100000002 "Example Identity CA"
+    enroll "$1" fab-site fab-site hsm "Example Foundry" duns:100000011 "Example Wafer Fab" --accreditation dmea-trusted-supplier --accreditation-id DMEA-TF-0042
+    enroll "$1" sort-site sort-site hsm "Example Sort Services" duns:100000012 "Example Sort House" --accreditation iso-iec-20243 --accreditation-id OTTPS-0107
+    enroll "$1" osat-site osat-site hsm "Example OSAT Group" duns:100000013 "Example OSAT" --accreditation dmea-trusted-supplier --accreditation-id DMEA-TA-0213
+    enroll "$1" test-site test-site hsm "Example Test Services" duns:100000014 "Example Test House" --accreditation iso-iec-20243 --accreditation-id OTTPS-0233
+    enroll "$1" inspection-lab inspection-lab file "$2" "$3" "$2"
+    enroll "$1" rebuilder rebuilder file "$4" "$5" "$4"
+  }
+  enroll_all "$l/enrollments" "Example Failure Analysis Lab" duns:100000041 "Example Rebuild Services" duns:100000031
+  hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$l/enrollments" --out "$l/trust-root.json" > /dev/null
+  cp "$E2E/l4/policy.json" "$b/policy.json"
+
+  echo "== Design L4: a second reviewer, the freeze over both reviews, the release signed in the HSM"
+  hslsa design review        --bundle "$b" --lock "$E2E/inputs.lock.json" --key "$k/second-reviewer.key.pem" \
+    --reviewer "Example Second Reviewer <second-reviewer@example.com>"
+  hslsa design source-freeze --bundle "$b" --lock "$E2E/inputs.lock.json" --key "$k/flow-platform.key.pem" --cache "$OUT/cache" \
+    --trust-root "$l/trust-root.json" --policy "$b/policy.json"
+  hslsa design release       --bundle "$b" --lock "$E2E/inputs.lock.json" --key "$k/tapeout-authority.key.pem" \
+    --trust-root "$l/trust-root.json" --policy "$b/policy.json"
+  echo "== the second builder fetches the pinned sources itself and rebuilds the release"
+  hslsa design rebuild --bundle "$b" --lock "$E2E/inputs.lock.json" --key "$k/rebuilder.key.pem" --cache "$l/rebuild-cache" \
+    --builder-id https://rebuild.example.org/builders/picorv32@v1 --isolate
+
+  echo "== the lab commits to its seed; the fab checks the release, the sites sign the lot, final test consumes the commitment"
+  hslsa inspect commit --plan "$E2E/l4/inspection-plan.json" --key "$k/inspection-lab.key.pem" --lot ASM-EXAMPLE-17 \
+    --seed-out "$l/lab/seed.hex" --out "$l/lab/commitment.intoto.json"
+  hslsa fab-check --bundle "$b" --trust-root "$l/trust-root.json" --policy "$b/policy.json" --key "$k/fab-site.key.pem"
+  hslsa mfg  --bundle "$b" --scenario "$E2E/l3/mfg-scenario.json" --keys "$k" --devices "$l/parts" \
+    --inspection-commitment "$l/lab/commitment.intoto.json"
+  hslsa hbom --bundle "$b" --lock "$E2E/inputs.lock.json" --scenario "$E2E/l3/mfg-scenario.json" --key "$k/product-owner.key.pem"
+  cp -r "$l/parts" "$l/parts-before"
+  echo "== the lab draws its sample with the seed, inspects it and destroys it"
+  hslsa inspect lot --plan "$E2E/l4/inspection-plan.json" --key "$k/inspection-lab.key.pem" --bundle "$b" --parts "$l/parts" --seed "$l/lab/seed.hex"
+
+  echo "== the buyer receives three of the parts left and challenges each"
+  mkdir -p "$l/received"
+  local s
+  for s in $(ls "$l/parts" | head -3); do cp -r "$l/parts/$s" "$l/received/"; done
+  local vkey=$l/verifier
+  hslsa keygen --out "$vkey" verifier
+  hslsa verify --bundle "$b" --trust-root "$l/trust-root.json" --policy "$b/policy.json" --units "$l/received" \
+    --vsa-key "$vkey/verifier.key.pem" --vsa-out "$l/vsa"
+  if command -v "${SLSA_VERIFIER:-slsa-verifier}" > /dev/null; then
+    local sv=${SLSA_VERIFIER:-slsa-verifier} keyid lot design
+    hslsa pubkey --key "$vkey/verifier.key.pem" --out "$l/vsa/verifier.pub.pem"
+    keyid=$(hslsa keyid --key "$l/vsa/verifier.pub.pem")
+    lot=$(hslsa subject "$l/vsa/lot.vsa.intoto.json")
+    design=$(hslsa subject "$l/vsa/design.vsa.intoto.json")
+    echo "== slsa-verifier verify-vsa: the L4 design and lot"
+    "$sv" verify-vsa --verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1 \
+      --public-key-path "$l/vsa/verifier.pub.pem" --public-key-id "$keyid" \
+      --attestation-path "$l/vsa/design.vsa.intoto.json" --subject-digest "sha256:${design#* }" --resource-uri "hslsa:design:${design% *}" \
+      --verified-level HSLSA_DESIGN_LEVEL_4 --verified-level SLSA_BUILD_LEVEL_3
+    "$sv" verify-vsa --verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1 \
+      --public-key-path "$l/vsa/verifier.pub.pem" --public-key-id "$keyid" \
+      --attestation-path "$l/vsa/lot.vsa.intoto.json" --subject-digest "sha256:${lot#* }" --resource-uri "${lot% *}" \
+      --verified-level HSLSA_WAFER_LEVEL_4 --verified-level HSLSA_PACKAGE_TEST_LEVEL_4 --verified-level HSLSA_DESIGN_LEVEL_4
+  fi
+
+  echo "== what L4 refuses"
+  local check=(--bundle "$b" --policy "$b/policy.json")
+  refuses() { # <what> <reason> <command...>: the command fails, and says why
+    local what=$1 reason=$2 out; shift 2
+    if out=$("$@" 2>&1); then echo "FAIL: accepted $what" >&2; exit 1; fi
+    grep -qF -- "$reason" <<< "$out" || { echo "FAIL: refused $what, but not because $reason: $out" >&2; exit 1; }
+    echo "ok: refuses $what"
+  }
+  # A part the lab destroyed, sold on as a copy that answers as it did.
+  local sampled
+  sampled=$(comm -23 <(ls "$l/parts-before") <(ls "$l/parts") | head -1)
+  mkdir -p "$l/copy" && cp -r "$l/parts-before/$sampled" "$l/copy/"
+  refuses "a copy of a part the lab destroyed" "is one the lab destroyed in its inspection" \
+    hslsa verify "${check[@]}" --trust-root "$l/trust-root.json" --units "$l/copy"
+  # The lab enrolled under the test house's company, the rebuilder under the design house's.
+  enroll_all "$l/lab-of-the-test-house" "Example Test Services" duns:100000014 "Example Rebuild Services" duns:100000031
+  hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$l/lab-of-the-test-house" \
+    --out "$l/lab-of-the-test-house.json" > /dev/null
+  refuses "an inspection by the test house's own lab" "the organization that holds the test-site key; L4 needs an independent party" \
+    hslsa verify "${check[@]}" --trust-root "$l/lab-of-the-test-house.json" --units "$l/received"
+  enroll_all "$l/rebuilder-of-the-design-house" "Example Failure Analysis Lab" duns:100000041 "Example Open Silicon Group" duns:100000002
+  hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$l/rebuilder-of-the-design-house" \
+    --out "$l/rebuilder-of-the-design-house.json" > /dev/null
+  refuses "a rebuild by the design house itself" "L4 needs an independent party" \
+    hslsa verify "${check[@]}" --trust-root "$l/rebuilder-of-the-design-house.json" --units "$l/received"
+  # The lot sealed again without the lab's commitment, which is put in the
+  # bundle afterwards: the sample could have been chosen once the lot was known.
+  cp -r "$b" "$l/no-commitment"
+  hslsa mfg  --bundle "$l/no-commitment" --scenario "$E2E/l3/mfg-scenario.json" --keys "$k" --devices "$l/no-commitment-parts" > /dev/null
+  hslsa hbom --bundle "$l/no-commitment" --lock "$E2E/inputs.lock.json" --scenario "$E2E/l3/mfg-scenario.json" \
+    --key "$k/product-owner.key.pem" > /dev/null
+  cp "$l/lab/commitment.intoto.json" "$l/no-commitment/att/inspection-commitment.intoto.json"
+  refuses "a lot final test sealed without the lab's commitment" "nothing shows the lab committed to its seed before the lot was sealed" \
+    hslsa verify --bundle "$l/no-commitment" --policy "$b/policy.json" --trust-root "$l/trust-root.json" --units "$l/no-commitment-parts"
+  rm -rf "${k:?}" "${l:?}/tokens"
+  softhsm_done
+}
+
 # Design L3 makes an independent rerun of the equivalence proof possible: the
 # signoff record carries the frozen source and the netlist by digest. Anyone
 # holding the bundle and the trust root runs it with their own Yosys and this
@@ -381,6 +514,7 @@ case "${1:-}" in
   shuttle) shuttle ;;
   rerun) rerun ;;
   l3) l3 ;;
-  all) produce; verify; proxy; adapt; hsm; shuttle; rerun; l3 ;;
-  *) echo "usage: $0 produce|verify|proxy|adapt|hsm|shuttle|rerun|l3|all" >&2; exit 2 ;;
+  l4) l4 ;;
+  all) produce; verify; proxy; adapt; hsm; shuttle; rerun; l3; l4 ;;
+  *) echo "usage: $0 produce|verify|proxy|adapt|hsm|shuttle|rerun|l3|l4|all" >&2; exit 2 ;;
 esac

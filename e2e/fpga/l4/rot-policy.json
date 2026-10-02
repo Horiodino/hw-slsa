@@ -1,0 +1,112 @@
+{
+  "note": "The board buyer's policy for the root of trust's own chain at Wafer L4 and Package/Test L4, so that the test house that provisions each unit is rated L4 in its own track, as Firmware L4 for the board asks: an independent lab inspects a seeded sample of the lot. Its design section is the PicoRV32 example's, since EXR-01's die is that design. The firmware block holds the root of trust firmware to Firmware L4: built isolated with the pinned Go toolchain, reviewed, in the buyer's release log, rebuilt bit for bit by an independent rebuilder, and approved by two people.",
+  "simulated": {
+    "accept": true,
+    "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."
+  },
+  "design": {
+    "requiredSteps": [
+      "source-freeze",
+      "simulation",
+      "synthesis"
+    ],
+    "consumes": {
+      "simulation": [
+        "source-freeze"
+      ],
+      "synthesis": [
+        "source-freeze"
+      ]
+    },
+    "finalArtifactFrom": "synthesis",
+    "allowedTools": [
+      "iverilog",
+      "vvp",
+      "yosys"
+    ],
+    "source": {
+      "tagSigner": "source-owner",
+      "reviewer": "source-reviewer"
+    },
+    "thirdPartyIP": [
+      {
+        "name": "picorv32",
+        "signer": "ip-vendor",
+        "files": [
+          "picorv32.v"
+        ]
+      }
+    ]
+  },
+  "manufacturing": {
+    "requireTransfers": true
+  },
+  "accreditations": [
+    "dmea-trusted-supplier",
+    "iso-iec-20243"
+  ],
+  "firmware": {
+    "provisioningSigner": "test-site",
+    "toolPins": [
+      {
+        "name": "go",
+        "sha256": "9347e73e5188af1ef4c2046cbc9c985473f0155c187d4005ae44c21b300062eb",
+        "toolchain": {
+          "version": "1.25.14",
+          "treeDigest": "394d0dc00dbd912c65fe1a7ef8c0f123df361a2ebf7c54bf098c2b5a6cd94921"
+        }
+      },
+      {
+        "name": "go",
+        "sha256": "9347e73e5188af1ef4c2046cbc9c985473f0155c187d4005ae44c21b300062eb",
+        "toolchain": {
+          "version": "1.25.14",
+          "treeDigest": "b36b9a0c59882869661c10742fefb2a30bd3994f0d52435c682c12bec3b3dbf9"
+        }
+      }
+    ],
+    "review": {
+      "images": [
+        "rot-fw"
+      ],
+      "providers": [
+        "review-provider"
+      ],
+      "minScope": 1,
+      "maxOpenIssueCVSS": 3.9
+    },
+    "transparencyLog": {
+      "origin": "Example Buyer firmware release log"
+    },
+    "release": {
+      "minApprovers": 2
+    }
+  },
+  "claims": {
+    "design": [
+      "HSLSA_DESIGN_LEVEL_2",
+      "SLSA_BUILD_LEVEL_2"
+    ],
+    "lot": [
+      "HSLSA_WAFER_LEVEL_4",
+      "HSLSA_PACKAGE_TEST_LEVEL_4",
+      "HSLSA_DESIGN_LEVEL_2"
+    ]
+  },
+  "inspection": {
+    "note": "Wafer L4 and Package/Test L4 for the root of trust: an independent lab's seeded sample of at least two shipped units, with every metal layer and polysilicon imaged in the core and the register file.",
+    "minSample": 2,
+    "layers": [
+      "met1",
+      "met2",
+      "met3",
+      "met4",
+      "met5",
+      "poly"
+    ],
+    "regions": [
+      "core",
+      "register-file"
+    ]
+  }
+}

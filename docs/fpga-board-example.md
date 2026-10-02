@@ -19,9 +19,10 @@ e2e/fpga/run.sh produce   # root of trust vendor, board owner, EMS
 e2e/fpga/run.sh boot      # power on the received boards
 e2e/fpga/run.sh verify    # the buyer's checks and VSAs
 e2e/fpga/run.sh l3        # the whole chain again at Firmware L3 and Assembly L3, then the refusals
+e2e/fpga/run.sh l4        # and at Firmware L4 and Assembly L4, then the refusals
 ```
 
-It needs Go, Yosys, nextpnr-ice40, IceStorm (with its chip database), Icarus Verilog, a RISC-V GCC (`gcc-riscv64-unknown-elf` on Ubuntu), git and ssh-keygen; `l3` also needs bubblewrap and SoftHSM2. Outputs go under `out/fpga/`.
+It needs Go, Yosys, nextpnr-ice40, IceStorm (with its chip database), Icarus Verilog, a RISC-V GCC (`gcc-riscv64-unknown-elf` on Ubuntu), git and ssh-keygen; `l3` and `l4` also need bubblewrap and SoftHSM2. Outputs go under `out/fpga/`.
 
 ## The board
 
@@ -89,6 +90,17 @@ The board VSA claims `HSLSA_ASSEMBLY_LEVEL_2` and `HSLSA_FIRMWARE_LEVEL_2` for t
 - **Boot evidence is required.** The buyer passes the boards it received, which answer a challenge, and what they reported at boot.
 
 Then it shows what Firmware L3 refuses: a flash image not in the log, releases in a log the buyer does not read, firmware built with a compiler the policy does not pin, firmware no lab reviewed, boards with no boot evidence, a root of trust provisioned at a test house the buyer rates below L3, and a log that rewrote a release it had shown. The CI job `l3` runs it with the RISC-V packages at the versions the policy pins.
+
+## At Firmware L4
+
+`e2e/fpga/run.sh l4` makes the chain once more under [`e2e/fpga/l4/policy.json`](../e2e/fpga/l4/policy.json) and [`e2e/fpga/l4/rot-policy.json`](../e2e/fpga/l4/rot-policy.json), and the board VSAs state `HSLSA_ASSEMBLY_LEVEL_4` and `HSLSA_FIRMWARE_LEVEL_4`. On top of L3 ([levels](levels.md#firmware-l4)):
+
+- **A second builder reproduces every image built from source.** A rebuilder the buyer enrolls under its own company rebuilds the root of trust firmware (`fpga rot-firmware-rebuild`), the SoC firmware (`fpga firmware-rebuild`) and the bitstream (`design rebuild`), isolated, from the pinned sources, and each comes out bit for bit the released one. The flash image is laid out from those and signed by the code signer, so it is not rebuilt; the root of trust checks its signature at boot.
+- **Two people approve every release.** Two release managers each sign an approval of each firmware release record with `hslsa release approve`.
+- **An independent lab inspects both lots.** It commits to a seed before final test seals the root of trust's lot and before the EMS seals the board lot, then delayers two units of the root of trust (Wafer L4 and Package/Test L4) and X-rays two boards (Assembly L4). The boards are built from the units the lab left.
+- **Per-unit data is read back.** Every provisioning record's image and fuse readback must pass, and every provisioning site must be rated L4 in its own track.
+
+Then it shows what L4 refuses: a flash image only one person approved, SoC firmware nobody else rebuilt, a rebuild by the board owner itself, boards inspected by the EMS's own lab, and a root of trust provisioned at a test house the buyer rates below L4. The same CI job runs it after `l3`.
 
 ## What the tamper tests prove
 

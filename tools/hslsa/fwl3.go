@@ -30,6 +30,9 @@ type fwRelease struct {
 	Review bool   // the image is firmware a review covers, not a container of reviewed images
 	// ReviewName is the image's name in the policy's firmware.review.images, when it differs from Image.
 	ReviewName string
+	// Rebuilt, when set, accepts another independent party's reproduction
+	// of the image at Firmware L4 when the release has no rebuild record.
+	Rebuilt func(rel Obj) (Obj, error)
 }
 
 func (r fwRelease) reviewName() string {
@@ -188,6 +191,14 @@ var provisioningTrack = map[string]string{
 // accredited site for Wafer and Package/Test, signed at an accredited site
 // for Assembly.
 func provisioningSiteL3(trust *TrustRoot, policy Obj, path, role, label string) error {
+	return provisioningSite(trust, policy, path, role, label, 3)
+}
+
+// provisioningSite is rule 2 for Firmware L<level>: the site is rated at
+// least L<level> in its own track, whose checks ran under policy, with a key
+// that meets L3 there. At Firmware L4 the record must also show per-unit
+// data read back as written.
+func provisioningSite(trust *TrustRoot, policy Obj, path, role, label string, level int) error {
 	rec, err := trust.Open(path, role, FWProvisioning)
 	if err != nil {
 		return err
@@ -197,15 +208,20 @@ func provisioningSiteL3(trust *TrustRoot, policy Obj, path, role, label string) 
 	if track == "" {
 		return failf("%s: provisioning at stage %q, which no track rates", label, stage)
 	}
-	if trackClaim(policy, track) < 3 {
-		return failf("%s: provisioned at %s, which is rated %s L%d under its policy; Firmware L3 needs every provisioning site at L3 or higher in its own track (rule 2)",
-			label, S(rec, "predicate", "hwProvision", "site", "name"), TrackTitle[track], trackClaim(policy, track))
+	if trackClaim(policy, track) < level {
+		return failf("%s: provisioned at %s, which is rated %s L%d under its policy; Firmware L%d needs every provisioning site at L%d or higher in its own track (rule 2)",
+			label, S(rec, "predicate", "hwProvision", "site", "name"), TrackTitle[track], trackClaim(policy, track), level, level)
 	}
 	what := fmt.Sprintf("%s: provisioning record", label)
 	if track == "ASSEMBLY" {
-		return keyAccredited(trust, policy, path, role, what)
+		err = keyAccredited(trust, policy, path, role, what)
+	} else {
+		err = keyL3(trust, policy, path, role, what)
 	}
-	return keyL3(trust, policy, path, role, what)
+	if err != nil || level < 4 {
+		return err
+	}
+	return provisioningReadback(rec, label)
 }
 
 // firmwareL3Summary is the line the checks print after Firmware L3 passed.
@@ -221,21 +237,25 @@ func firmwareL3Summary(releases []fwRelease) string {
 		strings.Join(all, ", "), strings.Join(reviewed, ", "))
 }
 
-// fpgaFirmwareL3 runs Firmware L3 for the FPGA board: the board owner's
-// images and the root of trust's firmware, each under its own trust root
-// and policy; the at-boot check for every received board; and rule 2 for
-// the EMS's provisioning of each board and the root of trust vendor's
-// provisioning of each unit on them.
-func fpgaFirmwareL3(bundle string, trust *TrustRoot, policy Obj, rot *RoTResult, units map[string]*BoardUnit, received []string, bootsDir string) ([]Obj, error) {
+// fpgaFirmwareLevels runs Firmware L3 for the FPGA board, and Firmware L4
+// when the policy claims it: the board owner's images and the root of
+// trust's firmware, each under its own trust root and policy; the at-boot
+// check for every received board; and rule 2 for the EMS's provisioning of
+// each board and the root of trust vendor's provisioning of each unit on
+// them. At L4 an independent rebuilder also reproduces the SoC firmware, the
+// root of trust firmware and the bitstream, which is loaded from the same
+// flash, and two people approve each release.
+func fpgaFirmwareLevels(bundle string, trust *TrustRoot, policy Obj, design *DesignResult, rot *RoTResult, units map[string]*BoardUnit, received []string, bootsDir string) ([]Obj, error) {
 	label := "Firmware L3"
+	level := trackClaim(policy, "FIRMWARE")
 	if bootsDir == "" || len(received) == 0 {
 		return nil, failf("%s: the at-boot check is required; pass the received boards and what they returned at boot (--boards, --boots)", label)
 	}
-	design := filepath.Join(bundle, FPGADesignDir)
+	designDir := filepath.Join(bundle, FPGADesignDir)
 	builder := S(policy, "firmware", "builder")
 	board := []fwRelease{
-		{Image: FPGAFWImage, Bundle: design, Record: "att/" + FPGAFWAtt, Role: builder, Review: true},
-		{Image: FlashImage, Bundle: design, Record: "att/" + FlashAtt, Role: builder},
+		{Image: FPGAFWImage, Bundle: designDir, Record: "att/" + FPGAFWAtt, Role: builder, Review: true},
+		{Image: FlashImage, Bundle: designDir, Record: "att/" + FlashAtt, Role: builder},
 	}
 	boardInputs, err := firmwareL3(trust, policy, board, label+": board")
 	if err != nil {
@@ -246,9 +266,25 @@ func fpgaFirmwareL3(bundle string, trust *TrustRoot, policy Obj, rot *RoTResult,
 	if err != nil {
 		return nil, err
 	}
+	if level >= 4 {
+		l4 := "Firmware L4"
+		in, err := firmwareL4(trust, policy, board, l4+": board")
+		if err != nil {
+			return nil, err
+		}
+		bit, err := checkDesignRebuild(designDir, trust, policy, design.Final, l4+": bitstream")
+		if err != nil {
+			return nil, err
+		}
+		boardInputs = append(append(boardInputs, in...), bit)
+		if in, err = firmwareL4(rot.Trust, rot.Policy, rotFW, l4+": root of trust"); err != nil {
+			return nil, err
+		}
+		rotInputs = append(rotInputs, in...)
+	}
 	// Inputs are named relative to the board bundle.
 	var inputs []Obj
-	for dir, list := range map[string][]Obj{design: boardInputs, rot.Bundle: rotInputs} {
+	for dir, list := range map[string][]Obj{designDir: boardInputs, rot.Bundle: rotInputs} {
 		rel, err := filepath.Rel(bundle, dir)
 		if err != nil {
 			return nil, err
@@ -258,18 +294,22 @@ func fpgaFirmwareL3(bundle string, trust *TrustRoot, policy Obj, rot *RoTResult,
 		}
 	}
 	sortByName(inputs)
+	site := fmt.Sprintf("Firmware L%d", min(level, 4))
 	for _, serial := range sortedKeys(anyUnits(units)) {
 		u := units[serial]
-		if err := provisioningSiteL3(trust, policy, filepath.Join(bundle, "att", BoardProvAtt(serial)), S(policy, "firmware", "provisioningSigner"), label+": board "+serial); err != nil {
+		if err := provisioningSite(trust, policy, filepath.Join(bundle, "att", BoardProvAtt(serial)), S(policy, "firmware", "provisioningSigner"), site+": board "+serial, level); err != nil {
 			return nil, err
 		}
-		if err := provisioningSiteL3(rot.Trust, rot.Policy, filepath.Join(rot.Bundle, "att", RoTProvAtt(u.RoTUnit)), S(rot.Policy, "firmware", "provisioningSigner"),
-			label+": root of trust "+short(u.RoTUnit)); err != nil {
+		if err := provisioningSite(rot.Trust, rot.Policy, filepath.Join(rot.Bundle, "att", RoTProvAtt(u.RoTUnit)), S(rot.Policy, "firmware", "provisioningSigner"),
+			site+": root of trust "+short(u.RoTUnit), level); err != nil {
 			return nil, err
 		}
 	}
 	fmt.Println(firmwareL3Summary(append(board, rotFW...)))
-	fmt.Printf("Firmware L3: every provisioning site is rated L3 in its own track (the EMS for %d boards, the root of trust's test house for their units)\n", len(units))
+	fmt.Printf("%s: every provisioning site is rated L%d in its own track (the EMS for %d boards, the root of trust's test house for their units)\n", site, min(level, 4), len(units))
+	if level >= 4 {
+		fmt.Println(firmwareL4Summary("Firmware L4", []string{FPGAFWImage, RoTFWImage, S(design.Final, "name")}))
+	}
 	return inputs, nil
 }
 
@@ -285,10 +325,15 @@ func anyUnits(m map[string]*BoardUnit) Obj {
 	return o
 }
 
-// caliptraFirmwareL3 runs Firmware L3 for the Caliptra example: its ROM, FMC
-// and runtime, and rule 2 for the test house that provisioned each unit.
-func caliptraFirmwareL3(bundle string, trust *TrustRoot, policy Obj, units []string) ([]Obj, error) {
+// caliptraFirmwareLevels runs Firmware L3 for the Caliptra example, and
+// Firmware L4 when the policy claims it: its ROM, FMC and runtime, and rule
+// 2 for the test house that provisioned each unit. At L4 the ROM may be
+// reproduced by the party that froze it instead of a rebuilder: step 6a's
+// rom-matches-frozen check, passing against the Caliptra TAC's published
+// digest, counts as its independent rebuild.
+func caliptraFirmwareLevels(bundle string, trust *TrustRoot, policy Obj, units []string) ([]Obj, error) {
 	label := "Firmware L3"
+	level := trackClaim(policy, "FIRMWARE")
 	var releases []fwRelease
 	for _, im := range []struct{ image, record, review string }{
 		{Images["rom"], FWAtt["rom"], "caliptra-rom"},
@@ -297,15 +342,64 @@ func caliptraFirmwareL3(bundle string, trust *TrustRoot, policy Obj, units []str
 	} {
 		releases = append(releases, fwRelease{Image: im.image, Bundle: bundle, Record: "att/" + im.record, Role: "firmware-platform", Review: true, ReviewName: im.review})
 	}
+	releases[0].Rebuilt = func(rel Obj) (Obj, error) { return romFrozen(bundle, trust, rel) }
 	inputs, err := firmwareL3(trust, policy, releases, label)
 	if err != nil {
 		return nil, err
 	}
+	if level >= 4 {
+		in, err := firmwareL4(trust, policy, releases, "Firmware L4")
+		if err != nil {
+			return nil, err
+		}
+		inputs = append(inputs, in...)
+	}
+	site := fmt.Sprintf("Firmware L%d", min(level, 4))
 	for _, u := range units {
-		if err := provisioningSiteL3(trust, policy, filepath.Join(bundle, "att", ProvAtt(u)), S(policy, "firmware", "provisioningSigner"), label+": unit "+u); err != nil {
+		if err := provisioningSite(trust, policy, filepath.Join(bundle, "att", ProvAtt(u)), S(policy, "firmware", "provisioningSigner"), site+": unit "+u, level); err != nil {
 			return nil, err
 		}
 	}
 	fmt.Println(firmwareL3Summary(releases))
+	if level >= 4 {
+		fmt.Println(firmwareL4Summary("Firmware L4", []string{Images["rom"], Images["fmc"], Images["runtime"]}))
+	}
 	return inputs, nil
+}
+
+// romFrozen accepts the Caliptra ROM's reproduction by the party that froze
+// it: the ROM merge record (step 6a), from the flow platform, names this ROM
+// release and this image, and its rom-matches-frozen check passed.
+func romFrozen(bundle string, trust *TrustRoot, rel Obj) (Obj, error) {
+	where := "Firmware L4: " + Images["rom"]
+	path := filepath.Join(bundle, "att", AttName("rom-merge"))
+	if !fileExists(path) {
+		return nil, failf("%s: no independent rebuild (%s), and no ROM merge record whose rom-matches-frozen check could stand in for one", where, FWRebuildAtt(FWAtt["rom"]))
+	}
+	merge, err := trust.Open(path, "flow-platform", DesignFlow)
+	if err != nil {
+		return nil, err
+	}
+	var image Obj
+	for _, s := range Objs(rel, "subject") {
+		if S(s, "name") == Images["rom"] {
+			image = s
+		}
+	}
+	namesRelease, namesImage := false, false
+	for _, d := range Objs(merge, "predicate", "buildDefinition", "resolvedDependencies") {
+		if S(d, "name") == "att/"+FWAtt["rom"] && jsonEqual(get(d, "digest"), fileDigest(filepath.Join(bundle, "att", FWAtt["rom"]))) {
+			namesRelease = true
+		}
+		if S(d, "name") == Images["rom"] && S(d, "digest", "sha256") == S(image, "digest", "sha256") {
+			namesImage = true
+		}
+	}
+	if !namesRelease || !namesImage {
+		return nil, failf("%s: the ROM merge record does not name this ROM release and image", where)
+	}
+	if !hasCheck(Objs(merge, "predicate", "hwFlow", "checks"), "rom-matches-frozen") {
+		return nil, failf("%s: no independent rebuild (%s), and the ROM merge record has no passing rom-matches-frozen check", where, FWRebuildAtt(FWAtt["rom"]))
+	}
+	return envRD(bundle, AttName("rom-merge")), nil
 }

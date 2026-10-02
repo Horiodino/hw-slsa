@@ -71,8 +71,11 @@ The data type identifier of an HSLSA record is its predicate type. Where several
 | Distribution | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `.../mfg/step/distribution@v1`, also for transfers between manufacturing sites |
 | Proxy-signed step (L1 only) | As the step it records | As the step it records, with `hwMfg.proxy` naming the signer and the supplier's export |
 | Evidence (L1 only) | `https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1` | `.../mfg/step/evidence@v1` |
+| Inspection commitment (L4) | `https://github.com/Horiodino/hw-slsa/inspection-commitment/v0.1` | None; the lab's commitment to its sampling seed, made before the lot is sealed |
 | Physical inspection (L4) | `https://github.com/Horiodino/hw-slsa/physical-inspection/v0.1` | None |
 | Firmware image build | `https://slsa.dev/provenance/v1` | Named for the builder |
+| Firmware rebuild (L4) | `https://slsa.dev/provenance/v1` | The release's; the record names the release it rebuilt |
+| Release approval (Firmware L4) | `https://github.com/Horiodino/hw-slsa/release-approval/v0.1` | None; one person's sign-off of a firmware release record |
 | Firmware provisioning | `https://github.com/Horiodino/hw-slsa/fw-provisioning/v0.1` | `.../fw-provisioning/step/provision@v1` |
 | Firmware review | The OCP S.A.F.E. short-form report's own CoRIM profile | None |
 | Firmware reference values | The HSLSA CoRIM profile, `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` | None |

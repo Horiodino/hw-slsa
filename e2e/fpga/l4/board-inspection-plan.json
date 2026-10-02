@@ -1,0 +1,12 @@
+{
+  "note": "Simulated: the lab stands in for an independent inspection lab. It reads each sampled board's board.json, where a real lab would X-ray the board and read the parts' markings under a microscope, and challenges each identity part as a real lab would over its debug port.",
+  "lab": {"name": "Example Failure Analysis Lab", "country": "US"},
+  "tracks": ["ASSEMBLY"],
+  "sampleSize": 2,
+  "technique": "2D and 3D X-ray of each board, optical inspection of every component marking, and an identity challenge of each part that has one",
+  "destructive": false,
+  "simulated": {
+    "simulator": "hslsa inspect boards, reading each sampled board's simulated board.json and challenging its identity parts (tools/hslsa/inspect.go)",
+    "standsIn": "an independent lab's X-ray, marking inspection and identity challenge of sampled boards"
+  }
+}

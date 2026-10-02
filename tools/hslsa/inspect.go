@@ -550,6 +550,8 @@ func inspectionCheck(bundle string, trust *TrustRoot, policy Obj, sc inspectionS
 			return nil, failf("%s: received unit %s is one the lab destroyed in its inspection; a part that answers as it is a copy", label, short(u))
 		}
 	}
+	fmt.Printf("%s: PASSED, %s inspected a seeded sample of %d of the %d in %s, none failed\n",
+		label, orgOf(trust, iPath, role), len(samples), len(sc.units), S(sc.lot, "name"))
 	return []Obj{commitRD, relRD(bundle, "att/"+InspectionAtt)}, nil
 }
 

@@ -56,6 +56,7 @@ var commands = map[string]command{
 	"pin":           {"print the toolPins entries for tools on this machine, for a policy to pin", pinCmd},
 	"tlog":          {"the buyer's private transparency log for firmware releases: add records, sign checkpoints, prove and check", tlogCmd},
 	"inspect":       {"an independent lab's L4 inspection: commit to a sampling seed before the lot is sealed, then inspect the sample it draws", inspectCmd},
+	"release":       {"two-person review of a firmware release: an approver signs their approval of a release record", releaseCmd},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -696,7 +697,7 @@ func eda(args []string) error {
 }
 
 func caliptra(args []string) error {
-	act, rest, err := action(args, "ca", "firmware", "design", "fab", "rtl-model", "provision", "hbom", "review", "verify")
+	act, rest, err := action(args, "ca", "firmware", "firmware-rebuild", "design", "fab", "rtl-model", "provision", "hbom", "review", "verify")
 	if err != nil {
 		return err
 	}
@@ -722,6 +723,16 @@ func caliptra(args []string) error {
 			return err
 		}
 		return hslsa.CaliptraFirmware(*bundle, *lock, *build, *key)
+	case "firmware-rebuild":
+		bundle, lock := f.str("bundle", "", true), f.str("lock", "", true)
+		build := f.str("build-dir", "the second builder's own build of the caliptra-sw commit the lock pins", true)
+		key := f.str("key", "the second builder's key (role rebuilder)", true)
+		builderID := f.str("builder-id", "the second builder's id, which must not be the release's", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		os.Setenv("HSLSA_BUILDER_ID", *builderID)
+		return hslsa.CaliptraFirmwareRebuild(*bundle, *lock, *build, *key)
 	case "design":
 		bundle, lock, key := f.str("bundle", "", true), f.str("lock", "", true), f.str("key", "", true)
 		trust, policy := f.str("trust-root", "", false), f.str("policy", "", false)
@@ -842,7 +853,7 @@ func board(args []string) error {
 }
 
 func fpga(args []string) error {
-	act, rest, err := action(args, "rot-firmware", "rot-job", "rot-station", "rot-hbom", "firmware", "design", "image",
+	act, rest, err := action(args, "rot-firmware", "rot-firmware-rebuild", "rot-job", "rot-station", "rot-hbom", "firmware", "firmware-rebuild", "design", "image",
 		"produce", "provision", "boot", "verify")
 	if err != nil {
 		return err
@@ -864,6 +875,21 @@ func fpga(args []string) error {
 			return err
 		}
 		return hslsa.RoTFirmware(*bundle, *src, *key, *cs, *svn, *isolate)
+	case "rot-firmware-rebuild":
+		bundle := f.str("bundle", "the root of trust bundle whose firmware release to rebuild", true)
+		src := f.str("src", "the second builder's own copy of the root of trust firmware's Go package", true)
+		key := f.str("key", "the second builder's key (role rebuilder)", true)
+		out := f.str("out", "the rebuild record to write (default <bundle>/att/"+hslsa.FWRebuildAtt(hslsa.RoTFWAtt)+")", false)
+		builderID := f.str("builder-id", "the second builder's id, which must not be the release's", true)
+		isolate := f.Bool("isolate", false, "build in a sandbox with no network and no signing key in reach (SLSA Build L3)")
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		if *out == "" {
+			*out = filepath.Join(*bundle, "att", hslsa.FWRebuildAtt(hslsa.RoTFWAtt))
+		}
+		os.Setenv("HSLSA_BUILDER_ID", *builderID)
+		return hslsa.RoTFirmwareRebuild(*bundle, *src, *key, *out, *isolate)
 	case "rot-job":
 		bundle, scenario := f.str("bundle", "", true), f.str("scenario", "", true)
 		export := f.str("export", "the station's export directory, where its job file goes", true)
@@ -896,6 +922,25 @@ func fpga(args []string) error {
 			*cache = ".hslsa-cache"
 		}
 		return hslsa.FPGAFirmware(*bundle, *lock, *key, *cache, *isolate)
+	case "firmware-rebuild":
+		bundle := f.str("bundle", "the FPGA design bundle whose firmware release to rebuild", true)
+		lock := f.str("lock", "the inputs lock, which pins the firmware's sources", true)
+		key := f.str("key", "the second builder's key (role rebuilder)", true)
+		cache := f.str("cache", "where the second builder keeps the sources it fetches", false)
+		out := f.str("out", "the rebuild record to write (default <bundle>/att/"+hslsa.FWRebuildAtt(hslsa.FPGAFWAtt)+")", false)
+		builderID := f.str("builder-id", "the second builder's id, which must not be the release's", true)
+		isolate := f.Bool("isolate", false, "build in a sandbox with no network and no signing key in reach (SLSA Build L3)")
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		if *cache == "" {
+			*cache = ".hslsa-cache"
+		}
+		if *out == "" {
+			*out = filepath.Join(*bundle, "att", hslsa.FWRebuildAtt(hslsa.FPGAFWAtt))
+		}
+		os.Setenv("HSLSA_BUILDER_ID", *builderID)
+		return hslsa.FPGAFirmwareRebuild(*bundle, *lock, *key, *cache, *out, *isolate)
 	case "design":
 		bundle, lock, key := f.str("bundle", "", true), f.str("lock", "", true), f.str("key", "", true)
 		if err := f.parse(rest); err != nil {
@@ -1615,4 +1660,21 @@ func pilot(args []string) error {
 		return fmt.Errorf("the lot failed its receipt check; the report says why")
 	}
 	return nil
+}
+
+func releaseCmd(args []string) error {
+	_, rest, err := action(args, "approve")
+	if err != nil {
+		return err
+	}
+	f := newFlags("release approve")
+	bundle := f.str("bundle", "the bundle holding the release record", true)
+	record := f.str("record", "the release record, inside the bundle (for example att/fw-rot.intoto.json)", true)
+	approver := f.str("approver", "the approver's name", true)
+	key := f.str("key", "the approver's own key (role release-approver)", true)
+	out := f.str("out", "the approval to write (default beside the record)", false)
+	if err := f.parse(rest); err != nil {
+		return err
+	}
+	return hslsa.ReleaseApprove(*bundle, *record, *approver, *key, *out)
 }

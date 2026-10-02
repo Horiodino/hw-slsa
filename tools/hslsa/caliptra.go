@@ -1844,7 +1844,7 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 			strings.Join(Strs(policy, "firmware", "review", "images"), ", "), strings.Join(rev.Providers, ", "))
 	}
 	if trackClaim(policy, "FIRMWARE") >= 3 {
-		in, err := caliptraFirmwareL3(bundle, trust, policy, units)
+		in, err := caliptraFirmwareLevels(bundle, trust, policy, units)
 		if err != nil {
 			return err
 		}

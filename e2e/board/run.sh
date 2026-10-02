@@ -5,6 +5,7 @@
 #   e2e/board/run.sh verify    board receipt check, board VSA, slsa-verifier
 #   e2e/board/run.sh l3        Assembly L3 on the chips from e2e/run.sh l3: challenged at build,
 #                              a platform certificate per board, the boards challenged at receipt
+#   e2e/board/run.sh l4        Assembly L4 on the same chips: an independent lab inspects a seeded sample of the boards
 #
 # Same privacy rules as the chip test: local ECDSA P-256 keys in DSSE
 # envelopes, nothing uploaded to a transparency log.
@@ -22,6 +23,30 @@ if [[ -z "${HSLSA:-}" ]]; then
   (cd "$ROOT" && go build -o "$HSLSA" ./tools/hslsa/cmd/hslsa)
 fi
 hslsa() { "$HSLSA" "$@"; }
+
+# The buyer enrolls a key of $k (the caller's key directory), valid until $not_after.
+enroll() { # <dir> <role> <org> <org id> <site> [flags]
+  local dir=$1 role=$2 org=$3 id=$4 site=$5; shift 5
+  mkdir -p "$dir"
+  hslsa pilot enroll --buyer-key "$k/buyer-root.key.pem" --pub "$k/$role.pub.pem" --role "$role" \
+    --org-name "$org" --org-id "$id" --site "$site" --country US --custody file \
+    --not-after "$not_after" --out "$dir/$role.intoto.json" "$@" > /dev/null
+}
+enroll_all() { # <dir> <EMS accreditation>
+  enroll "$1" board-owner "Example Open Silicon Group" duns:100000002 "Example Design Center"
+  enroll "$1" platform-ca "Example Open Silicon Group" duns:100000002 "Example Platform CA"
+  enroll "$1" ems-site "Example EMS" duns:100000021 "Example EMS" "${@:2}"
+  enroll "$1" dist-franchised "Example Franchised Distributor" duns:100000022 "Example Franchised Distributor" \
+    --accreditation sae-as6496 --accreditation-id AS6496-0311
+  enroll "$1" dist-broker "Example Components Broker" duns:100000023 "Example Components Broker"
+  enroll "$1" pcb-fab "Example PCB Fab" duns:100000024 "Example PCB Fab" --accreditation ipc-1791 --accreditation-id IPC1791-0057
+}
+refuses() { # <what> <reason> <command...>
+  local what=$1 reason=$2 out; shift 2
+  if out=$("$@" 2>&1); then echo "FAIL: accepted $what" >&2; exit 1; fi
+  grep -qF -- "$reason" <<< "$out" || { echo "FAIL: refused $what, but not because $reason: $out" >&2; exit 1; }
+  echo "ok: refuses $what"
+}
 
 produce() {
   rm -rf "$BUNDLE" "$KEYS"
@@ -79,22 +104,6 @@ l3() {
   hslsa keygen --out "$k" ems-site board-owner dist-franchised dist-broker pcb-fab platform-ca buyer-root
   local not_after ent=$l/enrollments
   not_after=$(date -u -d '+90 days' +%Y-%m-%d)
-  enroll() { # <dir> <role> <org> <org id> <site> [flags]
-    local dir=$1 role=$2 org=$3 id=$4 site=$5; shift 5
-    mkdir -p "$dir"
-    hslsa pilot enroll --buyer-key "$k/buyer-root.key.pem" --pub "$k/$role.pub.pem" --role "$role" \
-      --org-name "$org" --org-id "$id" --site "$site" --country US --custody file \
-      --not-after "$not_after" --out "$dir/$role.intoto.json" "$@" > /dev/null
-  }
-  enroll_all() { # <dir> <EMS accreditation>
-    enroll "$1" board-owner "Example Open Silicon Group" duns:100000002 "Example Design Center"
-    enroll "$1" platform-ca "Example Open Silicon Group" duns:100000002 "Example Platform CA"
-    enroll "$1" ems-site "Example EMS" duns:100000021 "Example EMS" "${@:2}"
-    enroll "$1" dist-franchised "Example Franchised Distributor" duns:100000022 "Example Franchised Distributor" \
-      --accreditation sae-as6496 --accreditation-id AS6496-0311
-    enroll "$1" dist-broker "Example Components Broker" duns:100000023 "Example Components Broker"
-    enroll "$1" pcb-fab "Example PCB Fab" duns:100000024 "Example PCB Fab" --accreditation ipc-1791 --accreditation-id IPC1791-0057
-  }
   enroll_all "$ent" --accreditation ipc-1791 --accreditation-id IPC1791-0042
   hslsa pilot trust-root --buyer-pub "$k/buyer-root.pub.pem" --enrollments "$ent" --out "$l/trust-root.json" > /dev/null
   local b=$l/board
@@ -127,12 +136,6 @@ l3() {
   fi
 
   echo "== what Assembly L3 refuses"
-  refuses() { # <what> <reason> <command...>
-    local what=$1 reason=$2 out; shift 2
-    if out=$("$@" 2>&1); then echo "FAIL: accepted $what" >&2; exit 1; fi
-    grep -qF -- "$reason" <<< "$out" || { echo "FAIL: refused $what, but not because $reason: $out" >&2; exit 1; }
-    echo "ok: refuses $what"
-  }
   local check=(--bundle "$b" --policy "$b/policy.json" "${parts[@]}")
   # A chip swapped after the board was built: another genuine chip of the lot in U1.
   local first; first=$(head -1 "$HERE/received-boards.txt")
@@ -150,10 +153,81 @@ l3() {
   rm -rf "$k"
 }
 
+# Assembly L4 (docs/levels.md), on the same L3 chip lot: the Assembly L3 board
+# lot, plus a lab the buyer enrolls under its own company. The lab commits to a
+# seed before the EMS seals the board lot; A1 consumes the commitment. After
+# the lot ships, the lab draws its sample from the seed, X-rays those boards,
+# checks every marking against the board HBOM and challenges every identity
+# part, and signs an inspection record the buyer checks at receipt.
+l4() {
+  local l=$OUT/board-l4 chip=$OUT/l3
+  [[ -d $chip/parts ]] || { echo "run e2e/run.sh l3 first" >&2; exit 1; }
+  rm -rf "${l:?}" && mkdir -p "$l/keys"
+  local k=$l/keys
+  hslsa keygen --out "$k" ems-site board-owner dist-franchised dist-broker pcb-fab platform-ca inspection-lab buyer-root
+  local not_after ent=$l/enrollments
+  not_after=$(date -u -d '+90 days' +%Y-%m-%d)
+  enroll_all "$ent" --accreditation ipc-1791 --accreditation-id IPC1791-0042
+  enroll "$ent" inspection-lab "Example Failure Analysis Lab" duns:100000041 "Example Failure Analysis Lab"
+  hslsa pilot trust-root --buyer-pub "$k/buyer-root.pub.pem" --enrollments "$ent" --out "$l/trust-root.json" > /dev/null
+  local b=$l/board
+  mkdir -p "$b" && cp "$HERE/l4/policy.json" "$b/policy.json" && cp "$l/trust-root.json" "$b/trust-root.json"
+  local parts=(--part-trust-root "picosoc=$chip/trust-root.json" --part-policy "picosoc=$chip/bundle/policy.json")
+
+  echo "== the lab commits to a seed for the board lot; the EMS builds the boards and consumes the commitment as it seals the lot"
+  hslsa inspect commit --plan "$HERE/l4/inspection-plan.json" --key "$k/inspection-lab.key.pem" --lot BRD-EXAMPLE-01 \
+    --seed-out "$l/lab/seed.hex" --out "$l/lab/commitment.intoto.json"
+  hslsa board produce --bundle "$b" --chip-bundle "$chip/bundle" --scenario "$HERE/board-scenario.json" \
+    --design "$HERE/board-design.json" --policy "$HERE/l4/policy.json" --keys "$k" \
+    --chip-parts "$chip/parts" --boards-out "$l/boards" --inspection-commitment "$l/lab/commitment.intoto.json" "${parts[@]}"
+  echo "== the lab X-rays the boards its seed draws, checks every marking and challenges every identity part"
+  hslsa inspect boards --plan "$HERE/l4/inspection-plan.json" --key "$k/inspection-lab.key.pem" --bundle "$b" \
+    --boards "$l/boards" --seed "$l/lab/seed.hex"
+
+  echo "== the buyer receives two boards, challenges the chips on them and checks the inspection"
+  mkdir -p "$l/received"
+  local s
+  while read -r s; do cp -r "$l/boards/$s" "$l/received/"; done < "$HERE/received-boards.txt"
+  hslsa keygen --out "$l/verifier" verifier
+  hslsa board verify --bundle "$b" --trust-root "$l/trust-root.json" --policy "$b/policy.json" --boards "$l/received" \
+    --vsa-key "$l/verifier/verifier.key.pem" --vsa-out "$l/vsa" "${parts[@]}"
+  if command -v "${SLSA_VERIFIER:-slsa-verifier}" > /dev/null; then
+    local sv=${SLSA_VERIFIER:-slsa-verifier} keyid lot
+    hslsa pubkey --key "$l/verifier/verifier.key.pem" --out "$l/vsa/verifier.pub.pem"
+    keyid=$(hslsa keyid --key "$l/vsa/verifier.pub.pem")
+    lot=$(hslsa subject "$l/vsa/board.vsa.intoto.json")
+    echo "== slsa-verifier verify-vsa: the L4 board lot"
+    "$sv" verify-vsa --verifier-id https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1 \
+      --public-key-path "$l/vsa/verifier.pub.pem" --public-key-id "$keyid" \
+      --attestation-path "$l/vsa/board.vsa.intoto.json" --subject-digest "sha256:${lot#* }" --resource-uri "${lot% *}" \
+      --verified-level HSLSA_ASSEMBLY_LEVEL_4
+  fi
+
+  echo "== what Assembly L4 refuses"
+  local check=(--bundle "$b" --policy "$b/policy.json" --boards "$l/received" "${parts[@]}")
+  # The same signers, with the lab enrolled under the EMS's own company.
+  enroll_all "$l/ems-lab" --accreditation ipc-1791 --accreditation-id IPC1791-0042
+  enroll "$l/ems-lab" inspection-lab "Example EMS" duns:100000021 "Example EMS failure analysis"
+  hslsa pilot trust-root --buyer-pub "$k/buyer-root.pub.pem" --enrollments "$l/ems-lab" --out "$l/ems-lab.json" > /dev/null
+  refuses "boards inspected by the EMS's own lab" "the organization that holds the ems-site key; L4 needs an independent party" \
+    hslsa board verify "${check[@]}" --trust-root "$l/ems-lab.json"
+  # A buyer that asks for more samples than the lab inspected.
+  jq '.inspection.minSample = 3' "$b/policy.json" > "$l/min3.json"
+  refuses "a sample smaller than the policy asks" "below the policy's minimum of 3" \
+    hslsa board verify --bundle "$b" --policy "$l/min3.json" --boards "$l/received" "${parts[@]}" --trust-root "$l/trust-root.json"
+  # An inspection record with no commitment in A1: the lab could have picked its sample after seeing the lot.
+  mv "$b/att/inspection-commitment.intoto.json" "$l/commitment-moved.json"
+  refuses "an inspection with no commitment before the lot was sealed" "inspection-commitment.intoto.json" \
+    hslsa board verify "${check[@]}" --trust-root "$l/trust-root.json"
+  mv "$l/commitment-moved.json" "$b/att/inspection-commitment.intoto.json"
+  rm -rf "${k:?}"
+}
+
 case "${1:-}" in
   produce) produce ;;
   verify) verify ;;
   l3) l3 ;;
+  l4) l4 ;;
   all) produce; verify ;;
-  *) echo "usage: $0 produce|verify|l3|all" >&2; exit 2 ;;
+  *) echo "usage: $0 produce|verify|l3|l4|all" >&2; exit 2 ;;
 esac

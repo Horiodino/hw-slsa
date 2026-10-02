@@ -102,6 +102,10 @@ jobs:
         run: e2e/run.sh l3
       - name: Assembly L3, the board on those chips, challenged at build, a platform certificate per board, challenged at receipt
         run: e2e/board/run.sh l3
+      - name: Design L4, Wafer L4 and Package/Test L4, a second builder's rebuild, two reviewers, an HSM tapeout key and an independent lab's seeded inspection
+        run: e2e/run.sh l4
+      - name: Assembly L4, an independent lab's seeded inspection of the boards on the L3 chips
+        run: e2e/board/run.sh l4
       - name: The same lot with suppliers that sign nothing, proxy-signed and checked
         run: e2e/run.sh proxy
       - name: The same lot made from the suppliers' MES and STDF exports, and checked against them

@@ -1,6 +1,6 @@
 # Levels L3 and L4: what the reference tool checks
 
-The spec defines four levels per track ([Tracks and levels](../spec/hslsa-v0.1.md#tracks-and-levels)). L1 and L2 are checked for all five tracks by the checks the other pages describe. This page covers L3, which every track now reaches, and the L4 defense profile, which is still being built. For each level it says what the tool checks, which command makes the records, which example shows it end to end, and what the tests make it refuse.
+The spec defines four levels per track ([Tracks and levels](../spec/hslsa-v0.1.md#tracks-and-levels)). L1 and L2 are checked for all five tracks by the checks the other pages describe. This page covers L3 and the L4 defense profile, which every track now reaches. For each level it says what the tool checks, which command makes the records, which example shows it end to end, and what the tests make it refuse.
 
 Everything in the examples is simulated: the sites, their HSMs (SoftHSM), the accreditations, and the dies with their on-die root of trust. The records say so (see [Simulated hardware](simulated-hardware.md)). What the examples prove is that the checks work and refuse what they should, not that any real part meets a level.
 
@@ -10,7 +10,7 @@ A buyer's policy names the levels it claims in `claims`. Each check runs the ext
 
 Three guards stop a claim the tool cannot stand behind (`tools/hslsa/levels.go`):
 
-- A claim of a level the tool does not check yet is refused before any record is read, and again when a VSA is signed. Today that is L4 in every track.
+- A claim of a level the tool does not check is refused before any record is read, and again when a VSA is signed. Every track is now checked through L4, the highest level the spec defines, so this guard refuses nothing today.
 - `SLSA_BUILD_LEVEL_n` needs a Design or Firmware level of at least n in the same list, since Design Ln and Firmware Ln meet SLSA Build Ln and not the other way round.
 - A VSA states levels only in the tracks its check covers: a lot receipt check cannot state a Firmware or Assembly level, whatever the policy claims.
 
@@ -85,4 +85,58 @@ The Caliptra example's policy stays at Firmware L2: its firmware is built by the
 
 ## L4 defense profile
 
-Not checked yet; every L4 claim is refused. Planned: for Design, a rebuild under a separate trust root, two-person review of source freeze and waivers, and an HSM-held tapeout key; for Wafer, Package/Test and Assembly, a physical inspection record signed by an independent lab under its own trust root, with a seed committed before the lot is sealed and a sampling plan; for Firmware, an independent bit-for-bit rebuild of every image and two-person review of releases.
+L4 adds what one company cannot vouch for alone: a second party that redoes or inspects the work, and two people where one could act alone. The spec's [Records at L4](../spec/hslsa-v0.1.md#records-at-l4) defines the records.
+
+### Independence is what the buyer enrolled
+
+Every L4 rule needs a party that is not the one it checks: the second builder, the inspection lab. A record cannot show who runs a key, so L4, like L3, needs a buyer-run trust root, and the buyer's enrollment says which company holds each key. `independentOf` in `tools/hslsa/designl4.go` requires that the independent party's key
+
+- is enrolled, so the buyer has said whose it is;
+- holds no other role in the trust root;
+- is enrolled under another organization id than every key of the roles it must be independent of: the flow platform and the tapeout authority for a design rebuild, the firmware platform for a firmware rebuild, the producing sites for an inspection.
+
+The pilot trust root already refuses one key enrolled for two roles.
+
+### Design L4
+
+What the spec asks: a second, independently operated builder rebuilds the release from the same source and tools and reaches the same final artifact; two-person review on the source freeze and on any waiver; the tapeout release signed with an HSM key.
+
+What the tool does (`tools/hslsa/designl4.go`):
+
+- `hslsa design rebuild --bundle B --lock L --key K --cache C --builder-id URI [--isolate]` is the second builder. It fetches the pinned sources into its own cache, re-runs the steps that make the final artifact (synthesis for the PicoRV32 netlist; synthesis, routing and bitstream for the FPGA bitstream) with the tools the flow ran, and signs a rebuild record (`design-rebuild.intoto.json`, role `rebuilder`) whose `gds-bit-exact` check says whether it got the released artifact bit for bit. The OpenLane 2 example has its own rebuild (`CheckRebuild` in `openlane.go`).
+- `hslsa design review --reviewer NAME` adds a second review of the source tag; the source freeze counts the reviews, and the policy's `design.source.minReviewers` must be at least 2.
+- The tapeout release's key must be enrolled with HSM custody.
+- Waivers need no rule of their own: the reference tool accepts none, so a failed gate stops the tapeout check at every level.
+
+The tapeout check at Design L4 (`designL4`) requires a rebuild record from an independent rebuilder that names this release, built from the frozen source with exactly the tools the flow's records name, on a builder id that ran no step of the flow, and whose check passed. Example: `e2e/run.sh l4`, where slsa-verifier checks the design VSA at `HSLSA_DESIGN_LEVEL_4`. Tests: `designl4_test.go`, which refuses among others a rebuild on the flow's own builder, a rebuild with another Yosys, from another source, of another release, with a failed check, by a rebuilder enrolled under the design house, one review, and a tapeout key in a file.
+
+### Wafer L4, Package/Test L4 and Assembly L4: physical inspection
+
+What the spec asks: an independent lab inspects a sample of each lot, drawn so that neither the producer nor the lab can choose which units: delayering and imaging of named regions and layers against the signed design (Wafer); decapsulation and X-ray, each die matched to its genealogy (Package/Test); X-ray of the board and authentication of its components against the board HBOM (Assembly).
+
+What the tool does (`tools/hslsa/inspect.go`):
+
+- `hslsa inspect commit --plan P --lot ID --key K --seed-out S --out C`: before the lot is sealed, the lab picks a random seed, keeps it, and signs a commitment (role `inspection-lab`) to the lot, its sampling plan and the seed's sha256.
+- The step that seals the lot consumes the commitment: final test for a chip lot (`hslsa mfg --inspection-commitment C`), board assembly for a board lot (`hslsa board produce` or `hslsa fpga produce --inspection-commitment C`). So the commitment existed before the producer knew which units the lot holds.
+- `hslsa inspect lot` (chips) and `hslsa inspect boards` (boards): after the lot ships, the lab reveals the seed, ranks every unit by sha256(seed, 0x00, unit) and takes the lowest ones, inspects them, and signs an inspection record (`inspection.intoto.json`). The lab is simulated: it reads a sampled die's layout fingerprint and identity from its `die.json`, and a board's placements from its `board.json`. Delayering and decapsulation destroy the sample, so the lab removes those parts; X-ray does not.
+- The policy's `inspection` block sets the smallest sample (`minSample`), the layers and regions a Wafer inspection must image (`layers`, `regions`), and the lab's role (`lab`, default `inspection-lab`).
+
+The lot receipt check at Wafer L4 and Package/Test L4 (`chipL4`), and the board receipt check at Assembly L4 (`boardL4`), require an inspection record and a commitment signed by the same lab key, from a lab independent of every producing site; the commitment consumed by the sealing step; the revealed seed matching the committed digest; the plan followed as committed; the record covering this lot, its size and the released design; a sample of at least `minSample`; exactly the units the seed draws; every sample passing the track's checks (`layout-matches-release`, `package-xray` and `die-matches-genealogy`, or `x-ray-matches-hbom` and `components-authenticated`); and no received unit that the lab destroyed.
+
+Examples: `e2e/run.sh l4` inspects five parts of the PicoRV32 lot, which slsa-verifier checks at `HSLSA_WAFER_LEVEL_4` and `HSLSA_PACKAGE_TEST_LEVEL_4`, and refuses a copy of a part the lab destroyed, an inspection by the test house's own lab, a rebuild by the design house itself, and a lot final test sealed without the lab's commitment. `e2e/board/run.sh l4` inspects two boards at Assembly L4, and refuses the EMS's own lab, a sample smaller than the policy asks, and an inspection with no commitment. Tests: `inspect_test.go` (a stable seeded sample, a substituted mask and a swapped die found by the lab, and twenty refused records) and `boardl4_test.go` (a counterfeit marking, a part the HBOM does not list, a missing part and a swapped identity part, each found by the lab).
+
+### Firmware L4
+
+What the spec asks: an independent party reproduces each image built from source bit for bit; two-person review on releases; per-unit data covered by provisioning readback instead; a closed vendor binary caps the product at Firmware L3 unless its vendor supplies an independent rebuild; and every provisioning site at L4 in its own track (rule 2).
+
+What the tool does (`tools/hslsa/fwl4.go`):
+
+- A rebuild record is the second builder's own SLSA provenance of the same build, kept beside the release as `rebuild-<record>` and signed by the `rebuilder` role: `hslsa fpga rot-firmware-rebuild` for the root of trust firmware, `hslsa fpga firmware-rebuild` for the SoC firmware, and `hslsa caliptra firmware-rebuild` for Caliptra's. Each fetches the sources and builds again, isolated, with its own builder id, and names the release record it rebuilt among its inputs.
+- `hslsa release approve --bundle B --record R --approver NAME --key K` signs a release approval (role `release-approver`) of one release record, beside it as `approval-<record>-<approver>.intoto.json`.
+- Provisioning records already carry `image-readback` and `fuse-readback` checks; at L4 every image a station wrote must have been read back with the digest it was written with.
+
+The Firmware L4 check (`firmwareL4`) requires, for every image built from source, a rebuild from an independent rebuilder on another builder id, of the same build type and parameters from the same sources, with tools the policy pins (the Firmware L3 rules, run on the rebuild), giving the released digest. An image laid out from images the platform already has (the FPGA board's flash image) runs no step code and is exempt: its parts are rebuilt, and the root of trust checks its signature at boot. The Caliptra ROM may instead rest on the ROM merge record's `rom-matches-frozen` check. For every release, the policy's `firmware.release.minApprovers` must be at least 2, and that many people must approve it, each with a key of their own that is not the build platform's. On the FPGA board, Firmware L4 also asks for the bitstream's Design L4 rebuild, and holds the root of trust firmware to Firmware L4 under the buyer's policy for the root of trust.
+
+Example: `e2e/fpga/run.sh l4` makes the FPGA board's chain at L4. The root of trust's lot is at Wafer L4 and Package/Test L4 (the lab delayers two units), the board lot at Assembly L4 (the lab X-rays two boards), the rebuilder reproduces the root of trust firmware, the SoC firmware and the bitstream bit for bit, and two release managers approve each release. The buyer checks two boards with their boot evidence, and slsa-verifier checks the VSAs at `HSLSA_FIRMWARE_LEVEL_4` and `HSLSA_ASSEMBLY_LEVEL_4`. It then refuses a flash image only one person approved, SoC firmware nobody else rebuilt, a rebuild by the board owner itself, boards inspected by the EMS's own lab, and a root of trust provisioned at a test house rated below L4. Tests: `fwl4_test.go`, which refuses twenty-two forged but validly signed records (a rebuild on the release's builder, not isolated, with a tool the policy does not pin, of another release, giving another digest, approvals by one person twice, with one key, with the build platform's key, of another record, and more), checks provisioning readback and rule 2 at L4, and rebuilds the root of trust firmware for real in the sandbox.
+
+The Caliptra example stays at Firmware L2, as at L3: its firmware is built outside the sandbox.

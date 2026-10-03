@@ -1,0 +1,72 @@
+# The documentation website: every page made from the repository's own
+# markdown (site/gen), built with Hugo, every internal link and anchor
+# checked, and the result uploaded as an artifact named docs-site.
+#
+# Private by design: nothing is deployed and GitHub Pages is not used, since a
+# Pages site is readable by anyone. To read the site, download the artifact
+# from the run, unzip it and open index.html. See site/README.md.
+name: Docs site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.md"
+      - site/**
+      - hbom/hbom-predicate-v0.1.schema.json
+      - tools/hslsa/cmd/hslsa/**
+      - .github/workflows/docs-site.yml
+  pull_request:
+    paths:
+      - "**.md"
+      - site/**
+      - hbom/hbom-predicate-v0.1.schema.json
+      - tools/hslsa/cmd/hslsa/**
+      - .github/workflows/docs-site.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: docs-site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and check the site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: gofmt and go vet (site generator)
+        run: |
+          unformatted=$(gofmt -l site)
+          [[ -z $unformatted ]] || { echo "gofmt needed: $unformatted"; exit 1; }
+          go vet ./site/...
+      - name: Build the site and check its links
+        run: site/build.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-site
+          path: site/public
+          retention-days: 30
+          if-no-files-found: error
+      - name: Summary
+        run: |
+          pages=$(find site/public -name '*.html' | wc -l)
+          {
+            echo "### Docs site"
+            echo
+            echo "$pages pages built from commit \`${GITHUB_SHA::7}\`, every internal link and anchor checked."
+            echo "Download **docs-site** from this run's artifacts, unzip it and open \`index.html\`."
+          } >> "$GITHUB_STEP_SUMMARY"

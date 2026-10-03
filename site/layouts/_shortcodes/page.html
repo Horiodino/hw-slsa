@@ -1,0 +1,4 @@
+{{- /* The URL of a page by its content path; the home page as index.html so links work from disk. */ -}}
+{{- $p := site.GetPage (.Get 0) -}}
+{{- if not $p }}{{ errorf "%s: no page %q" .Position (.Get 0) }}{{ end -}}
+{{- if $p.IsHome }}{{ "index.html" | relURL }}{{ else }}{{ $p.RelPermalink }}{{ end -}}

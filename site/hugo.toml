@@ -1,0 +1,38 @@
+# The documentation website. Its pages are made from the repository's own
+# markdown by site/gen; see site/README.md for how to build and preview it.
+title = "HSLSA"
+languageCode = "en"
+baseURL = "/"
+# Relative links and .html page names let the built site be opened straight
+# from disk, which is how the private preview is read.
+relativeURLs = true
+uglyURLs = true
+disableKinds = ["taxonomy", "term", "RSS", "sitemap", "404"]
+enableRobotsTXT = false
+
+[params]
+repo = "https://github.com/Horiodino/hw-slsa"
+# Set by the build: HUGO_PARAMS_COMMIT=<sha>.
+commit = ""
+# The site is private for now; keep search engines away if a copy leaks.
+noindex = true
+
+[outputs]
+home = ["html", "searchindex"]
+
+[outputFormats.searchindex]
+mediaType = "text/javascript"
+baseName = "search-index"
+isPlainText = true
+notAlternative = true
+
+[markup.goldmark.parser]
+autoHeadingIDType = "github"
+
+[markup.highlight]
+noClasses = false
+guessSyntax = false
+
+[markup.tableOfContents]
+startLevel = 2
+endLevel = 3

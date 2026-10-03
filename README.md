@@ -4,7 +4,7 @@ HSLSA is a framework for proving how a chip or board was made, the way [SLSA](ht
 
 This README is the entry point for anyone new to the project, whether you are here to contribute, to review the spec, or to run the pilot as a buyer or supplier. It explains the ideas, says where everything lives, and links to the documents that go deeper.
 
-**Status:** working draft, spec version 0.1, [revision 15](spec/hslsa-v0.1.md#changelog) (2026-09-29). Everything runs in CI on real open-source designs and tools, with simulated fab, packaging and test data, and every record made from simulated hardware says so. No company outside this repository signs records yet; the [pilot kit](pilot/README.md) is how that starts. The repository is private by the owner's choice.
+**Status:** working draft, spec version 0.1, [revision 17](spec/hslsa-v0.1.md#changelog) (2026-10-02). Everything runs in CI on real open-source designs and tools, with simulated fab, packaging and test data, and every record made from simulated hardware says so. No company outside this repository signs records yet; the [pilot kit](pilot/README.md) is how that starts. The repository is private by the owner's choice.
 
 ## Contents
 
@@ -129,7 +129,8 @@ hbom/            HBOM schema, committed example HBOMs and their renderings
 e2e/             inputs and scripts for each example: picorv32, board, fpga, caliptra, eda-tcl, pilot
 openlane2/       the OpenLane 2 RTL-to-GDS example: pins, script overlay, run.sh
 pilot/           the pilot kit: buyer, supplier and vendor guides, agreement, make-kit.sh
-.github/workflows/  the four CI workflows and the release workflow
+site/            the documentation website: page generator, templates, build.sh
+.github/workflows/  the four CI workflows, the release workflow and the docs site build
 ```
 
 | Path | What it is |
@@ -158,7 +159,9 @@ pilot/           the pilot kit: buyer, supplier and vendor guides, agreement, ma
 | [`docs/viability.md`](docs/viability.md) | Which tracks are ready, which are hard, and why |
 | [`docs/release.md`](docs/release.md) | Making a release, and pulling and running the `hslsa` container image |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phases from draft to real use, exit criteria, open owner decisions |
+| [`docs/levels.md`](docs/levels.md) | What the reference tool checks at L3 and L4 in each track, and which example shows it |
 | [`pilot/`](pilot/README.md) | The pilot kit for one buyer |
+| [`site/`](site/README.md) | The documentation website, built from the markdown above |
 
 ## Building and testing
 
@@ -188,6 +191,8 @@ bin/hslsa lot-digest hbom/picosoc-sky130.shipped-lot.txt
 bin/hslsa render --hbom hbom/picosoc-sky130.hbom.intoto.json --format cyclonedx
 bin/hslsa render --hbom hbom/picosoc-sky130.hbom.intoto.json --check hbom/picosoc-sky130.cdx.json
 ```
+
+To read all of this as one searchable website, run `site/build.sh` and open `site/public/index.html`; CI also uploads the built site with every change to the docs ([site/README.md](site/README.md)).
 
 The HSM signing code needs cgo; a build with `CGO_ENABLED=0` (as in the pilot kit's binaries) works except for PKCS#11 keys. The HSM tests skip unless SoftHSM2 is installed ([hsm-signing.md](docs/hsm-signing.md)).
 
@@ -267,7 +272,7 @@ The sample supplier exports live in [`e2e/picorv32/supplier-exports/`](e2e/picor
 
 ## CI
 
-Five GitHub Actions workflows in [`.github/workflows/`](.github/workflows):
+Six GitHub Actions workflows in [`.github/workflows/`](.github/workflows):
 
 | Workflow | Runs | Jobs |
 | --- | --- | --- |
@@ -276,6 +281,7 @@ Five GitHub Actions workflows in [`.github/workflows/`](.github/workflows):
 | [`caliptra-e2e.yml`](.github/workflows/caliptra-e2e.yml) | Pushes to main, pull requests touching the tool or the example | Produce, verify; `verify-rtl` only when dispatched by hand with `rtl` set |
 | [`openlane2-flow.yml`](.github/workflows/openlane2-flow.yml) | Changes to `openlane2/`, the EDA hook or the tool | Flow, independent rebuild, verify |
 | [`release.yml`](.github/workflows/release.yml) | A `v*` tag, or by hand (a dry run from a branch) | The four workflows above, then the signed pilot kit, the private `hslsa` image on GHCR and a GitHub release ([docs/release.md](docs/release.md)) |
+| [`docs-site.yml`](.github/workflows/docs-site.yml) | Changes to any markdown, the site or the tool's commands | Builds the documentation website, checks every link in it, uploads it as the `docs-site` artifact; publishes nothing |
 
 Each "produce" job plays the suppliers and deletes its private keys before uploading the bundle; each "verify" job plays the buyer and sees only the bundle and public trust roots. Because the repository is private, Actions minutes count against the owner's plan: long jobs such as the Caliptra boot on the Verilated RTL (hours, past the 6-hour hosted limit) run only when dispatched by hand, on the owner's self-hosted runner.
 

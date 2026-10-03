@@ -1,0 +1,8 @@
+{{ define "main" }}
+{{ partial "article.html" . }}
+<ul class="cards">
+  {{- range .Pages.ByWeight }}
+  <li class="card"><a href="{{ .RelPermalink }}"><strong>{{ .Title }}</strong>{{ with .Description }}<span>{{ . }}</span>{{ end }}</a></li>
+  {{- end }}
+</ul>
+{{ end }}

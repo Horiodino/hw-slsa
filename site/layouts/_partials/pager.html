@@ -1,0 +1,13 @@
+{{- $pages := .CurrentSection.Pages.ByWeight }}
+{{- $prev := false }}{{ $next := false }}{{ $seen := false }}
+{{- range $pages }}
+  {{- if $seen }}{{ if not $next }}{{ $next = . }}{{ end }}
+  {{- else if eq . $ }}{{ $seen = true }}
+  {{- else }}{{ $prev = . }}{{ end }}
+{{- end }}
+{{- if or $prev $next }}
+<nav class="pager" aria-label="More in {{ .CurrentSection.Title }}">
+  {{- with $prev }}<a class="pager-prev" href="{{ .RelPermalink }}"><span>Previous</span>{{ .LinkTitle }}</a>{{ end }}
+  {{- with $next }}<a class="pager-next" href="{{ .RelPermalink }}"><span>Next</span>{{ .LinkTitle }}</a>{{ end }}
+</nav>
+{{- end }}

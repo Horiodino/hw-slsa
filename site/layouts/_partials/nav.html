@@ -1,0 +1,16 @@
+{{- $current := . }}
+<ul class="nav">
+  <li><a href="{{ "index.html" | relURL }}"{{ if .IsHome }} aria-current="page"{{ end }}>Overview</a></li>
+</ul>
+{{- range site.Sections.ByWeight }}
+{{- $inSection := eq $current.Section .Section }}
+<details class="nav-group"{{ if or $inSection $current.IsHome }} open{{ end }}>
+  <summary>{{ .LinkTitle }}</summary>
+  <ul class="nav">
+    <li><a href="{{ .RelPermalink }}"{{ if eq $current .Page }} aria-current="page"{{ end }}>{{ if eq .Section "pilot" }}How the pilot works{{ else }}All {{ lower .Title }}{{ end }}</a></li>
+    {{- range .Pages.ByWeight }}
+    <li><a href="{{ .RelPermalink }}"{{ if eq $current .Page }} aria-current="page"{{ end }}>{{ .LinkTitle }}</a></li>
+    {{- end }}
+  </ul>
+</details>
+{{- end }}

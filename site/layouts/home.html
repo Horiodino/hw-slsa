@@ -1,0 +1,31 @@
+{{ define "main" }}
+<section class="hero" aria-labelledby="hero-title">
+  <p class="eyebrow">Specification v0.1 · working draft</p>
+  <h1 id="hero-title">Provenance for every step a chip takes, from RTL to a booted board.</h1>
+  <p class="lede">Each party that touches a part signs a small record of what it did. The records link by digest, and the buyer checks the whole chain before accepting parts or letting a device into its fleet.</p>
+  <ol class="tracks" aria-label="The five tracks, in supply chain order">
+    <li><span class="track-name">Design</span><span class="track-scope">RTL, IP, EDA flow to GDSII</span></li>
+    <li><span class="track-name">Wafer</span><span class="track-scope">Masks, fab, wafer sort</span></li>
+    <li><span class="track-name">Package/Test</span><span class="track-scope">Packaging, final test</span></li>
+    <li><span class="track-name">Assembly</span><span class="track-scope">Shipments, board build</span></li>
+    <li><span class="track-name">Firmware</span><span class="track-scope">Boot ROM, images, provisioning</span></li>
+  </ol>
+  <ul class="levels-line" aria-label="Levels, cumulative within a track">
+    <li><span class="lv">L0</span> no claim</li>
+    <li><span class="lv">L1</span> provenance exists</li>
+    <li><span class="lv">L2</span> signed by the producer</li>
+    <li><span class="lv">L3</span> hardened</li>
+    <li><span class="lv lv4">L4</span> independently verified (optional)</li>
+  </ul>
+</section>
+<ul class="cards cards-home">
+  {{- range site.Sections.ByWeight }}
+  <li class="card"><a href="{{ .RelPermalink }}"><strong>{{ .Title }}</strong>{{ with .Description }}<span>{{ . }}</span>{{ end }}<em>{{ len .Pages }} page{{ if ne (len .Pages) 1 }}s{{ end }}</em></a></li>
+  {{- end }}
+</ul>
+<article class="doc doc-home">
+  <div class="prose">
+    {{ .Content }}
+  </div>
+</article>
+{{ end }}

@@ -1,0 +1,23 @@
+{{- /* The page heading, its contents list and the body. */ -}}
+<article class="doc">
+  <header class="doc-head">
+    {{- if not .IsHome }}
+    <p class="crumbs"><a href="{{ "index.html" | relURL }}">HSLSA</a>{{ if and .IsPage .Parent (not .Parent.IsHome) }} <span aria-hidden="true">/</span> <a href="{{ .Parent.RelPermalink }}">{{ .Parent.Title }}</a>{{ end }}</p>
+    {{- end }}
+    <h1>{{ .Title }}</h1>
+    {{- with .Params.source }}
+    <p class="source">From <a href="{{ site.Params.repo }}/blob/main/{{ . }}"><code>{{ . }}</code></a> in the repository</p>
+    {{- end }}
+  </header>
+  {{- $toc := .TableOfContents }}
+  {{- $n := len (findRE "<li>" $toc) }}
+  {{- if gt $n 2 }}
+  <details class="toc"{{ if lt $n 16 }} open{{ end }}>
+    <summary>On this page</summary>
+    {{ $toc }}
+  </details>
+  {{- end }}
+  <div class="prose">
+    {{ .Content }}
+  </div>
+</article>

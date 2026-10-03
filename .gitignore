@@ -2,3 +2,9 @@ out/
 .hslsa-cache/
 bin/
 dist/
+site/.cache/
+site/content/
+site/public/
+site/resources/
+site/.hugo_build.lock
+site/static/js/mermaid.min.js

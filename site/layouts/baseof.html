@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ if .IsHome }}{{ site.Title }}: hardware supply chain security{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+{{- with .Description }}
+<meta name="description" content="{{ . }}">
+{{- end }}
+{{- if site.Params.noindex }}
+<meta name="robots" content="noindex, nofollow">
+{{- end }}
+<link rel="home" href="{{ "index.html" | relURL }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="{{ "css/site.css" | relURL }}">
+<script>
+  // Apply a saved light or dark choice before the page paints.
+  try { var t = localStorage.getItem("hslsa-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true" tabindex="-1">
+<header class="topbar">
+  <label for="nav-toggle" class="nav-button" aria-label="Show navigation"><span></span></label>
+  <a class="brand" href="{{ "index.html" | relURL }}"><span class="brand-mark" aria-hidden="true"></span>HSLSA<span class="brand-sub">hardware supply chain security</span></a>
+  <div class="search" role="search">
+    <label for="search-input" class="visually-hidden">Search the docs</label>
+    <input id="search-input" type="search" placeholder="Search the docs" autocomplete="off" spellcheck="false">
+    <kbd class="search-key" aria-hidden="true">/</kbd>
+    <ol id="search-results" class="search-results" hidden></ol>
+  </div>
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch between light and dark">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
+  </button>
+</header>
+<div class="layout">
+  <nav class="sidebar" aria-label="Documentation">
+    {{ partial "nav.html" . }}
+  </nav>
+  <main id="content" class="main">
+    {{ block "main" . }}{{ end }}
+  </main>
+</div>
+<footer class="footer">
+  <p>Code under <a href="{{ site.Params.repo }}/blob/main/LICENSE">Apache-2.0</a>; specification and documentation under <a href="{{ site.Params.repo }}/blob/main/LICENSE-CC-BY-4.0">CC-BY-4.0</a>.
+  {{- with site.Params.commit }} Built from commit <a href="{{ site.Params.repo }}/commit/{{ . }}"><code>{{ substr . 0 7 }}</code></a>.{{ end }}
+  Every page is generated from the markdown in the <a href="{{ site.Params.repo }}">repository</a>, which stays the source of truth.</p>
+</footer>
+{{- if .Store.Get "hasMermaid" }}
+<script src="{{ "js/mermaid.min.js" | relURL }}" data-mermaid></script>
+{{- end }}
+<script src="{{ "search-index.js" | relURL }}"></script>
+<script src="{{ "js/site.js" | relURL }}"></script>
+</body>
+</html>

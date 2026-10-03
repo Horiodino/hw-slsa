@@ -3,7 +3,10 @@
 # Three jobs play three parties. "produce" is the design house and its
 # suppliers: it runs the real RTL flow and signs every record. "verify" is the
 # buyer: it gets only the public bundle, checks the whole chain, signs VSAs
-# and verifies them with the official slsa-verifier release. "escrow" plays an
+# and verifies them with the official slsa-verifier release, then checks the
+# bundles again without tools/hslsa: openssl verifies the signatures and the
+# official OPA release evaluates the buyer rules in policies/rego (see
+# docs/rego-policies.md). "escrow" plays an
 # auditor who gets a lot's records with confidential fields withheld plus their
 # disclosures, and a buyer who gets only the auditor's VSAs; see
 # docs/selective-disclosure.md.
@@ -39,6 +42,9 @@ env:
   CYCLONEDX_CLI_VERSION: v0.32.0
   # sha256 of cyclonedx-linux-x64 v0.32.0, as listed on the CycloneDX/cyclonedx-cli release page
   CYCLONEDX_CLI_SHA256: 454879e6a4a405c8a13bff49b8982adcb0596f3019b26b0811c66e4d7f0783e1
+  OPA_VERSION: v1.21.1
+  # sha256 of opa_linux_amd64_static v1.21.1, the asset digest listed on the open-policy-agent/opa v1.21.1 release page
+  OPA_SHA256: 668506eb17a2eaa1fce6cc0d1f42ef85125d4ac5bda5fc74d1152d0c77145031
 
 jobs:
   lint:
@@ -196,6 +202,22 @@ jobs:
         env:
           HSLSA_VSA_SIGNING_KEY: ${{ secrets.HSLSA_VSA_SIGNING_KEY }}
         run: e2e/board/run.sh verify | tee -a verify.log
+      - name: Install OPA ${{ env.OPA_VERSION }}
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/opa" \
+            "https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_linux_amd64_static"
+          echo "${OPA_SHA256}  $RUNNER_TEMP/opa" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/opa"
+          echo "OPA=$RUNNER_TEMP/opa" >> "$GITHUB_ENV"
+      - name: Rego policy tests (opa test), valid records accepted and broken ones refused
+        run: |
+          "$OPA" check --strict policies/rego
+          "$OPA" fmt --fail -l policies/rego
+          "$OPA" test policies/rego hslsa.hbom_schema:hbom/hbom-predicate-v0.1.schema.json
+      - name: Independent check of the chip bundle, openssl and OPA, no tools/hslsa
+        run: e2e/rego/run.sh --received e2e/picorv32/received-units.txt out/bundle | tee -a verify.log
+      - name: Independent check of the board bundle, openssl and OPA, no tools/hslsa
+        run: e2e/rego/run.sh --received e2e/board/received-boards.txt out/board | tee -a verify.log
       - name: Validate the CycloneDX renderings with the CycloneDX CLI ${{ env.CYCLONEDX_CLI_VERSION }}
         run: |
           curl -sSfL -o "$RUNNER_TEMP/cyclonedx" \

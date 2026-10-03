@@ -1,0 +1,2508 @@
+{
+ "files": {
+  "artifacts/equivalence.log": {
+   "sha256": "c5780b05bf4c04ad04e84b234de35e1aeee28d57a8959a2366413fabcce55f89",
+   "size": 140418
+  },
+  "artifacts/equivalence.ys": {
+   "sha256": "ae7c98b551d6fe7c471c35e87b2b9a32e67e8990a502c64f32133673fbbe9b76",
+   "size": 364
+  },
+  "artifacts/final-test-results.json": {
+   "json": {
+    "units": {
+     "PSOC130-A0-00001": "pass",
+     "PSOC130-A0-00002": "pass",
+     "PSOC130-A0-00003": "pass",
+     "PSOC130-A0-00004": "pass",
+     "PSOC130-A0-00005": "pass",
+     "PSOC130-A0-00006": "pass",
+     "PSOC130-A0-00007": "fail",
+     "PSOC130-A0-00008": "pass",
+     "PSOC130-A0-00009": "pass",
+     "PSOC130-A0-00010": "pass",
+     "PSOC130-A0-00011": "pass",
+     "PSOC130-A0-00012": "pass",
+     "PSOC130-A0-00013": "pass",
+     "PSOC130-A0-00014": "pass",
+     "PSOC130-A0-00015": "pass",
+     "PSOC130-A0-00016": "pass",
+     "PSOC130-A0-00017": "pass",
+     "PSOC130-A0-00018": "pass",
+     "PSOC130-A0-00019": "fail",
+     "PSOC130-A0-00020": "pass",
+     "PSOC130-A0-00021": "pass",
+     "PSOC130-A0-00022": "pass",
+     "PSOC130-A0-00023": "pass",
+     "PSOC130-A0-00024": "pass",
+     "PSOC130-A0-00025": "pass",
+     "PSOC130-A0-00026": "pass",
+     "PSOC130-A0-00027": "pass",
+     "PSOC130-A0-00028": "pass",
+     "PSOC130-A0-00029": "pass",
+     "PSOC130-A0-00030": "pass",
+     "PSOC130-A0-00031": "pass",
+     "PSOC130-A0-00032": "pass",
+     "PSOC130-A0-00033": "fail",
+     "PSOC130-A0-00034": "pass",
+     "PSOC130-A0-00035": "pass",
+     "PSOC130-A0-00036": "pass",
+     "PSOC130-A0-00037": "pass",
+     "PSOC130-A0-00038": "pass",
+     "PSOC130-A0-00039": "pass",
+     "PSOC130-A0-00040": "pass"
+    }
+   },
+   "sha256": "f42a0aa78356da5053b242858536fd63a767d0d936d0a4440dc7d67fb3875269",
+   "size": 1300
+  },
+  "artifacts/genealogy.json": {
+   "json": {
+    "units": {
+     "PSOC130-A0-00001": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 0,
+      "y": 0
+     },
+     "PSOC130-A0-00002": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 0
+     },
+     "PSOC130-A0-00003": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 3,
+      "y": 0
+     },
+     "PSOC130-A0-00004": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 4,
+      "y": 0
+     },
+     "PSOC130-A0-00005": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 0,
+      "y": 1
+     },
+     "PSOC130-A0-00006": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 1
+     },
+     "PSOC130-A0-00007": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 2,
+      "y": 1
+     },
+     "PSOC130-A0-00008": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 3,
+      "y": 1
+     },
+     "PSOC130-A0-00009": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 4,
+      "y": 1
+     },
+     "PSOC130-A0-00010": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 0,
+      "y": 2
+     },
+     "PSOC130-A0-00011": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 2
+     },
+     "PSOC130-A0-00012": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 2,
+      "y": 2
+     },
+     "PSOC130-A0-00013": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 3,
+      "y": 2
+     },
+     "PSOC130-A0-00014": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 4,
+      "y": 2
+     },
+     "PSOC130-A0-00015": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 0,
+      "y": 3
+     },
+     "PSOC130-A0-00016": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 3
+     },
+     "PSOC130-A0-00017": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 2,
+      "y": 3
+     },
+     "PSOC130-A0-00018": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 3,
+      "y": 3
+     },
+     "PSOC130-A0-00019": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 0,
+      "y": 4
+     },
+     "PSOC130-A0-00020": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 4
+     },
+     "PSOC130-A0-00021": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 2,
+      "y": 4
+     },
+     "PSOC130-A0-00022": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 3,
+      "y": 4
+     },
+     "PSOC130-A0-00023": {
+      "wafer": "W01",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 4,
+      "y": 4
+     },
+     "PSOC130-A0-00024": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 0,
+      "y": 0
+     },
+     "PSOC130-A0-00025": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 0
+     },
+     "PSOC130-A0-00026": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 2,
+      "y": 0
+     },
+     "PSOC130-A0-00027": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 3,
+      "y": 0
+     },
+     "PSOC130-A0-00028": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 4,
+      "y": 0
+     },
+     "PSOC130-A0-00029": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 1
+     },
+     "PSOC130-A0-00030": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 2,
+      "y": 1
+     },
+     "PSOC130-A0-00031": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 3,
+      "y": 1
+     },
+     "PSOC130-A0-00032": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 4,
+      "y": 1
+     },
+     "PSOC130-A0-00033": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 0,
+      "y": 2
+     },
+     "PSOC130-A0-00034": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 2
+     },
+     "PSOC130-A0-00035": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 2,
+      "y": 2
+     },
+     "PSOC130-A0-00036": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 3,
+      "y": 2
+     },
+     "PSOC130-A0-00037": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 4,
+      "y": 2
+     },
+     "PSOC130-A0-00038": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 0,
+      "y": 3
+     },
+     "PSOC130-A0-00039": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 1,
+      "y": 3
+     },
+     "PSOC130-A0-00040": {
+      "wafer": "W02",
+      "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+      "x": 2,
+      "y": 3
+     }
+    }
+   },
+   "sha256": "f3b54611e00b4a5b385a4289495d84b4b780a03e8ea51236a7891cf7e9196fbd",
+   "size": 5860
+  },
+  "artifacts/packaged-lot.txt": {
+   "sha256": "09a9efdf3366473420dc56c65c077fe8d42f1e474ea63b85ba85445dbe805244",
+   "size": 680,
+   "text": "PSOC130-A0-00001\nPSOC130-A0-00002\nPSOC130-A0-00003\nPSOC130-A0-00004\nPSOC130-A0-00005\nPSOC130-A0-00006\nPSOC130-A0-00007\nPSOC130-A0-00008\nPSOC130-A0-00009\nPSOC130-A0-00010\nPSOC130-A0-00011\nPSOC130-A0-00012\nPSOC130-A0-00013\nPSOC130-A0-00014\nPSOC130-A0-00015\nPSOC130-A0-00016\nPSOC130-A0-00017\nPSOC130-A0-00018\nPSOC130-A0-00019\nPSOC130-A0-00020\nPSOC130-A0-00021\nPSOC130-A0-00022\nPSOC130-A0-00023\nPSOC130-A0-00024\nPSOC130-A0-00025\nPSOC130-A0-00026\nPSOC130-A0-00027\nPSOC130-A0-00028\nPSOC130-A0-00029\nPSOC130-A0-00030\nPSOC130-A0-00031\nPSOC130-A0-00032\nPSOC130-A0-00033\nPSOC130-A0-00034\nPSOC130-A0-00035\nPSOC130-A0-00036\nPSOC130-A0-00037\nPSOC130-A0-00038\nPSOC130-A0-00039\nPSOC130-A0-00040\n"
+  },
+  "artifacts/picorv32.netlist.v": {
+   "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3",
+   "size": 610806
+  },
+  "artifacts/shipped-lot.txt": {
+   "sha256": "4876860b247bffbd0ceedf5bb53d278f9a25251619cd68dee4d740a4c73cbaf1",
+   "size": 629,
+   "text": "PSOC130-A0-00001\nPSOC130-A0-00002\nPSOC130-A0-00003\nPSOC130-A0-00004\nPSOC130-A0-00005\nPSOC130-A0-00006\nPSOC130-A0-00008\nPSOC130-A0-00009\nPSOC130-A0-00010\nPSOC130-A0-00011\nPSOC130-A0-00012\nPSOC130-A0-00013\nPSOC130-A0-00014\nPSOC130-A0-00015\nPSOC130-A0-00016\nPSOC130-A0-00017\nPSOC130-A0-00018\nPSOC130-A0-00020\nPSOC130-A0-00021\nPSOC130-A0-00022\nPSOC130-A0-00023\nPSOC130-A0-00024\nPSOC130-A0-00025\nPSOC130-A0-00026\nPSOC130-A0-00027\nPSOC130-A0-00028\nPSOC130-A0-00029\nPSOC130-A0-00030\nPSOC130-A0-00031\nPSOC130-A0-00032\nPSOC130-A0-00034\nPSOC130-A0-00035\nPSOC130-A0-00036\nPSOC130-A0-00037\nPSOC130-A0-00038\nPSOC130-A0-00039\nPSOC130-A0-00040\n"
+  },
+  "artifacts/simulation.log": {
+   "sha256": "067c6b2ee5bd892d79d2c16d34827711ca4fe0130e3fff3250cc32962fff9bbc",
+   "size": 8797
+  },
+  "artifacts/source-git/commit": {
+   "gitObject": {
+    "id": "d9feac4a82a290458f04a26c3ae92e97d5d19488",
+    "type": "commit"
+   },
+   "sha256": "e8c09c581c87f969770add2b7ce3257d64dec6c5834bfcb2ca03484b2a184d52",
+   "size": 232,
+   "text": "tree 983400424d1d1266fba933092336cfa052ce4f48\nauthor Example RTL Engineer <rtl-engineer@example.com> 1788264000 +0000\ncommitter Example Design Lead <design-lead@example.com> 1788264000 +0000\n\nFreeze RTL for tapeout picosoc-rtl-v1.0\n"
+  },
+  "artifacts/source-git/tag": {
+   "gitObject": {
+    "id": "15fbb722ea73003c2f796aad5470ce5430169082",
+    "type": "tag"
+   },
+   "sha256": "1dfcf2c83aca1b4b256abfaf5b478da3981bc1b5f0f836360ee643dadda15205",
+   "size": 571,
+   "sshSignedBy": [
+    "source-owner"
+   ],
+   "text": "object d9feac4a82a290458f04a26c3ae92e97d5d19488\ntype commit\ntag picosoc-rtl-v1.0\ntagger Example Design Lead <design-lead@example.com> 1788264000 +0000\n\nRTL freeze picosoc-rtl-v1.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAAGgAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAAhuaXN0cDI1NgAAAE\nEE+FrmWo678EStk2R/iYzGszgMETFKmDtX6G70Lmny3TqnIz/T6qZ+roYD1PN6YMz9OQM0\nCk0eevDST9fpC7tnnAAAAANnaXQAAAAAAAAABnNoYTUxMgAAAGUAAAATZWNkc2Etc2hhMi\n1uaXN0cDI1NgAAAEoAAAAhAM1JI16InOfRaQiwTcxTQiZ6SBIASWvHZWW2Ehxifq3sAAAA\nIQCcd3P9BZcsfLpTJNVF4CTzyuVR0arbcoU48G1UIh2l2g==\n-----END SSH SIGNATURE-----\n"
+  },
+  "artifacts/source-git/tree": {
+   "gitObject": {
+    "id": "983400424d1d1266fba933092336cfa052ce4f48",
+    "type": "tree"
+   },
+   "sha256": "1b736f007c4c986d707c665f0025136595605ed5415e7eec97819a5160afa562",
+   "size": 80
+  },
+  "artifacts/source.tar": {
+   "members": {
+    "picorv32.v": "0836050971b3c6cdd28ac3b1e5719a67fb645161912bef1e472e63995ceb0622",
+    "testbench_ez.v": "bc4bb99e07b5f49fcd0ae8cd3ccb6d071cf318a4d242853aecaa207c7d152be1"
+   },
+   "sha256": "af1ce1d0b2d86c59f42da57332de162a0573a48be5c124eca33c2389cbb9ac58",
+   "size": 99328
+  },
+  "artifacts/synthesis-stat.txt": {
+   "sha256": "91a162e4cf2ed6497875cfd3632f7ae3467d4db814a27f1a6166113ceff554a1",
+   "size": 1176,
+   "text": "\n8. Printing statistics.\n\n=== picorv32 ===\n\n   Number of wires:               6930\n   Number of wire bits:           9439\n   Number of public wires:         182\n   Number of public wire bits:    2276\n   Number of memories:               0\n   Number of memory bits:            0\n   Number of processes:              0\n   Number of cells:               8716\n     $_ANDNOT_                    1381\n     $_AND_                        152\n     $_DFFE_PP_                   1268\n     $_DFF_P_                       37\n     $_MUX_                       2944\n     $_NAND_                       485\n     $_NOR_                        226\n     $_NOT_                        247\n     $_ORNOT_                      276\n     $_OR_                         913\n     $_SDFFCE_PN0P_                  5\n     $_SDFFCE_PP0P_                  7\n     $_SDFFE_PN0N_                   1\n     $_SDFFE_PN0P_                 157\n     $_SDFFE_PP0P_                   1\n     $_SDFFE_PP1P_                   3\n     $_SDFF_PN0_                   101\n     $_SDFF_PP0_                     9\n     $_SDFF_PP1_                     1\n     $_XNOR_                       124\n     $_XOR_                        378\n\n"
+  },
+  "artifacts/synthesis.log": {
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "size": 0
+  },
+  "artifacts/transfer-packaging.json": {
+   "json": {
+    "from": {
+     "country": "US",
+     "name": "Example OSAT"
+    },
+    "id": "packaging:urn:hslsa:assembly-lot:ASM-EXAMPLE-17",
+    "items": [
+     "PSOC130-A0-00001",
+     "PSOC130-A0-00002",
+     "PSOC130-A0-00003",
+     "PSOC130-A0-00004",
+     "PSOC130-A0-00005",
+     "PSOC130-A0-00006",
+     "PSOC130-A0-00007",
+     "PSOC130-A0-00008",
+     "PSOC130-A0-00009",
+     "PSOC130-A0-00010",
+     "PSOC130-A0-00011",
+     "PSOC130-A0-00012",
+     "PSOC130-A0-00013",
+     "PSOC130-A0-00014",
+     "PSOC130-A0-00015",
+     "PSOC130-A0-00016",
+     "PSOC130-A0-00017",
+     "PSOC130-A0-00018",
+     "PSOC130-A0-00019",
+     "PSOC130-A0-00020",
+     "PSOC130-A0-00021",
+     "PSOC130-A0-00022",
+     "PSOC130-A0-00023",
+     "PSOC130-A0-00024",
+     "PSOC130-A0-00025",
+     "PSOC130-A0-00026",
+     "PSOC130-A0-00027",
+     "PSOC130-A0-00028",
+     "PSOC130-A0-00029",
+     "PSOC130-A0-00030",
+     "PSOC130-A0-00031",
+     "PSOC130-A0-00032",
+     "PSOC130-A0-00033",
+     "PSOC130-A0-00034",
+     "PSOC130-A0-00035",
+     "PSOC130-A0-00036",
+     "PSOC130-A0-00037",
+     "PSOC130-A0-00038",
+     "PSOC130-A0-00039",
+     "PSOC130-A0-00040"
+    ],
+    "lot": "urn:hslsa:assembly-lot:ASM-EXAMPLE-17",
+    "quantity": 40,
+    "to": {
+     "country": "US",
+     "name": "Example Test House"
+    }
+   },
+   "sha256": "3fbadc304d976af2689e802fdba3f7c12ade5878242035b31c52a7e3a0fc1805",
+   "size": 1241
+  },
+  "artifacts/transfer-wafer-fab.json": {
+   "json": {
+    "from": {
+     "country": "US",
+     "name": "Example Wafer Fab"
+    },
+    "id": "wafer-fab:urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+    "items": [
+     "W01",
+     "W02"
+    ],
+    "lot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+    "quantity": 2,
+    "to": {
+     "country": "US",
+     "name": "Example Sort House"
+    }
+   },
+   "sha256": "d56262f3a2db15ed2f965b26cea74c2e0b926122b3fd34922c4203a3f72c3711",
+   "size": 317
+  },
+  "artifacts/transfer-wafer-sort.json": {
+   "json": {
+    "from": {
+     "country": "US",
+     "name": "Example Sort House"
+    },
+    "id": "wafer-sort:urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+    "items": [
+     "W01",
+     "W02"
+    ],
+    "lot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+    "quantity": 2,
+    "to": {
+     "country": "US",
+     "name": "Example OSAT"
+    }
+   },
+   "sha256": "53e2bbec641d3a1a61c242380ec83c70c446c6e8f4568a8f7156eb334bb77237",
+   "size": 313
+  },
+  "artifacts/wafer-maps.json": {
+   "json": {
+    "dies": [
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 1,
+      "y": 0
+     },
+     {
+      "bin": "fail",
+      "wafer": "W01",
+      "x": 2,
+      "y": 0
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 3,
+      "y": 0
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 4,
+      "y": 0
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 0,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 1,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 2,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 3,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 4,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 0,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 1,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 2,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 3,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 4,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 0,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 1,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 2,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 3,
+      "y": 3
+     },
+     {
+      "bin": "fail",
+      "wafer": "W01",
+      "x": 4,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 0,
+      "y": 4
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 1,
+      "y": 4
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 2,
+      "y": 4
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 3,
+      "y": 4
+     },
+     {
+      "bin": "pass",
+      "wafer": "W01",
+      "x": 4,
+      "y": 4
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 0,
+      "y": 0
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 1,
+      "y": 0
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 2,
+      "y": 0
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 3,
+      "y": 0
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 4,
+      "y": 0
+     },
+     {
+      "bin": "fail",
+      "wafer": "W02",
+      "x": 0,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 1,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 2,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 3,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 4,
+      "y": 1
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 0,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 1,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 2,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 3,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 4,
+      "y": 2
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 0,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 1,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 2,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 3,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 4,
+      "y": 3
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 0,
+      "y": 4
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 1,
+      "y": 4
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 2,
+      "y": 4
+     },
+     {
+      "bin": "fail",
+      "wafer": "W02",
+      "x": 3,
+      "y": 4
+     },
+     {
+      "bin": "pass",
+      "wafer": "W02",
+      "x": 4,
+      "y": 4
+     }
+    ],
+    "waferLot": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+   },
+   "sha256": "f86ce880e233d27876a2ece36412287ef05a8d6de94dfb6323041c9c26a0932d",
+   "size": 4229
+  },
+  "att/design-0-source-freeze.intoto.json": {
+   "envelope": {
+    "keys": [
+     "49d56eb00467d295dea4a4083eeed6779c9ffcca5caa59f9580abf726ee9ee27"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "flow-platform"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/design-flow/step/source-freeze@v1",
+       "externalParameters": {
+        "commit": "ef203c2b0a3fb793280f5114941416c425c5b461",
+        "design": "picorv32",
+        "repo": "https://github.com/YosysHQ/picorv32",
+        "tag": "picosoc-rtl-v1.0"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "0836050971b3c6cdd28ac3b1e5719a67fb645161912bef1e472e63995ceb0622"
+         },
+         "name": "picorv32.v",
+         "uri": "git+https://github.com/YosysHQ/picorv32@ef203c2b0a3fb793280f5114941416c425c5b461#picorv32.v"
+        },
+        {
+         "digest": {
+          "sha256": "bc4bb99e07b5f49fcd0ae8cd3ccb6d071cf318a4d242853aecaa207c7d152be1"
+         },
+         "name": "testbench_ez.v",
+         "uri": "git+https://github.com/YosysHQ/picorv32@ef203c2b0a3fb793280f5114941416c425c5b461#testbench_ez.v"
+        },
+        {
+         "digest": {
+          "gitCommit": "d9feac4a82a290458f04a26c3ae92e97d5d19488"
+         },
+         "uri": "git+https://git.example.com/example-open-silicon/picosoc-rtl.git@refs/tags/picosoc-rtl-v1.0"
+        },
+        {
+         "digest": {
+          "sha256": "0b083e117c6558839de0a2bceac2a8f3cb865213ce72a67fc55972a8b8eb29ea"
+         },
+         "name": "att/source-review.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "0753e7d5332ff0791ba3279d2ffc95ef6dedf7f2e14f418af90a05d153710c28"
+         },
+         "name": "att/ip-picorv32.intoto.json"
+        }
+       ]
+      },
+      "hwFlow": {
+       "checks": [
+        {
+         "detail": "every file matches inputs.lock.json",
+         "name": "inputs-pinned",
+         "result": "pass"
+        },
+        {
+         "detail": "tag signed by source-owner, commit reviewed by source-reviewer",
+         "name": "signed-reviewed-tag",
+         "result": "pass"
+        },
+        {
+         "detail": "1 IP block(s) match signed vendor provenance",
+         "name": "third-party-ip-provenance",
+         "result": "pass"
+        }
+       ],
+       "step": "source-freeze",
+       "tools": []
+      },
+      "runDetails": {
+       "builder": {
+        "id": "https://github.com/Horiodino/hw-slsa/local-run"
+       },
+       "byproducts": [],
+       "metadata": {
+        "finishedOn": "2026-10-07T03:10:31Z",
+        "invocationId": "local",
+        "startedOn": "2026-10-07T03:10:31Z"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "af1ce1d0b2d86c59f42da57332de162a0573a48be5c124eca33c2389cbb9ac58"
+       },
+       "name": "source.tar"
+      }
+     ]
+    }
+   },
+   "sha256": "981b2a1609099147ead0ee4d3f11af6ee605d1139e3d3360753361658a9a3d10",
+   "size": 2927
+  },
+  "att/design-1-simulation.intoto.json": {
+   "envelope": {
+    "keys": [
+     "49d56eb00467d295dea4a4083eeed6779c9ffcca5caa59f9580abf726ee9ee27"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "flow-platform"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/design-flow/step/simulation@v1",
+       "externalParameters": {
+        "files": [
+         "testbench_ez.v",
+         "picorv32.v"
+        ],
+        "top": "testbench"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "af1ce1d0b2d86c59f42da57332de162a0573a48be5c124eca33c2389cbb9ac58"
+         },
+         "name": "source.tar"
+        }
+       ]
+      },
+      "hwFlow": {
+       "checks": [
+        {
+         "detail": "exit 0",
+         "name": "testbench-ran",
+         "result": "pass"
+        },
+        {
+         "detail": "$finish called",
+         "name": "testbench-finished",
+         "result": "pass"
+        },
+        {
+         "detail": "182 x 'ifetch'",
+         "name": "activity",
+         "result": "pass"
+        }
+       ],
+       "isolation": {
+        "freshWorkdir": true,
+        "mounts": [
+         "/usr (read-only)",
+         "/work (the step's own working directory, holding only its inputs)"
+        ],
+        "namespaces": [
+         "user",
+         "mount",
+         "pid",
+         "ipc",
+         "uts",
+         "network",
+         "cgroup"
+        ],
+        "network": "none",
+        "sandbox": "bubblewrap 0.9.0",
+        "signedOutsideStep": true,
+        "signingKeyMounted": false,
+        "stepsShareNoFiles": true
+       },
+       "network": {
+        "mode": "isolated",
+        "observed": []
+       },
+       "step": "simulation",
+       "tools": [
+        {
+         "digest": {
+          "sha256": "a6071e4b4a68feafca0c8ee0e6aa275eee9a43a108c62801cfd1eca6eab6d8a3"
+         },
+         "name": "iverilog",
+         "package": {
+          "files": 48,
+          "manager": "dpkg",
+          "name": "iverilog",
+          "treeDigest": {
+           "sha256": "5d0e1b1ab20e281f7bdcfd9a758c7adf540b55c934f8a6b845eeb20160d0c567"
+          },
+          "version": "12.0-2build2"
+         },
+         "version": "Icarus Verilog version 12.0 (stable) ()"
+        },
+        {
+         "digest": {
+          "sha256": "a10bd7d4a0850308ac8c2c98115b6a3084f9be978307610f2a521190c28f4023"
+         },
+         "name": "vvp",
+         "package": {
+          "files": 48,
+          "manager": "dpkg",
+          "name": "iverilog",
+          "treeDigest": {
+           "sha256": "5d0e1b1ab20e281f7bdcfd9a758c7adf540b55c934f8a6b845eeb20160d0c567"
+          },
+          "version": "12.0-2build2"
+         },
+         "version": "Icarus Verilog runtime version 12.0 (stable) ()"
+        }
+       ]
+      },
+      "runDetails": {
+       "builder": {
+        "id": "https://github.com/Horiodino/hw-slsa/local-run"
+       },
+       "byproducts": [],
+       "metadata": {
+        "finishedOn": "2026-10-07T03:10:32Z",
+        "invocationId": "local",
+        "startedOn": "2026-10-07T03:10:31Z"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "067c6b2ee5bd892d79d2c16d34827711ca4fe0130e3fff3250cc32962fff9bbc"
+       },
+       "name": "simulation.log"
+      }
+     ]
+    }
+   },
+   "sha256": "2ef1c01860380a0cb6eec739c25a4019ab85a79d4ceef2d75501b0234592bb7e",
+   "size": 3039
+  },
+  "att/design-2-synthesis.intoto.json": {
+   "envelope": {
+    "keys": [
+     "49d56eb00467d295dea4a4083eeed6779c9ffcca5caa59f9580abf726ee9ee27"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "flow-platform"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/design-flow/step/synthesis@v1",
+       "externalParameters": {
+        "script": "read_verilog picorv32.v; attrmap -remove parallel_case -remove full_case; prep -flatten -top picorv32; memory_map; setundef -zero; synth -top picorv32 -flatten -nofsm; check -assert; tee -q -o synthesis-stat.txt stat; write_verilog -noattr picorv32.netlist.v",
+        "top": "picorv32"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "af1ce1d0b2d86c59f42da57332de162a0573a48be5c124eca33c2389cbb9ac58"
+         },
+         "name": "source.tar"
+        }
+       ]
+      },
+      "hwFlow": {
+       "checks": [
+        {
+         "detail": "exit 0",
+         "name": "synthesis-and-check-assert",
+         "result": "pass"
+        }
+       ],
+       "isolation": {
+        "freshWorkdir": true,
+        "mounts": [
+         "/usr (read-only)",
+         "/work (the step's own working directory, holding only its inputs)"
+        ],
+        "namespaces": [
+         "user",
+         "mount",
+         "pid",
+         "ipc",
+         "uts",
+         "network",
+         "cgroup"
+        ],
+        "network": "none",
+        "sandbox": "bubblewrap 0.9.0",
+        "signedOutsideStep": true,
+        "signingKeyMounted": false,
+        "stepsShareNoFiles": true
+       },
+       "network": {
+        "mode": "isolated",
+        "observed": []
+       },
+       "step": "synthesis",
+       "tools": [
+        {
+         "digest": {
+          "sha256": "88c0a12bb814a1a8716b1ae10b482e35d3005ed558e1f5f626b3dc983ea3abd0"
+         },
+         "name": "yosys",
+         "package": {
+          "files": 221,
+          "manager": "dpkg",
+          "name": "yosys",
+          "treeDigest": {
+           "sha256": "55582b4ee82c589891402bd1cd249c347a773d0b9425b8de6ebdbedb4757c1a0"
+          },
+          "version": "0.33-5build2"
+         },
+         "version": "Yosys 0.33 (git sha1 2584903a060)"
+        }
+       ]
+      },
+      "runDetails": {
+       "builder": {
+        "id": "https://github.com/Horiodino/hw-slsa/local-run"
+       },
+       "byproducts": [
+        {
+         "digest": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+         },
+         "name": "synthesis.log"
+        }
+       ],
+       "metadata": {
+        "finishedOn": "2026-10-07T03:10:43Z",
+        "invocationId": "local",
+        "startedOn": "2026-10-07T03:10:32Z"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+       },
+       "name": "picorv32.netlist.v"
+      },
+      {
+       "digest": {
+        "sha256": "91a162e4cf2ed6497875cfd3632f7ae3467d4db814a27f1a6166113ceff554a1"
+       },
+       "name": "synthesis-stat.txt"
+      }
+     ]
+    }
+   },
+   "sha256": "a4e6adca9ddb843f2810941ba99c712aaa004fe45031a0ac3d5c4a138025b046",
+   "size": 3027
+  },
+  "att/design-3-signoff.intoto.json": {
+   "envelope": {
+    "keys": [
+     "49d56eb00467d295dea4a4083eeed6779c9ffcca5caa59f9580abf726ee9ee27"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "flow-platform"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/design-flow/step/signoff@v1",
+       "externalParameters": {
+        "gate": "picorv32.netlist.v",
+        "gold": [
+         "picorv32.v"
+        ],
+        "method": "yosys equiv_make + equiv_induct (induction over the clock, every shared signal)",
+        "script": "equivalence.ys",
+        "top": "picorv32"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "af1ce1d0b2d86c59f42da57332de162a0573a48be5c124eca33c2389cbb9ac58"
+         },
+         "name": "source.tar"
+        },
+        {
+         "digest": {
+          "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+         },
+         "name": "picorv32.netlist.v"
+        },
+        {
+         "digest": {
+          "sha256": "ae7c98b551d6fe7c471c35e87b2b9a32e67e8990a502c64f32133673fbbe9b76"
+         },
+         "name": "equivalence.ys"
+        }
+       ]
+      },
+      "hwFlow": {
+       "checks": [
+        {
+         "detail": "2160 signals proven equal, exit 0",
+         "name": "rtl-netlist-equivalence",
+         "result": "pass"
+        }
+       ],
+       "isolation": {
+        "freshWorkdir": true,
+        "mounts": [
+         "/usr (read-only)",
+         "/work (the step's own working directory, holding only its inputs)"
+        ],
+        "namespaces": [
+         "user",
+         "mount",
+         "pid",
+         "ipc",
+         "uts",
+         "network",
+         "cgroup"
+        ],
+        "network": "none",
+        "sandbox": "bubblewrap 0.9.0",
+        "signedOutsideStep": true,
+        "signingKeyMounted": false,
+        "stepsShareNoFiles": true
+       },
+       "network": {
+        "mode": "isolated",
+        "observed": []
+       },
+       "step": "signoff",
+       "tools": [
+        {
+         "digest": {
+          "sha256": "88c0a12bb814a1a8716b1ae10b482e35d3005ed558e1f5f626b3dc983ea3abd0"
+         },
+         "name": "yosys",
+         "package": {
+          "files": 221,
+          "manager": "dpkg",
+          "name": "yosys",
+          "treeDigest": {
+           "sha256": "55582b4ee82c589891402bd1cd249c347a773d0b9425b8de6ebdbedb4757c1a0"
+          },
+          "version": "0.33-5build2"
+         },
+         "version": "Yosys 0.33 (git sha1 2584903a060)"
+        }
+       ]
+      },
+      "runDetails": {
+       "builder": {
+        "id": "https://github.com/Horiodino/hw-slsa/local-run"
+       },
+       "byproducts": [],
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "local",
+        "startedOn": "2026-10-07T03:10:44Z"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "c5780b05bf4c04ad04e84b234de35e1aeee28d57a8959a2366413fabcce55f89"
+       },
+       "name": "equivalence.log"
+      }
+     ]
+    }
+   },
+   "sha256": "e6a6c8891c560241cefadb1d27f97e5991912cfa2c0623306c966b055f0525a3",
+   "size": 2915
+  },
+  "att/design-release.intoto.json": {
+   "envelope": {
+    "keys": [
+     "11984d0af383f9fce7838088a1088b7bc2bffdef7568912acbe53ddf76eb7db2"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "tapeout-authority"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/design-flow/step/release@v1",
+       "externalParameters": {
+        "design": "picorv32",
+        "finalArtifact": "picorv32.netlist.v",
+        "finalArtifactKind": "gate-level netlist (stands in for GDS until steps 3 to 7 run)",
+        "ipBlocks": [
+         {
+          "name": "picorv32",
+          "supplier": "YosysHQ",
+          "version": "ef203c2b0a3fb793280f5114941416c425c5b461"
+         }
+        ]
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "981b2a1609099147ead0ee4d3f11af6ee605d1139e3d3360753361658a9a3d10"
+         },
+         "name": "att/design-0-source-freeze.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "2ef1c01860380a0cb6eec739c25a4019ab85a79d4ceef2d75501b0234592bb7e"
+         },
+         "name": "att/design-1-simulation.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "a4e6adca9ddb843f2810941ba99c712aaa004fe45031a0ac3d5c4a138025b046"
+         },
+         "name": "att/design-2-synthesis.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "e6a6c8891c560241cefadb1d27f97e5991912cfa2c0623306c966b055f0525a3"
+         },
+         "name": "att/design-3-signoff.intoto.json"
+        }
+       ]
+      },
+      "hwFlow": {
+       "checks": [
+        {
+         "detail": "all design steps present, signed and linked",
+         "name": "tapeout-policy",
+         "result": "pass"
+        }
+       ],
+       "step": "release",
+       "tools": []
+      },
+      "runDetails": {
+       "builder": {
+        "id": "https://github.com/Horiodino/hw-slsa/local-run"
+       },
+       "byproducts": [],
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "local",
+        "startedOn": "2026-10-07T03:12:29Z"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/design-flow/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+       },
+       "name": "picorv32.netlist.v"
+      }
+     ]
+    }
+   },
+   "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873",
+   "size": 2351
+  },
+  "att/hbom.cdx.json": {
+   "sha256": "94f8327390dc4f1f7ac131c6b86a3f43c083ebe4c345b917778f99d359f80861",
+   "size": 18743
+  },
+  "att/hbom.intoto.json": {
+   "envelope": {
+    "keys": [
+     "0515030074132585509b5e5ae3fd9d850be8227ac3f6c5befd916b59445c3113"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "product-owner"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "design": {
+       "finalLayout": {
+        "digest": {
+         "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+        },
+        "uri": "file:artifacts/picorv32.netlist.v"
+       },
+       "flow": [
+        {
+         "provenanceRef": {
+          "digest": {
+           "sha256": "981b2a1609099147ead0ee4d3f11af6ee605d1139e3d3360753361658a9a3d10"
+          },
+          "uri": "file:att/design-0-source-freeze.intoto.json"
+         },
+         "step": "source-freeze",
+         "tools": [
+          {
+           "name": "hslsa",
+           "version": "0.1"
+          }
+         ]
+        },
+        {
+         "provenanceRef": {
+          "digest": {
+           "sha256": "2ef1c01860380a0cb6eec739c25a4019ab85a79d4ceef2d75501b0234592bb7e"
+          },
+          "uri": "file:att/design-1-simulation.intoto.json"
+         },
+         "step": "simulation",
+         "tools": [
+          {
+           "digest": {
+            "sha256": "a6071e4b4a68feafca0c8ee0e6aa275eee9a43a108c62801cfd1eca6eab6d8a3"
+           },
+           "name": "iverilog",
+           "version": "Icarus Verilog version 12.0 (stable) ()"
+          },
+          {
+           "digest": {
+            "sha256": "a10bd7d4a0850308ac8c2c98115b6a3084f9be978307610f2a521190c28f4023"
+           },
+           "name": "vvp",
+           "version": "Icarus Verilog runtime version 12.0 (stable) ()"
+          }
+         ]
+        },
+        {
+         "provenanceRef": {
+          "digest": {
+           "sha256": "a4e6adca9ddb843f2810941ba99c712aaa004fe45031a0ac3d5c4a138025b046"
+          },
+          "uri": "file:att/design-2-synthesis.intoto.json"
+         },
+         "step": "synthesis",
+         "tools": [
+          {
+           "digest": {
+            "sha256": "88c0a12bb814a1a8716b1ae10b482e35d3005ed558e1f5f626b3dc983ea3abd0"
+           },
+           "name": "yosys",
+           "version": "Yosys 0.33 (git sha1 2584903a060)"
+          }
+         ]
+        },
+        {
+         "provenanceRef": {
+          "digest": {
+           "sha256": "e6a6c8891c560241cefadb1d27f97e5991912cfa2c0623306c966b055f0525a3"
+          },
+          "uri": "file:att/design-3-signoff.intoto.json"
+         },
+         "step": "signoff",
+         "tools": [
+          {
+           "digest": {
+            "sha256": "88c0a12bb814a1a8716b1ae10b482e35d3005ed558e1f5f626b3dc983ea3abd0"
+           },
+           "name": "yosys",
+           "version": "Yosys 0.33 (git sha1 2584903a060)"
+          }
+         ]
+        },
+        {
+         "provenanceRef": {
+          "digest": {
+           "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+          },
+          "uri": "file:att/design-release.intoto.json"
+         },
+         "step": "release",
+         "tools": [
+          {
+           "name": "hslsa",
+           "version": "0.1"
+          }
+         ]
+        }
+       ],
+       "ipBlocks": [
+        {
+         "kind": "soft",
+         "license": "ISC",
+         "name": "picorv32",
+         "source": {
+          "digest": {
+           "gitCommit": "ef203c2b0a3fb793280f5114941416c425c5b461"
+          },
+          "uri": "https://github.com/YosysHQ/picorv32"
+         },
+         "supplier": {
+          "name": "YosysHQ"
+         }
+        }
+       ],
+       "rtlSources": [
+        {
+         "digest": {
+          "sha256": "0836050971b3c6cdd28ac3b1e5719a67fb645161912bef1e472e63995ceb0622"
+         },
+         "language": "Verilog",
+         "path": "picorv32.v",
+         "repo": "https://github.com/YosysHQ/picorv32"
+        },
+        {
+         "digest": {
+          "sha256": "bc4bb99e07b5f49fcd0ae8cd3ccb6d071cf318a4d242853aecaa207c7d152be1"
+         },
+         "language": "Verilog",
+         "path": "testbench_ez.v",
+         "repo": "https://github.com/YosysHQ/picorv32"
+        }
+       ]
+      },
+      "hbomVersion": "0.1",
+      "manufacturing": {
+       "assembly": {
+        "assemblyLot": "ASM-EXAMPLE-17",
+        "attestationRef": {
+         "digest": {
+          "sha256": "496d0f37b7c99b791da8a30031ad5382a68273ac36cf25bcd81c838261b6a217"
+         },
+         "uri": "file:att/mfg-f3-packaging.intoto.json"
+        },
+        "osat": {
+         "country": "US",
+         "name": "Example OSAT"
+        },
+        "packageType": "QFN-64 7x7 mm"
+       },
+       "fab": {
+        "attestationRef": {
+         "digest": {
+          "sha256": "27a3c63961ba2e238f9c7250bad15faf3c97d9ae9035be651e61b488de4f84b9"
+         },
+         "uri": "file:att/mfg-f1-wafer-fab.intoto.json"
+        },
+        "foundry": {
+         "country": "US",
+         "name": "Example Wafer Fab"
+        },
+        "maskSetId": "MS-EXAMPLE-0001",
+        "processNode": "SKY130 (130 nm CMOS)"
+       },
+       "test": [
+        {
+         "program": {
+          "name": "psoc130-probe",
+          "version": "1.0.0"
+         },
+         "resultsRef": {
+          "digest": {
+           "sha256": "777f45b237b07f392b3a5362b83a39ea7a8eb6b47afcc08411c2abe9eef106fb"
+          },
+          "uri": "file:att/mfg-f2-wafer-sort.intoto.json"
+         },
+         "site": {
+          "country": "US",
+          "name": "Example Sort House"
+         },
+         "stage": "wafer-sort"
+        },
+        {
+         "program": {
+          "name": "psoc130-ft",
+          "version": "1.2.0"
+         },
+         "resultsRef": {
+          "digest": {
+           "sha256": "9369a8edf0dbc0ead667ecde67adc242de790c54c29260f4c49e590061048b04"
+          },
+          "uri": "file:att/mfg-f4-final-test.intoto.json"
+         },
+         "site": {
+          "country": "US",
+          "name": "Example Test House"
+         },
+         "stage": "final-test"
+        }
+       ],
+       "waferLots": [
+        {
+         "lotId": "LOT-EXAMPLE-A",
+         "waferIds": [
+          "W01",
+          "W02"
+         ]
+        }
+       ]
+      },
+      "product": {
+       "deviceIdentity": {
+        "scheme": "serial",
+        "serial": "per unit; the shipped lot lists every serial"
+       },
+       "level": "package",
+       "manufacturer": {
+        "country": "US",
+        "name": "Example Open Silicon Group"
+       },
+       "name": "picorv32-hslsa-e2e",
+       "partNumber": "PSOC130-QFN64",
+       "revision": "A0"
+      },
+      "renderings": [
+       {
+        "digest": {
+         "sha256": "94f8327390dc4f1f7ac131c6b86a3f43c083ebe4c345b917778f99d359f80861"
+        },
+        "format": "CycloneDX-1.6",
+        "uri": "file:att/hbom.cdx.json"
+       },
+       {
+        "digest": {
+         "sha256": "5300b06d4ec9751b06aaa4df6526cde20be8bb6d5392dfb4e673ea331c547265"
+        },
+        "format": "SPDX-3.1-RC1",
+        "uri": "file:att/hbom.spdx.json"
+       }
+      ]
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/hbom/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+       },
+       "name": "picorv32.netlist.v"
+      },
+      {
+       "digest": {
+        "sha256": "4876860b247bffbd0ceedf5bb53d278f9a25251619cd68dee4d740a4c73cbaf1"
+       },
+       "name": "urn:hslsa:lot:ASM-EXAMPLE-17"
+      }
+     ]
+    }
+   },
+   "sha256": "13ecd62d9c63c0f1cd6f69ee55f1edc2d824b5cfc736b1ddfeb41291b249457c",
+   "size": 6323
+  },
+  "att/hbom.spdx.json": {
+   "sha256": "5300b06d4ec9751b06aaa4df6526cde20be8bb6d5392dfb4e673ea331c547265",
+   "size": 44270
+  },
+  "att/ip-picorv32.intoto.json": {
+   "envelope": {
+    "keys": [
+     "a17a9c5f206c630652d4b14ef92edc5fca766dc3c8a307e13567a1c95bba82b2"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "ip-vendor"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/ip-release@v1",
+       "externalParameters": {
+        "ip": "picorv32",
+        "license": "ISC",
+        "repo": "https://github.com/YosysHQ/picorv32",
+        "supplier": "YosysHQ",
+        "version": "ef203c2b0a3fb793280f5114941416c425c5b461"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "gitCommit": "ef203c2b0a3fb793280f5114941416c425c5b461"
+         },
+         "uri": "git+https://github.com/YosysHQ/picorv32@ef203c2b0a3fb793280f5114941416c425c5b461"
+        }
+       ]
+      },
+      "runDetails": {
+       "builder": {
+        "id": "https://github.com/Horiodino/hw-slsa/local-run"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:10:31Z",
+        "invocationId": "local",
+        "startedOn": "2026-10-07T03:10:31Z"
+       }
+      }
+     },
+     "predicateType": "https://slsa.dev/provenance/v1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "0836050971b3c6cdd28ac3b1e5719a67fb645161912bef1e472e63995ceb0622"
+       },
+       "name": "picorv32.v"
+      }
+     ]
+    }
+   },
+   "sha256": "0753e7d5332ff0791ba3279d2ffc95ef6dedf7f2e14f418af90a05d153710c28",
+   "size": 1443
+  },
+  "att/mfg-f1-wafer-fab.intoto.json": {
+   "envelope": {
+    "keys": [
+     "832931b2d7548cb8d3c5b71c5cc44d401cd74a1f115a348dcd25617d86e20cc6"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "fab-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/wafer-fab@v1",
+       "externalParameters": {
+        "lotId": "LOT-EXAMPLE-A",
+        "maskSetId": "MS-EXAMPLE-0001",
+        "processNode": "SKY130 (130 nm CMOS)"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+         },
+         "name": "att/design-release.intoto.json"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "mask-vs-gds-xor",
+         "result": "pass"
+        },
+        {
+         "name": "inline-parametrics",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "designRef": {
+        "digest": {
+         "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+        },
+        "name": "picorv32.netlist.v",
+        "release": {
+         "digest": {
+          "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+         },
+         "name": "att/design-release.intoto.json"
+        }
+       },
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "wafer fab, wafer sort, packaging and final test: the lot, its wafer maps, genealogy and test results are made up"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example Wafer Fab"
+       },
+       "step": "wafer-fab"
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-wafer-fab"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "wafer-fab:LOT-EXAMPLE-A"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "438a13a4c303541d6d09133ad5b828484326fefbebd79f636ce439b3aab2f680"
+       },
+       "name": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+      }
+     ]
+    }
+   },
+   "sha256": "27a3c63961ba2e238f9c7250bad15faf3c97d9ae9035be651e61b488de4f84b9",
+   "size": 2231
+  },
+  "att/mfg-f2-wafer-sort.intoto.json": {
+   "envelope": {
+    "keys": [
+     "fce211522922008412e12b894590ba9251fd8afec8d29b4d22370731d7f5bf0e"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "sort-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/wafer-sort@v1",
+       "externalParameters": {
+        "lotId": "LOT-EXAMPLE-A",
+        "probeProgram": {
+         "name": "psoc130-probe",
+         "version": "1.0.0"
+        }
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "5872f94f334e6e6975081c01c4e95ea3e668586fab3fdff632056f3500c97a99"
+         },
+         "name": "att/mfg-transfer-wafer-fab.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "438a13a4c303541d6d09133ad5b828484326fefbebd79f636ce439b3aab2f680"
+         },
+         "name": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "probe",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "designRef": {
+        "digest": {
+         "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+        },
+        "name": "picorv32.netlist.v",
+        "release": {
+         "digest": {
+          "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+         },
+         "name": "att/design-release.intoto.json"
+        }
+       },
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "wafer fab, wafer sort, packaging and final test: the lot, its wafer maps, genealogy and test results are made up"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example Sort House"
+       },
+       "step": "wafer-sort",
+       "yield": {
+        "failed": 4,
+        "in": 50,
+        "passed": 46
+       }
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-sort-house"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "wafer-sort:LOT-EXAMPLE-A"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "f86ce880e233d27876a2ece36412287ef05a8d6de94dfb6323041c9c26a0932d"
+       },
+       "name": "wafer-maps.json"
+      }
+     ]
+    }
+   },
+   "sha256": "777f45b237b07f392b3a5362b83a39ea7a8eb6b47afcc08411c2abe9eef106fb",
+   "size": 2371
+  },
+  "att/mfg-f3-packaging.intoto.json": {
+   "envelope": {
+    "keys": [
+     "d17294de5275e4142179810e081c031e8b3ab7a9a64f7231605e57fe59487b5d"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "osat-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/packaging@v1",
+       "externalParameters": {
+        "lotId": "ASM-EXAMPLE-17",
+        "packageType": "QFN-64 7x7 mm"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "69eb918e542d3d70dfeb16fa7d1e19c454685de8fd3689f14fc850f14d6a43c6"
+         },
+         "name": "att/mfg-transfer-wafer-sort.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "f86ce880e233d27876a2ece36412287ef05a8d6de94dfb6323041c9c26a0932d"
+         },
+         "name": "wafer-maps.json"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "die-attach",
+         "result": "pass"
+        },
+        {
+         "name": "wire-bond",
+         "result": "pass"
+        },
+        {
+         "name": "x-ray-sample",
+         "result": "pass"
+        },
+        {
+         "name": "marking",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "designRef": {
+        "digest": {
+         "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+        },
+        "name": "picorv32.netlist.v",
+        "release": {
+         "digest": {
+          "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+         },
+         "name": "att/design-release.intoto.json"
+        }
+       },
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "wafer fab, wafer sort, packaging and final test: the lot, its wafer maps, genealogy and test results are made up"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example OSAT"
+       },
+       "step": "packaging"
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-osat"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "packaging:ASM-EXAMPLE-17"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "09a9efdf3366473420dc56c65c077fe8d42f1e474ea63b85ba85445dbe805244"
+       },
+       "name": "urn:hslsa:assembly-lot:ASM-EXAMPLE-17"
+      },
+      {
+       "digest": {
+        "sha256": "f3b54611e00b4a5b385a4289495d84b4b780a03e8ea51236a7891cf7e9196fbd"
+       },
+       "name": "genealogy.json"
+      }
+     ]
+    }
+   },
+   "sha256": "496d0f37b7c99b791da8a30031ad5382a68273ac36cf25bcd81c838261b6a217",
+   "size": 2563
+  },
+  "att/mfg-f4-final-test.intoto.json": {
+   "envelope": {
+    "keys": [
+     "c7c0297a75db07e6e8077cc150ecc6a18b6d6dd059f51faaea42def1a449dfcc"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "test-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/final-test@v1",
+       "externalParameters": {
+        "lotId": "ASM-EXAMPLE-17",
+        "testProgram": {
+         "name": "psoc130-ft",
+         "version": "1.2.0"
+        }
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "3568b757b9a7d6d6c88ac78d8cc9ba2774894c3c4e1db9e146da3b96e366a2ab"
+         },
+         "name": "att/mfg-transfer-packaging.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "09a9efdf3366473420dc56c65c077fe8d42f1e474ea63b85ba85445dbe805244"
+         },
+         "name": "urn:hslsa:assembly-lot:ASM-EXAMPLE-17"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "final-test-per-unit",
+         "result": "pass"
+        },
+        {
+         "name": "yield-within-limits",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "designRef": {
+        "digest": {
+         "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+        },
+        "name": "picorv32.netlist.v",
+        "release": {
+         "digest": {
+          "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+         },
+         "name": "att/design-release.intoto.json"
+        }
+       },
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "wafer fab, wafer sort, packaging and final test: the lot, its wafer maps, genealogy and test results are made up"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example Test House"
+       },
+       "step": "final-test",
+       "yield": {
+        "failed": [
+         "PSOC130-A0-00007",
+         "PSOC130-A0-00019",
+         "PSOC130-A0-00033"
+        ],
+        "in": 40,
+        "passed": 37
+       }
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-test-house"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "final-test:ASM-EXAMPLE-17"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "4876860b247bffbd0ceedf5bb53d278f9a25251619cd68dee4d740a4c73cbaf1"
+       },
+       "name": "urn:hslsa:lot:ASM-EXAMPLE-17"
+      },
+      {
+       "digest": {
+        "sha256": "f42a0aa78356da5053b242858536fd63a767d0d936d0a4440dc7d67fb3875269"
+       },
+       "name": "final-test-results.json"
+      }
+     ]
+    }
+   },
+   "sha256": "9369a8edf0dbc0ead667ecde67adc242de790c54c29260f4c49e590061048b04",
+   "size": 2699
+  },
+  "att/mfg-transfer-packaging.intoto.json": {
+   "envelope": {
+    "keys": [
+     "d17294de5275e4142179810e081c031e8b3ab7a9a64f7231605e57fe59487b5d"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "osat-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/distribution@v1",
+       "externalParameters": {
+        "id": "packaging:urn:hslsa:assembly-lot:ASM-EXAMPLE-17",
+        "lotId": "urn:hslsa:assembly-lot:ASM-EXAMPLE-17"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "496d0f37b7c99b791da8a30031ad5382a68273ac36cf25bcd81c838261b6a217"
+         },
+         "name": "att/mfg-f3-packaging.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "09a9efdf3366473420dc56c65c077fe8d42f1e474ea63b85ba85445dbe805244"
+         },
+         "name": "urn:hslsa:assembly-lot:ASM-EXAMPLE-17"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "packing-list-matches-lot",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "designRef": {
+        "digest": {
+         "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+        },
+        "name": "picorv32.netlist.v",
+        "release": {
+         "digest": {
+          "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+         },
+         "name": "att/design-release.intoto.json"
+        }
+       },
+       "receiver": {
+        "country": "US",
+        "name": "Example Test House"
+       },
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "wafer fab, wafer sort, packaging and final test: the lot, its wafer maps, genealogy and test results are made up"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example OSAT"
+       },
+       "step": "distribution"
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-osat"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "transfer-packaging:urn:hslsa:assembly-lot:ASM-EXAMPLE-17"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "3fbadc304d976af2689e802fdba3f7c12ade5878242035b31c52a7e3a0fc1805"
+       },
+       "name": "transfer-packaging.json"
+      }
+     ]
+    }
+   },
+   "sha256": "3568b757b9a7d6d6c88ac78d8cc9ba2774894c3c4e1db9e146da3b96e366a2ab",
+   "size": 2471
+  },
+  "att/mfg-transfer-wafer-fab.intoto.json": {
+   "envelope": {
+    "keys": [
+     "832931b2d7548cb8d3c5b71c5cc44d401cd74a1f115a348dcd25617d86e20cc6"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "fab-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/distribution@v1",
+       "externalParameters": {
+        "id": "wafer-fab:urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+        "lotId": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "27a3c63961ba2e238f9c7250bad15faf3c97d9ae9035be651e61b488de4f84b9"
+         },
+         "name": "att/mfg-f1-wafer-fab.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "438a13a4c303541d6d09133ad5b828484326fefbebd79f636ce439b3aab2f680"
+         },
+         "name": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "packing-list-matches-lot",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "designRef": {
+        "digest": {
+         "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+        },
+        "name": "picorv32.netlist.v",
+        "release": {
+         "digest": {
+          "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+         },
+         "name": "att/design-release.intoto.json"
+        }
+       },
+       "receiver": {
+        "country": "US",
+        "name": "Example Sort House"
+       },
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "wafer fab, wafer sort, packaging and final test: the lot, its wafer maps, genealogy and test results are made up"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example Wafer Fab"
+       },
+       "step": "distribution"
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-wafer-fab"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "transfer-wafer-fab:urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "d56262f3a2db15ed2f965b26cea74c2e0b926122b3fd34922c4203a3f72c3711"
+       },
+       "name": "transfer-wafer-fab.json"
+      }
+     ]
+    }
+   },
+   "sha256": "5872f94f334e6e6975081c01c4e95ea3e668586fab3fdff632056f3500c97a99",
+   "size": 2511
+  },
+  "att/mfg-transfer-wafer-sort.intoto.json": {
+   "envelope": {
+    "keys": [
+     "fce211522922008412e12b894590ba9251fd8afec8d29b4d22370731d7f5bf0e"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "sort-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/distribution@v1",
+       "externalParameters": {
+        "id": "wafer-sort:urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A",
+        "lotId": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "777f45b237b07f392b3a5362b83a39ea7a8eb6b47afcc08411c2abe9eef106fb"
+         },
+         "name": "att/mfg-f2-wafer-sort.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "438a13a4c303541d6d09133ad5b828484326fefbebd79f636ce439b3aab2f680"
+         },
+         "name": "urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "packing-list-matches-lot",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "designRef": {
+        "digest": {
+         "sha256": "c0a95f0730a8321ed4a3392214e958957e57ee3239deae615b2a526b89be89d3"
+        },
+        "name": "picorv32.netlist.v",
+        "release": {
+         "digest": {
+          "sha256": "b0f27f4447ea26c9ee4f59a48fd414e8b6eb8a502fc74d4179b4b937215cd873"
+         },
+         "name": "att/design-release.intoto.json"
+        }
+       },
+       "receiver": {
+        "country": "US",
+        "name": "Example OSAT"
+       },
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "wafer fab, wafer sort, packaging and final test: the lot, its wafer maps, genealogy and test results are made up"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example Sort House"
+       },
+       "step": "distribution"
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-sort-house"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:29Z",
+        "invocationId": "transfer-wafer-sort:urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "53e2bbec641d3a1a61c242380ec83c70c446c6e8f4568a8f7156eb334bb77237"
+       },
+       "name": "transfer-wafer-sort.json"
+      }
+     ]
+    }
+   },
+   "sha256": "69eb918e542d3d70dfeb16fa7d1e19c454685de8fd3689f14fc850f14d6a43c6",
+   "size": 2511
+  },
+  "att/source-review.intoto.json": {
+   "envelope": {
+    "keys": [
+     "f18543be3b8f270856456d77283fabc6c0a6760362721d912f67d68150ecf941"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "source-reviewer"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "author": "Example RTL Engineer <rtl-engineer@example.com> 1788264000 +0000",
+      "decision": "approved",
+      "repo": "https://git.example.com/example-open-silicon/picosoc-rtl.git",
+      "reviewedAt": "2026-10-07T03:10:31Z",
+      "reviewer": "Example RTL Reviewer <rtl-reviewer@example.com>",
+      "scope": "full tree"
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/source-review/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "gitCommit": "d9feac4a82a290458f04a26c3ae92e97d5d19488"
+       },
+       "name": "https://git.example.com/example-open-silicon/picosoc-rtl.git"
+      }
+     ]
+    }
+   },
+   "sha256": "0b083e117c6558839de0a2bceac2a8f3cb865213ce72a67fc55972a8b8eb29ea",
+   "size": 1055
+  },
+  "policy.json": {
+   "sha256": "7be24a19979cd39979dc74373bed6eda604f13912ef870584c567a3fcc787aaa",
+   "size": 1691
+  },
+  "trust-root.json": {
+   "sha256": "8d9ac58c7bac8f30a2b628818624b5a01ffb094f16b21f39465569a49b4cc745",
+   "size": 2214
+  }
+ },
+ "parts": {},
+ "policy": {
+  "claims": {
+   "design": [
+    "HSLSA_DESIGN_LEVEL_3",
+    "SLSA_BUILD_LEVEL_3"
+   ],
+   "lot": [
+    "HSLSA_WAFER_LEVEL_2",
+    "HSLSA_PACKAGE_TEST_LEVEL_2",
+    "HSLSA_DESIGN_LEVEL_3"
+   ]
+  },
+  "design": {
+   "allowedTools": [
+    "iverilog",
+    "vvp",
+    "yosys"
+   ],
+   "consumes": {
+    "signoff": [
+     "source-freeze"
+    ],
+    "simulation": [
+     "source-freeze"
+    ],
+    "synthesis": [
+     "source-freeze"
+    ]
+   },
+   "equivalence": {
+    "step": "signoff"
+   },
+   "finalArtifactFrom": "synthesis",
+   "requiredSteps": [
+    "source-freeze",
+    "simulation",
+    "synthesis",
+    "signoff"
+   ],
+   "source": {
+    "reviewer": "source-reviewer",
+    "tagSigner": "source-owner"
+   },
+   "thirdPartyIP": [
+    {
+     "files": [
+      "picorv32.v"
+     ],
+     "name": "picorv32",
+     "signer": "ip-vendor"
+    }
+   ],
+   "toolPins": [
+    {
+     "name": "iverilog",
+     "package": {
+      "name": "iverilog",
+      "treeDigest": "5d0e1b1ab20e281f7bdcfd9a758c7adf540b55c934f8a6b845eeb20160d0c567",
+      "version": "12.0-2build2"
+     },
+     "sha256": "a6071e4b4a68feafca0c8ee0e6aa275eee9a43a108c62801cfd1eca6eab6d8a3"
+    },
+    {
+     "name": "vvp",
+     "package": {
+      "name": "iverilog",
+      "treeDigest": "5d0e1b1ab20e281f7bdcfd9a758c7adf540b55c934f8a6b845eeb20160d0c567",
+      "version": "12.0-2build2"
+     },
+     "sha256": "a10bd7d4a0850308ac8c2c98115b6a3084f9be978307610f2a521190c28f4023"
+    },
+    {
+     "name": "yosys",
+     "package": {
+      "name": "yosys",
+      "treeDigest": "55582b4ee82c589891402bd1cd249c347a773d0b9425b8de6ebdbedb4757c1a0",
+      "version": "0.33-5build2"
+     },
+     "sha256": "88c0a12bb814a1a8716b1ae10b482e35d3005ed558e1f5f626b3dc983ea3abd0"
+    }
+   ]
+  },
+  "manufacturing": {
+   "requireTransfers": true
+  },
+  "simulated": {
+   "accept": true,
+   "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."
+  }
+ },
+ "received": [
+  "PSOC130-A0-00001",
+  "PSOC130-A0-00020",
+  "PSOC130-A0-00040"
+ ],
+ "trustRoot": {
+  "roles": [
+   "fab-site",
+   "flow-platform",
+   "ip-vendor",
+   "osat-site",
+   "product-owner",
+   "sort-site",
+   "source-owner",
+   "source-reviewer",
+   "tapeout-authority",
+   "test-site"
+  ],
+  "validUntil": null
+ }
+}

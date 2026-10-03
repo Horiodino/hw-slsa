@@ -124,6 +124,7 @@ tools/hslsa/     the Go reference tool and verifier (library and tests)
   cmd/hslsa/     the hslsa command
   testdata/      throwaway test keys and fixtures
 adapters/        the EDA Tcl hook (the other adapters are hslsa subcommands)
+policies/rego/   buyer policies in Rego for OPA, with their tests
 hbom/            HBOM schema, committed example HBOMs and their renderings
   formats/       the official CycloneDX 1.6 and SPDX 3.1-RC1 schemas renderings are checked against
 e2e/             inputs and scripts for each example: picorv32, board, fpga, caliptra, eda-tcl, pilot
@@ -160,6 +161,7 @@ site/            the documentation website: page generator, templates, build.sh
 | [`docs/release.md`](docs/release.md) | Making a release, and pulling and running the `hslsa` container image |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phases from draft to real use, exit criteria, open owner decisions |
 | [`docs/levels.md`](docs/levels.md) | What the reference tool checks at L3 and L4 in each track, and which example shows it |
+| [`docs/rego-policies.md`](docs/rego-policies.md) | The tapeout, lot receipt and board receipt checks as Rego policies, run with OPA and openssl instead of the reference tool |
 | [`pilot/`](pilot/README.md) | The pilot kit for one buyer |
 | [`site/`](site/README.md) | The documentation website, built from the markdown above |
 
@@ -204,6 +206,7 @@ Each example script builds the tool into `bin/hslsa` itself (set `HSLSA` to use 
 | `e2e/board/run.sh produce`, then `verify` | after `e2e/run.sh produce` | [board-example.md](docs/board-example.md) |
 | `e2e/board/run.sh l3`, `l4` | after `e2e/run.sh l3`; bubblewrap and SoftHSM2 for the chip lot | [levels.md](docs/levels.md) |
 | `e2e/escrow.sh produce`, `audit`, `buyer`, `leaks` | after `e2e/run.sh produce` | [selective-disclosure.md](docs/selective-disclosure.md) |
+| `e2e/rego/run.sh out/bundle`, `out/board` | after `e2e/run.sh produce` / `e2e/board/run.sh produce`; OPA, openssl, ssh-keygen and jq, but no Go | [rego-policies.md](docs/rego-policies.md) |
 | `e2e/eda-tcl/run.sh` | Yosys | [adapters/eda-tcl](adapters/eda-tcl/README.md) |
 | `e2e/fpga/run.sh produce`, `boot`, `verify`, `l3`, `l4` | Yosys, nextpnr-ice40, IceStorm, Icarus Verilog, a RISC-V GCC; bubblewrap and SoftHSM2 for `l3` and `l4` | [fpga-board-example.md](docs/fpga-board-example.md) |
 | `e2e/pilot/run.sh chip` / `board` | after `e2e/run.sh produce` / after the FPGA example's `produce` and `boot` | [pilot/README.md](pilot/README.md#the-rehearsal) |
@@ -276,7 +279,7 @@ Six GitHub Actions workflows in [`.github/workflows/`](.github/workflows):
 
 | Workflow | Runs | Jobs |
 | --- | --- | --- |
-| [`hslsa-e2e.yml`](.github/workflows/hslsa-e2e.yml) | Every push and pull request | Lint and unit tests (gofmt, vet, tests, govulncheck, HBOM schema); produce (PicoRV32, proxy, adapters, pilot chip rehearsal, HSM, EDA Tcl, board, escrow); verify (buyer, slsa-verifier); escrow |
+| [`hslsa-e2e.yml`](.github/workflows/hslsa-e2e.yml) | Every push and pull request | Lint and unit tests (gofmt, vet, tests, govulncheck, HBOM schema); produce (PicoRV32, proxy, adapters, pilot chip rehearsal, HSM, EDA Tcl, board, escrow); verify (buyer, slsa-verifier, then the same bundles with OPA and openssl); escrow |
 | [`fpga-board-e2e.yml`](.github/workflows/fpga-board-e2e.yml) | Changes to the tool, the FPGA example or the pilot | Produce and boot, then verify and the pilot board rehearsal |
 | [`caliptra-e2e.yml`](.github/workflows/caliptra-e2e.yml) | Pushes to main, pull requests touching the tool or the example | Produce, verify; `verify-rtl` only when dispatched by hand with `rtl` set |
 | [`openlane2-flow.yml`](.github/workflows/openlane2-flow.yml) | Changes to `openlane2/`, the EDA hook or the tool | Flow, independent rebuild, verify |

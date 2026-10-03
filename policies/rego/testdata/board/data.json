@@ -1,0 +1,1310 @@
+{
+ "files": {
+  "artifacts/board-build.json": {
+   "json": {
+    "DEVB-A-0001": {
+     "placements": {
+      "C1": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C2": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C3": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C4": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C5": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C6": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "PCB1": {
+       "lot": "EXAMPLE-PCB-LOT-01",
+       "mpn": "PSOC-DEVB-01-PCB"
+      },
+      "R1": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "R2": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "U1": {
+       "lot": "ASM-EXAMPLE-17",
+       "mpn": "PSOC130-QFN64",
+       "unit": "PSOC130-A0-00001"
+      },
+      "U2": {
+       "lot": "EXAMPLE-WB-LOT-0001",
+       "mpn": "W25Q128JVSIQ"
+      },
+      "U3": {
+       "lot": "EXAMPLE-TI-LOT-0001",
+       "mpn": "TLV75518PDBVR"
+      },
+      "U4": {
+       "lot": "EXAMPLE-TI-LOT-0002",
+       "mpn": "TLV75533PDBVR"
+      },
+      "Y1": {
+       "lot": "EXAMPLE-AB-LOT-0001",
+       "mpn": "ASE-12.000MHZ-LC-T"
+      }
+     },
+     "result": "pass"
+    },
+    "DEVB-A-0002": {
+     "placements": {
+      "C1": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C2": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C3": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C4": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C5": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C6": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "PCB1": {
+       "lot": "EXAMPLE-PCB-LOT-01",
+       "mpn": "PSOC-DEVB-01-PCB"
+      },
+      "R1": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "R2": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "U1": {
+       "lot": "ASM-EXAMPLE-17",
+       "mpn": "PSOC130-QFN64",
+       "unit": "PSOC130-A0-00002"
+      },
+      "U2": {
+       "lot": "EXAMPLE-WB-LOT-0001",
+       "mpn": "W25Q128JVSIQ"
+      },
+      "U3": {
+       "lot": "EXAMPLE-TI-LOT-0001",
+       "mpn": "TLV75518PDBVR"
+      },
+      "U4": {
+       "lot": "EXAMPLE-TI-LOT-0002",
+       "mpn": "TLV75533PDBVR"
+      },
+      "Y1": {
+       "lot": "EXAMPLE-AB-LOT-0001",
+       "mpn": "ASE-12.000MHZ-LC-T"
+      }
+     },
+     "result": "pass"
+    },
+    "DEVB-A-0003": {
+     "placements": {
+      "C1": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C2": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C3": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C4": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C5": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C6": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "PCB1": {
+       "lot": "EXAMPLE-PCB-LOT-01",
+       "mpn": "PSOC-DEVB-01-PCB"
+      },
+      "R1": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "R2": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "U1": {
+       "lot": "ASM-EXAMPLE-17",
+       "mpn": "PSOC130-QFN64",
+       "unit": "PSOC130-A0-00003"
+      },
+      "U2": {
+       "lot": "EXAMPLE-WB-LOT-0001",
+       "mpn": "W25Q128JVSIQ"
+      },
+      "U3": {
+       "lot": "EXAMPLE-TI-LOT-0001",
+       "mpn": "TLV75518PDBVR"
+      },
+      "U4": {
+       "lot": "EXAMPLE-TI-LOT-0002",
+       "mpn": "TLV75533PDBVR"
+      },
+      "Y1": {
+       "lot": "EXAMPLE-AB-LOT-0001",
+       "mpn": "ASE-12.000MHZ-LC-T"
+      }
+     },
+     "result": "pass"
+    },
+    "DEVB-A-0004": {
+     "placements": {
+      "C1": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C2": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C3": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C4": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C5": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C6": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "PCB1": {
+       "lot": "EXAMPLE-PCB-LOT-01",
+       "mpn": "PSOC-DEVB-01-PCB"
+      },
+      "R1": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "R2": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "U1": {
+       "lot": "ASM-EXAMPLE-17",
+       "mpn": "PSOC130-QFN64",
+       "unit": "PSOC130-A0-00004"
+      },
+      "U2": {
+       "lot": "EXAMPLE-WB-LOT-0001",
+       "mpn": "W25Q128JVSIQ"
+      },
+      "U3": {
+       "lot": "EXAMPLE-TI-LOT-0001",
+       "mpn": "TLV75518PDBVR"
+      },
+      "U4": {
+       "lot": "EXAMPLE-TI-LOT-0002",
+       "mpn": "TLV75533PDBVR"
+      },
+      "Y1": {
+       "lot": "EXAMPLE-AB-LOT-0001",
+       "mpn": "ASE-12.000MHZ-LC-T"
+      }
+     },
+     "result": "fail"
+    },
+    "DEVB-A-0005": {
+     "placements": {
+      "C1": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C2": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C3": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C4": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C5": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C6": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "PCB1": {
+       "lot": "EXAMPLE-PCB-LOT-01",
+       "mpn": "PSOC-DEVB-01-PCB"
+      },
+      "R1": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "R2": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "U1": {
+       "lot": "ASM-EXAMPLE-17",
+       "mpn": "PSOC130-QFN64",
+       "unit": "PSOC130-A0-00005"
+      },
+      "U2": {
+       "lot": "EXAMPLE-WB-LOT-0001",
+       "mpn": "W25Q128JVSIQ"
+      },
+      "U3": {
+       "lot": "EXAMPLE-TI-LOT-0001",
+       "mpn": "TLV75518PDBVR"
+      },
+      "U4": {
+       "lot": "EXAMPLE-TI-LOT-0002",
+       "mpn": "TLV75533PDBVR"
+      },
+      "Y1": {
+       "lot": "EXAMPLE-AB-LOT-0001",
+       "mpn": "ASE-12.000MHZ-LC-T"
+      }
+     },
+     "result": "pass"
+    },
+    "DEVB-A-0006": {
+     "placements": {
+      "C1": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C2": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C3": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C4": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C5": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "C6": {
+       "lot": "EXAMPLE-MU-LOT-0001",
+       "mpn": "GRM188R61A106KE69D"
+      },
+      "PCB1": {
+       "lot": "EXAMPLE-PCB-LOT-01",
+       "mpn": "PSOC-DEVB-01-PCB"
+      },
+      "R1": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "R2": {
+       "lot": "EXAMPLE-YG-LOT-0001",
+       "mpn": "RC0402FR-0710KL"
+      },
+      "U1": {
+       "lot": "ASM-EXAMPLE-17",
+       "mpn": "PSOC130-QFN64",
+       "unit": "PSOC130-A0-00006"
+      },
+      "U2": {
+       "lot": "EXAMPLE-WB-LOT-0001",
+       "mpn": "W25Q128JVSIQ"
+      },
+      "U3": {
+       "lot": "EXAMPLE-TI-LOT-0001",
+       "mpn": "TLV75518PDBVR"
+      },
+      "U4": {
+       "lot": "EXAMPLE-TI-LOT-0002",
+       "mpn": "TLV75533PDBVR"
+      },
+      "Y1": {
+       "lot": "EXAMPLE-AB-LOT-0001",
+       "mpn": "ASE-12.000MHZ-LC-T"
+      }
+     },
+     "result": "pass"
+    }
+   },
+   "sha256": "c19c835f8eec996bce13bdc9dc7590ee3e38b90ed8a965ed90e875a38895a9a6",
+   "size": 8595
+  },
+  "artifacts/board-design.json": {
+   "json": {
+    "board": "PSOC-DEVB-01",
+    "bom": [
+     {
+      "description": "Bare PCB, 4 layer FR-4, 50 x 40 mm",
+      "manufacturer": "Example PCB Fab",
+      "mpn": "PSOC-DEVB-01-PCB",
+      "refDes": [
+       "PCB1"
+      ]
+     },
+     {
+      "description": "PicoSoC on SKY130, QFN-64 (the example chip)",
+      "manufacturer": "Example Open Silicon Group",
+      "mpn": "PSOC130-QFN64",
+      "refDes": [
+       "U1"
+      ]
+     },
+     {
+      "description": "128 Mbit SPI NOR flash, SOIC-8, holds the bootloader and runtime images",
+      "manufacturer": "Winbond Electronics",
+      "mpn": "W25Q128JVSIQ",
+      "refDes": [
+       "U2"
+      ]
+     },
+     {
+      "description": "1.8 V 500 mA LDO for the core, SOT-23-5",
+      "manufacturer": "Texas Instruments",
+      "mpn": "TLV75518PDBVR",
+      "refDes": [
+       "U3"
+      ]
+     },
+     {
+      "description": "3.3 V 500 mA LDO for I/O and flash, SOT-23-5",
+      "manufacturer": "Texas Instruments",
+      "mpn": "TLV75533PDBVR",
+      "refDes": [
+       "U4"
+      ]
+     },
+     {
+      "description": "12 MHz CMOS oscillator, 3.2 x 2.5 mm",
+      "manufacturer": "Abracon",
+      "mpn": "ASE-12.000MHZ-LC-T",
+      "refDes": [
+       "Y1"
+      ]
+     },
+     {
+      "description": "10 uF 10 V X5R 0603 decoupling",
+      "manufacturer": "Murata Electronics",
+      "mpn": "GRM188R61A106KE69D",
+      "refDes": [
+       "C1",
+       "C2",
+       "C3",
+       "C4",
+       "C5",
+       "C6"
+      ]
+     },
+     {
+      "description": "10 kOhm 1% 0402 pull-ups",
+      "manufacturer": "YAGEO",
+      "mpn": "RC0402FR-0710KL",
+      "refDes": [
+       "R1",
+       "R2"
+      ]
+     }
+    ],
+    "note": "Released board design for the board-level example. Stands in for the full design package (schematic, Gerbers, pick-and-place); its digest is the board HBOM's design subject.",
+    "revision": "A"
+   },
+   "sha256": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d",
+   "size": 1445
+  },
+  "artifacts/board-lot.txt": {
+   "sha256": "d0c032429682df39bdf9a3d23021639f0987ce5695367cdd6c83283053657462",
+   "size": 60,
+   "text": "DEVB-A-0001\nDEVB-A-0002\nDEVB-A-0003\nDEVB-A-0005\nDEVB-A-0006\n"
+  },
+  "artifacts/shipment-EXAMPLE-SHIP-0001.json": {
+   "json": {
+    "id": "EXAMPLE-SHIP-0001",
+    "lines": [
+     {
+      "dateCode": "EXAMPLE-2636",
+      "lot": "ASM-EXAMPLE-17",
+      "manufacturer": "Example Open Silicon Group",
+      "mpn": "PSOC130-QFN64",
+      "quantity": 8,
+      "units": [
+       "PSOC130-A0-00001",
+       "PSOC130-A0-00002",
+       "PSOC130-A0-00003",
+       "PSOC130-A0-00004",
+       "PSOC130-A0-00005",
+       "PSOC130-A0-00006",
+       "PSOC130-A0-00008",
+       "PSOC130-A0-00009"
+      ]
+     },
+     {
+      "dateCode": "EXAMPLE-2621",
+      "lot": "EXAMPLE-WB-LOT-0001",
+      "manufacturer": "Winbond Electronics",
+      "mpn": "W25Q128JVSIQ",
+      "quantity": 10
+     },
+     {
+      "dateCode": "EXAMPLE-2618",
+      "lot": "EXAMPLE-TI-LOT-0001",
+      "manufacturer": "Texas Instruments",
+      "mpn": "TLV75518PDBVR",
+      "quantity": 10
+     },
+     {
+      "dateCode": "EXAMPLE-2619",
+      "lot": "EXAMPLE-TI-LOT-0002",
+      "manufacturer": "Texas Instruments",
+      "mpn": "TLV75533PDBVR",
+      "quantity": 10
+     },
+     {
+      "dateCode": "EXAMPLE-2611",
+      "lot": "EXAMPLE-AB-LOT-0001",
+      "manufacturer": "Abracon",
+      "mpn": "ASE-12.000MHZ-LC-T",
+      "quantity": 10
+     },
+     {
+      "dateCode": "EXAMPLE-2602",
+      "lot": "EXAMPLE-MU-LOT-0001",
+      "manufacturer": "Murata Electronics",
+      "mpn": "GRM188R61A106KE69D",
+      "quantity": 100
+     },
+     {
+      "dateCode": "EXAMPLE-2605",
+      "lot": "EXAMPLE-YG-LOT-0001",
+      "manufacturer": "YAGEO",
+      "mpn": "RC0402FR-0710KL",
+      "quantity": 100
+     }
+    ],
+    "shipDate": "2026-09-14",
+    "shipper": {
+     "country": "US",
+     "name": "Example Franchised Distributor"
+    }
+   },
+   "sha256": "1c037b3dad802ebe69a978c32509db4d9babdd6b24fa8f2b59e6e270eeaa4ffd",
+   "size": 1648
+  },
+  "artifacts/shipment-EXAMPLE-SHIP-0002.json": {
+   "json": {
+    "id": "EXAMPLE-SHIP-0002",
+    "lines": [
+     {
+      "dateCode": "EXAMPLE-2637",
+      "lot": "EXAMPLE-PCB-LOT-01",
+      "manufacturer": "Example PCB Fab",
+      "mpn": "PSOC-DEVB-01-PCB",
+      "quantity": 8
+     }
+    ],
+    "shipDate": "2026-09-15",
+    "shipper": {
+     "country": "US",
+     "name": "Example PCB Fab"
+    }
+   },
+   "sha256": "4e32ac7371af0bf634690f30aecfb3aa7f119aedb5fc2bc8c8dc3b641a2504f7",
+   "size": 324
+  },
+  "att/hbom.cdx.json": {
+   "sha256": "459c043f2d43919fab5d7066a9dc647b975173335f54bb6699e91f7cc2fd81d9",
+   "size": 16138
+  },
+  "att/hbom.intoto.json": {
+   "envelope": {
+    "keys": [
+     "6cc188339ff48a2c3d71f89c3ba9848ca5d45351077bfe0240ed523be6efa74b"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "board-owner"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "design": {
+       "finalLayout": {
+        "digest": {
+         "sha256": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+        },
+        "uri": "file:artifacts/board-design.json"
+       }
+      },
+      "hbomVersion": "0.1",
+      "manufacturing": {
+       "boardAssembly": {
+        "attestationRef": {
+         "digest": {
+          "sha256": "4ebe79e526482a7168c90c66c3652cb150c0db2c59395908891014a03bb5f5db"
+         },
+         "uri": "file:att/mfg-a1-board-assembly.intoto.json"
+        },
+        "boardLot": "BRD-EXAMPLE-01",
+        "ems": {
+         "country": "US",
+         "name": "Example EMS"
+        }
+       }
+      },
+      "parts": [
+       {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2637",
+        "distributionRef": {
+         "digest": {
+          "sha256": "623341eab90f0a6bbc88b495164151ad16fd0e6dac9f016d28e13e2cf88288fa"
+         },
+         "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0002.intoto.json"
+        },
+        "distributor": {
+         "country": "US",
+         "name": "Example PCB Fab"
+        },
+        "lot": "EXAMPLE-PCB-LOT-01",
+        "manufacturer": {
+         "name": "Example PCB Fab"
+        },
+        "mpn": "PSOC-DEVB-01-PCB",
+        "refDes": [
+         "PCB1"
+        ]
+       },
+       {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2636",
+        "distributionRef": {
+         "digest": {
+          "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47"
+         },
+         "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+         "country": "US",
+         "name": "Example Franchised Distributor"
+        },
+        "hbomRef": {
+         "digest": {
+          "sha256": "13ecd62d9c63c0f1cd6f69ee55f1edc2d824b5cfc736b1ddfeb41291b249457c"
+         },
+         "uri": "file:parts/picosoc/att/hbom.intoto.json"
+        },
+        "lot": "ASM-EXAMPLE-17",
+        "manufacturer": {
+         "name": "Example Open Silicon Group"
+        },
+        "mpn": "PSOC130-QFN64",
+        "refDes": [
+         "U1"
+        ]
+       },
+       {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2621",
+        "distributionRef": {
+         "digest": {
+          "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47"
+         },
+         "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+         "country": "US",
+         "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-WB-LOT-0001",
+        "manufacturer": {
+         "name": "Winbond Electronics"
+        },
+        "mpn": "W25Q128JVSIQ",
+        "refDes": [
+         "U2"
+        ]
+       },
+       {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2618",
+        "distributionRef": {
+         "digest": {
+          "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47"
+         },
+         "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+         "country": "US",
+         "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-TI-LOT-0001",
+        "manufacturer": {
+         "name": "Texas Instruments"
+        },
+        "mpn": "TLV75518PDBVR",
+        "refDes": [
+         "U3"
+        ]
+       },
+       {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2619",
+        "distributionRef": {
+         "digest": {
+          "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47"
+         },
+         "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+         "country": "US",
+         "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-TI-LOT-0002",
+        "manufacturer": {
+         "name": "Texas Instruments"
+        },
+        "mpn": "TLV75533PDBVR",
+        "refDes": [
+         "U4"
+        ]
+       },
+       {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2611",
+        "distributionRef": {
+         "digest": {
+          "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47"
+         },
+         "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+         "country": "US",
+         "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-AB-LOT-0001",
+        "manufacturer": {
+         "name": "Abracon"
+        },
+        "mpn": "ASE-12.000MHZ-LC-T",
+        "refDes": [
+         "Y1"
+        ]
+       },
+       {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2602",
+        "distributionRef": {
+         "digest": {
+          "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47"
+         },
+         "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+         "country": "US",
+         "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-MU-LOT-0001",
+        "manufacturer": {
+         "name": "Murata Electronics"
+        },
+        "mpn": "GRM188R61A106KE69D",
+        "refDes": [
+         "C1",
+         "C2",
+         "C3",
+         "C4",
+         "C5",
+         "C6"
+        ]
+       },
+       {
+        "authorized": true,
+        "dateCode": "EXAMPLE-2605",
+        "distributionRef": {
+         "digest": {
+          "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47"
+         },
+         "uri": "file:att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        "distributor": {
+         "country": "US",
+         "name": "Example Franchised Distributor"
+        },
+        "lot": "EXAMPLE-YG-LOT-0001",
+        "manufacturer": {
+         "name": "YAGEO"
+        },
+        "mpn": "RC0402FR-0710KL",
+        "refDes": [
+         "R1",
+         "R2"
+        ]
+       }
+      ],
+      "product": {
+       "deviceIdentity": {
+        "scheme": "serial",
+        "serial": "per board; the board lot lists every serial"
+       },
+       "level": "board",
+       "manufacturer": {
+        "country": "US",
+        "name": "Example Open Silicon Group"
+       },
+       "name": "picosoc-devboard",
+       "partNumber": "PSOC-DEVB-01",
+       "revision": "A"
+      },
+      "renderings": [
+       {
+        "digest": {
+         "sha256": "459c043f2d43919fab5d7066a9dc647b975173335f54bb6699e91f7cc2fd81d9"
+        },
+        "format": "CycloneDX-1.6",
+        "uri": "file:att/hbom.cdx.json"
+       },
+       {
+        "digest": {
+         "sha256": "b146fa3cdeed40b03dd68dffd2f5e5a9aad1bb1ebb5b5d331568f6da2ed8cc73"
+        },
+        "format": "SPDX-3.1-RC1",
+        "uri": "file:att/hbom.spdx.json"
+       }
+      ]
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/hbom/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+       },
+       "name": "board-design.json"
+      },
+      {
+       "digest": {
+        "sha256": "d0c032429682df39bdf9a3d23021639f0987ce5695367cdd6c83283053657462"
+       },
+       "name": "urn:hslsa:lot:BRD-EXAMPLE-01"
+      }
+     ]
+    }
+   },
+   "sha256": "2083cc3404abb368728954763c43cfe2397a540f804b36775ed5b88633f22e82",
+   "size": 6611
+  },
+  "att/hbom.spdx.json": {
+   "sha256": "b146fa3cdeed40b03dd68dffd2f5e5a9aad1bb1ebb5b5d331568f6da2ed8cc73",
+   "size": 36269
+  },
+  "att/mfg-a1-board-assembly.intoto.json": {
+   "envelope": {
+    "keys": [
+     "e18fca00e6a3b5e6cf6f84fb9224de12c50f5f85db64d0add74f0c7971b853c1"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "ems-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/board-assembly@v1",
+       "externalParameters": {
+        "boardDesign": "board-design.json",
+        "id": "BRD-EXAMPLE-01"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47"
+         },
+         "name": "att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "623341eab90f0a6bbc88b495164151ad16fd0e6dac9f016d28e13e2cf88288fa"
+         },
+         "name": "att/mfg-distribution-EXAMPLE-SHIP-0002.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "13ecd62d9c63c0f1cd6f69ee55f1edc2d824b5cfc736b1ddfeb41291b249457c"
+         },
+         "name": "parts/picosoc/att/hbom.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "9369a8edf0dbc0ead667ecde67adc242de790c54c29260f4c49e590061048b04"
+         },
+         "name": "parts/picosoc/att/mfg-f4-final-test.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "0bc9d5cddc7a116c088ac51f2124b53f75bf7a78071fc34ddbfd655c6bbe7f61"
+         },
+         "name": "att/receipt-ASM-EXAMPLE-17.vsa.intoto.json"
+        },
+        {
+         "digest": {
+          "sha256": "4876860b247bffbd0ceedf5bb53d278f9a25251619cd68dee4d740a4c73cbaf1"
+         },
+         "name": "urn:hslsa:lot:ASM-EXAMPLE-17"
+        },
+        {
+         "digest": {
+          "sha256": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+         },
+         "name": "board-design.json"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "part-lot-receipt-check",
+         "result": "pass"
+        },
+        {
+         "name": "aoi",
+         "result": "pass"
+        },
+        {
+         "name": "x-ray-sample",
+         "result": "pass"
+        },
+        {
+         "name": "ict",
+         "result": "pass"
+        },
+        {
+         "name": "functional-test",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "designRef": {
+        "digest": {
+         "sha256": "1390190a4e0b720c23eff32fc13b8198965c85033dd96b6d4428daf4e5d5e23d"
+        },
+        "name": "board-design.json"
+       },
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "the distributors' shipments and the EMS line: placement, inspection and board test"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example EMS"
+       },
+       "step": "board-assembly",
+       "yield": {
+        "failed": [
+         "DEVB-A-0004"
+        ],
+        "in": 6,
+        "passed": 5
+       }
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-ems"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:30Z",
+        "invocationId": "board-assembly:BRD-EXAMPLE-01"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "d0c032429682df39bdf9a3d23021639f0987ce5695367cdd6c83283053657462"
+       },
+       "name": "urn:hslsa:lot:BRD-EXAMPLE-01"
+      },
+      {
+       "digest": {
+        "sha256": "c67538c4cb6fcc400b2e3075174a189019ebfb9ce8030b5f1b95578c0791814c"
+       },
+       "name": "urn:hslsa:board:example-open-silicon-group:DEVB-A-0001"
+      },
+      {
+       "digest": {
+        "sha256": "bff6d082f8579fae490905b26ff41834196c99a83740cd44ce5900246204ce02"
+       },
+       "name": "urn:hslsa:board:example-open-silicon-group:DEVB-A-0002"
+      },
+      {
+       "digest": {
+        "sha256": "977d1b68ae7392d8ce745e75efe9b75b416c41fce13534c22de6d9704638cede"
+       },
+       "name": "urn:hslsa:board:example-open-silicon-group:DEVB-A-0003"
+      },
+      {
+       "digest": {
+        "sha256": "1e759ae615a67ecdc89697215270095673623d8ffc83b0a40dbb7bcd3fed161d"
+       },
+       "name": "urn:hslsa:board:example-open-silicon-group:DEVB-A-0005"
+      },
+      {
+       "digest": {
+        "sha256": "fa61e8e6f0cc3bbc7483ce4a7cf6bcf45fbaccf3ecb57e6846c13e189c7c22a5"
+       },
+       "name": "urn:hslsa:board:example-open-silicon-group:DEVB-A-0006"
+      },
+      {
+       "digest": {
+        "sha256": "c19c835f8eec996bce13bdc9dc7590ee3e38b90ed8a965ed90e875a38895a9a6"
+       },
+       "name": "board-build.json"
+      }
+     ]
+    }
+   },
+   "sha256": "4ebe79e526482a7168c90c66c3652cb150c0db2c59395908891014a03bb5f5db",
+   "size": 4439
+  },
+  "att/mfg-distribution-EXAMPLE-SHIP-0001.intoto.json": {
+   "envelope": {
+    "keys": [
+     "5dc15427274e5acc07250908e773fa4b5dcc227142e6320c76054d3369173347"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "dist-franchised"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/distribution@v1",
+       "externalParameters": {
+        "id": "EXAMPLE-SHIP-0001",
+        "shipDate": "2026-09-14"
+       },
+       "resolvedDependencies": [
+        {
+         "digest": {
+          "sha256": "4876860b247bffbd0ceedf5bb53d278f9a25251619cd68dee4d740a4c73cbaf1"
+         },
+         "name": "urn:hslsa:lot:ASM-EXAMPLE-17"
+        }
+       ]
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "certificate-of-conformance",
+         "result": "pass"
+        },
+        {
+         "name": "traceable-to-manufacturer",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "the distributors' shipments and the EMS line: placement, inspection and board test"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example Franchised Distributor"
+       },
+       "step": "distribution"
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-franchised-distributor"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:30Z",
+        "invocationId": "distribution:EXAMPLE-SHIP-0001"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "1c037b3dad802ebe69a978c32509db4d9babdd6b24fa8f2b59e6e270eeaa4ffd"
+       },
+       "name": "shipment-EXAMPLE-SHIP-0001.json"
+      }
+     ]
+    }
+   },
+   "sha256": "fffa0a6213bb6b91e2f06401c6494a6c1891b5a6d6eb0fa2f12b7b2a7cabec47",
+   "size": 1839
+  },
+  "att/mfg-distribution-EXAMPLE-SHIP-0002.intoto.json": {
+   "envelope": {
+    "keys": [
+     "cdafa14a3e69552ae7c0cc2dfb64cb0ea48b8483a84f9ed1496ce956a5ca37f4"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "pcb-fab"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "buildDefinition": {
+       "buildType": "https://github.com/Horiodino/hw-slsa/mfg/step/distribution@v1",
+       "externalParameters": {
+        "id": "EXAMPLE-SHIP-0002",
+        "shipDate": "2026-09-15"
+       },
+       "resolvedDependencies": []
+      },
+      "hwMfg": {
+       "checks": [
+        {
+         "name": "certificate-of-conformance",
+         "result": "pass"
+        },
+        {
+         "name": "traceable-to-manufacturer",
+         "result": "pass"
+        }
+       ],
+       "confidential": [],
+       "simulated": {
+        "simulator": "hand-written scenario",
+        "standsIn": "the distributors' shipments and the EMS line: placement, inspection and board test"
+       },
+       "site": {
+        "country": "US",
+        "name": "Example PCB Fab"
+       },
+       "step": "distribution"
+      },
+      "runDetails": {
+       "builder": {
+        "id": "urn:hslsa:site:example-pcb-fab"
+       },
+       "metadata": {
+        "finishedOn": "2026-10-07T03:12:30Z",
+        "invocationId": "distribution:EXAMPLE-SHIP-0002"
+       }
+      }
+     },
+     "predicateType": "https://github.com/Horiodino/hw-slsa/manufacturing-step/v0.1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "4e32ac7371af0bf634690f30aecfb3aa7f119aedb5fc2bc8c8dc3b641a2504f7"
+       },
+       "name": "shipment-EXAMPLE-SHIP-0002.json"
+      }
+     ]
+    }
+   },
+   "sha256": "623341eab90f0a6bbc88b495164151ad16fd0e6dac9f016d28e13e2cf88288fa",
+   "size": 1631
+  },
+  "att/receipt-ASM-EXAMPLE-17.vsa.intoto.json": {
+   "envelope": {
+    "keys": [
+     "e18fca00e6a3b5e6cf6f84fb9224de12c50f5f85db64d0add74f0c7971b853c1"
+    ],
+    "payloadType": "application/vnd.in-toto+json",
+    "signedBy": [
+     "ems-site"
+    ],
+    "statement": {
+     "_type": "https://in-toto.io/Statement/v1",
+     "predicate": {
+      "inputAttestations": [
+       {
+        "digest": {
+         "sha256": "27a3c63961ba2e238f9c7250bad15faf3c97d9ae9035be651e61b488de4f84b9"
+        },
+        "uri": "file:parts/picosoc/att/mfg-f1-wafer-fab.intoto.json"
+       },
+       {
+        "digest": {
+         "sha256": "777f45b237b07f392b3a5362b83a39ea7a8eb6b47afcc08411c2abe9eef106fb"
+        },
+        "uri": "file:parts/picosoc/att/mfg-f2-wafer-sort.intoto.json"
+       },
+       {
+        "digest": {
+         "sha256": "496d0f37b7c99b791da8a30031ad5382a68273ac36cf25bcd81c838261b6a217"
+        },
+        "uri": "file:parts/picosoc/att/mfg-f3-packaging.intoto.json"
+       },
+       {
+        "digest": {
+         "sha256": "9369a8edf0dbc0ead667ecde67adc242de790c54c29260f4c49e590061048b04"
+        },
+        "uri": "file:parts/picosoc/att/mfg-f4-final-test.intoto.json"
+       },
+       {
+        "digest": {
+         "sha256": "5872f94f334e6e6975081c01c4e95ea3e668586fab3fdff632056f3500c97a99"
+        },
+        "uri": "file:parts/picosoc/att/mfg-transfer-wafer-fab.intoto.json"
+       },
+       {
+        "digest": {
+         "sha256": "69eb918e542d3d70dfeb16fa7d1e19c454685de8fd3689f14fc850f14d6a43c6"
+        },
+        "uri": "file:parts/picosoc/att/mfg-transfer-wafer-sort.intoto.json"
+       },
+       {
+        "digest": {
+         "sha256": "3568b757b9a7d6d6c88ac78d8cc9ba2774894c3c4e1db9e146da3b96e366a2ab"
+        },
+        "uri": "file:parts/picosoc/att/mfg-transfer-packaging.intoto.json"
+       },
+       {
+        "digest": {
+         "sha256": "13ecd62d9c63c0f1cd6f69ee55f1edc2d824b5cfc736b1ddfeb41291b249457c"
+        },
+        "uri": "file:parts/picosoc/att/hbom.intoto.json"
+       }
+      ],
+      "policy": {
+       "digest": {
+        "sha256": "7be24a19979cd39979dc74373bed6eda604f13912ef870584c567a3fcc787aaa"
+       },
+       "uri": "file:policy.json"
+      },
+      "resourceUri": "urn:hslsa:lot:ASM-EXAMPLE-17",
+      "timeVerified": "2026-10-07T03:12:30Z",
+      "verificationResult": "PASSED",
+      "verifiedLevels": [
+       "HSLSA_WAFER_LEVEL_2",
+       "HSLSA_PACKAGE_TEST_LEVEL_2",
+       "HSLSA_DESIGN_LEVEL_3",
+       "HSLSA_SIMULATED"
+      ],
+      "verifier": {
+       "id": "https://github.com/Horiodino/hw-slsa/tools/hslsa/verify@v0.1"
+      }
+     },
+     "predicateType": "https://slsa.dev/verification_summary/v1",
+     "subject": [
+      {
+       "digest": {
+        "sha256": "e6fc38ed6ce55c4752213d5cf3f4236d946dd28adceffe47c42eca1018f9d7aa"
+       },
+       "name": "urn:hslsa:receipt:ASM-EXAMPLE-17"
+      }
+     ]
+    }
+   },
+   "sha256": "0bc9d5cddc7a116c088ac51f2124b53f75bf7a78071fc34ddbfd655c6bbe7f61",
+   "size": 2847
+  },
+  "policy.json": {
+   "sha256": "eb3d0fe2b8a4fbd13c12e3d0f8251edb603daa0c75c69ad1a7dabee63226f782",
+   "size": 883
+  },
+  "trust-root.json": {
+   "sha256": "552b936ced6c1ae378b6d52bb339d6db530c1a16d1e32483c2472f5b09e16d01",
+   "size": 1112
+  }
+ },
+ "parts": {},
+ "policy": {
+  "claims": {
+   "board": [
+    "HSLSA_ASSEMBLY_LEVEL_2"
+   ]
+  },
+  "note": "The buyer's policy for the board. Each shipper signs with its own role in the trust root and may ship, as an authorized channel, only the manufacturers listed for it.",
+  "requireAuthorizedChannel": true,
+  "shippers": {
+   "Example Components Broker": {
+    "authorizedFor": [],
+    "role": "dist-broker"
+   },
+   "Example Franchised Distributor": {
+    "authorizedFor": [
+     "Example Open Silicon Group",
+     "Winbond Electronics",
+     "Texas Instruments",
+     "Abracon",
+     "Murata Electronics",
+     "YAGEO"
+    ],
+    "role": "dist-franchised"
+   },
+   "Example PCB Fab": {
+    "authorizedFor": [
+     "Example PCB Fab"
+    ],
+    "role": "pcb-fab"
+   }
+  },
+  "simulated": {
+   "accept": true,
+   "note": "The example's manufacturing is simulated, so this policy accepts records made from simulated hardware. A policy for real parts leaves this out."
+  }
+ },
+ "received": [
+  "DEVB-A-0001",
+  "DEVB-A-0005"
+ ],
+ "trustRoot": {
+  "roles": [
+   "board-owner",
+   "dist-broker",
+   "dist-franchised",
+   "ems-site",
+   "pcb-fab"
+  ],
+  "validUntil": null
+ }
+}

@@ -86,6 +86,7 @@ var pages = []page{
 
 	// reference/cli.md and reference/hbom-schema.md are generated below.
 	{src: "hbom/formats/README.md", out: "reference/sbom-formats.md"},
+	{src: "docs/rego-policies.md", out: "reference/rego-policies.md", nav: "Buyer policies in Rego"},
 
 	{src: "docs/roadmap.md", out: "project/roadmap.md", nav: "Roadmap"},
 	{src: "docs/viability.md", out: "project/viability.md", nav: "Viability assessment"},

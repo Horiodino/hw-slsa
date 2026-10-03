@@ -1,4 +1,5 @@
 {
+  "claimedLevels": ["HSLSA_DESIGN_LEVEL_3", "HSLSA_WAFER_LEVEL_2", "HSLSA_PACKAGE_TEST_LEVEL_2"],
   "simulated": {"simulator": "sample exports written by tools/hslsa/adapt_test.go from the PicoRV32 scenario", "standsIn": "the fab's, sort house's, OSAT's and test house's MES and tester exports"},
   "product": {
     "name": "picorv32-hslsa-e2e",
@@ -38,7 +39,7 @@
       {"operation": "MARK", "check": "marking"}
     ]
   },
-  "transfers": true,
+  "transfers": "mes",
   "finalTest": {
     "site": {"name": "Example Test House", "country": "US"},
     "sources": [{"path": "ft-ASM-EXAMPLE-17.stdf", "format": "stdf-v4"}]

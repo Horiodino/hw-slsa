@@ -39,7 +39,7 @@ func designRebuildSteps(lock Obj) []string {
 
 func runDesignStep(step, bundle, lockPath, key string, isolate bool, fpga bool) error {
 	if !fpga {
-		return Synthesis(bundle, lockPath, key, isolate)
+		return Synthesis(bundle, lockPath, key, isolate, nil)
 	}
 	run := map[string]func(string, string, string) error{"synthesis": FPGASynthesis, "routing": FPGARouting, "bitstream": FPGABitstream}
 	return run[step](bundle, lockPath, key)

@@ -152,19 +152,32 @@ func failedChecks(checks []Obj) []string {
 	return failed
 }
 
-// finish signs a step record, then refuses to continue if one of its gates failed.
-func finish(bundle, step string, subjects []Obj, pred Obj, signer *Signer) error {
+// finish signs a step record, withholding the fields w names for the step,
+// then refuses to continue if one of its gates failed.
+func finish(bundle, step string, subjects []Obj, pred Obj, signer *Signer, w *Withholding) error {
+	pred, disclosures, err := withhold(pred, DesignFlow, w.fields(step))
+	if err != nil {
+		return fmt.Errorf("%s: %w", step, err)
+	}
 	stmt, err := statement(subjects, DesignFlow, pred)
 	if err != nil {
 		return err
 	}
-	if _, err := Sign(stmt, signer, filepath.Join(bundle, "att", AttName(step))); err != nil {
+	path := filepath.Join(bundle, "att", AttName(step))
+	if _, err := Sign(stmt, signer, path); err != nil {
+		return err
+	}
+	if err := writeDisclosures(path, disclosures); err != nil {
 		return err
 	}
 	if failed := failedChecks(Objs(pred, "hwFlow", "checks")); len(failed) > 0 {
 		return fmt.Errorf("%s: gate failed: %s (failure recorded in the attestation)", step, strings.Join(failed, ", "))
 	}
-	fmt.Printf("%s: ok, %d subject(s)\n", step, len(subjects))
+	msg := fmt.Sprintf("%s: ok, %d subject(s)", step, len(subjects))
+	if len(disclosures) > 0 {
+		msg += fmt.Sprintf(", %d field(s) withheld", len(disclosures))
+	}
+	fmt.Println(msg)
 	return nil
 }
 
@@ -299,17 +312,17 @@ func download(url, path string) error {
 }
 
 // SourceFreeze is step 0: fetch the pinned RTL, check every digest, and freeze it into one archive.
-func SourceFreeze(bundle, lockPath, key, cache string) error {
-	return sourceFreeze(bundle, lockPath, key, cache, "", "")
+func SourceFreeze(bundle, lockPath, key, cache string, w *Withholding) error {
+	return sourceFreeze(bundle, lockPath, key, cache, "", "", w)
 }
 
 // SourceFreezeL2 is step 0 at Design L2: it also gates on the signed, reviewed
 // tag and the IP vendor's provenance, and consumes all three by digest.
-func SourceFreezeL2(bundle, lockPath, key, cache, trustRoot, policyPath string) error {
-	return sourceFreeze(bundle, lockPath, key, cache, trustRoot, policyPath)
+func SourceFreezeL2(bundle, lockPath, key, cache, trustRoot, policyPath string, w *Withholding) error {
+	return sourceFreeze(bundle, lockPath, key, cache, trustRoot, policyPath, w)
 }
 
-func sourceFreeze(bundle, lockPath, key, cache, trustRoot, policyPath string) error {
+func sourceFreeze(bundle, lockPath, key, cache, trustRoot, policyPath string, w *Withholding) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
@@ -367,7 +380,7 @@ func sourceFreeze(bundle, lockPath, key, cache, trustRoot, policyPath string) er
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "source-freeze", []Obj{subject}, pred, signer)
+	return finish(bundle, "source-freeze", []Obj{subject}, pred, signer, w)
 }
 
 // stepRunner runs one design step's tools: in a sandbox of its own when the
@@ -424,7 +437,7 @@ func (r *stepRunner) collect(name, art string) error {
 }
 
 // Simulation is step 1: run the testbench on the frozen source.
-func Simulation(bundle, lockPath, key string, isolate bool) error {
+func Simulation(bundle, lockPath, key string, isolate bool, w *Withholding) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
@@ -490,7 +503,7 @@ func Simulation(bundle, lockPath, key string, isolate bool) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "simulation", []Obj{subject}, pred, signer)
+	return finish(bundle, "simulation", []Obj{subject}, pred, signer, w)
 }
 
 // synthesisScript is step 2's Yosys script. It reads the RTL the way the
@@ -508,7 +521,7 @@ func synthesisScript(files []string, top, stat, netlist string) string {
 }
 
 // Synthesis is step 2: synthesize the frozen RTL to a gate-level netlist.
-func Synthesis(bundle, lockPath, key string, isolate bool) error {
+func Synthesis(bundle, lockPath, key string, isolate bool, w *Withholding) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
@@ -581,7 +594,7 @@ func Synthesis(bundle, lockPath, key string, isolate bool) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "synthesis", subjects, pred, signer)
+	return finish(bundle, "synthesis", subjects, pred, signer, w)
 }
 
 // EquivalenceCheck is the check name of a formal equivalence proof between
@@ -627,7 +640,7 @@ const (
 // The record carries the script and consumes the source archive and the
 // netlist by digest, so anyone can run the same proof again
 // (RerunEquivalence).
-func Equivalence(bundle, lockPath, key string, isolate bool) error {
+func Equivalence(bundle, lockPath, key string, isolate bool, w *Withholding) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
@@ -683,7 +696,7 @@ func Equivalence(bundle, lockPath, key string, isolate bool) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "signoff", []Obj{logRD}, pred, signer)
+	return finish(bundle, "signoff", []Obj{logRD}, pred, signer, w)
 }
 
 // provenPattern is how equiv_status reports the proof.
@@ -798,7 +811,7 @@ func tapeoutGate(bundle, trustRoot, policyPath string) (Obj, error) {
 }
 
 // DesignRelease is the tapeout release: run the tapeout check, then sign the final design artifact.
-func DesignRelease(bundle, lockPath, key, trustRoot, policyPath string) error {
+func DesignRelease(bundle, lockPath, key, trustRoot, policyPath string, w *Withholding) error {
 	started := Now()
 	lock, err := ReadObj(lockPath)
 	if err != nil {
@@ -845,7 +858,7 @@ func DesignRelease(bundle, lockPath, key, trustRoot, policyPath string) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "release", []Obj{subject}, pred, signer)
+	return finish(bundle, "release", []Obj{subject}, pred, signer, w)
 }
 
 // ipBlocks lists the lock's third-party IP blocks for the release record.

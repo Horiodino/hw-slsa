@@ -1,4 +1,5 @@
 {
+  "claimedLevels": ["HSLSA_DESIGN_LEVEL_2", "HSLSA_WAFER_LEVEL_1", "HSLSA_PACKAGE_TEST_LEVEL_2"],
   "simulated": {"simulator": "sample exports written by tools/hslsa/adapt_test.go from the PicoRV32 scenario", "standsIn": "the foundry's and the OSAT Group's MES and tester exports"},
   "note": "The pilot lot: the PicoRV32 example's exports, with the OSAT Group's three sites (sort, assembly, test) signing their own records and the foundry signing nothing, so the sort site proxy-signs the fab's record from the fab's MES export.",
   "product": {

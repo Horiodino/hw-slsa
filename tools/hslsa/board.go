@@ -250,6 +250,10 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 	for _, s := range Objs(sc, "shipments") {
 		id := S(s, "id")
 		shipFile := filepath.Join(art, "shipment-"+id+".json")
+		s, exportDeps, importer, err := attachShipmentExports(bundle, filepath.Dir(scenarioPath), s)
+		if err != nil {
+			return err
+		}
 		if err := WriteJSON(shipFile, s); err != nil {
 			return err
 		}
@@ -273,10 +277,13 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 			return err
 		}
 		role := S(pol, "shippers", S(s, "shipper", "name"), "role")
+		hw := Obj{"site": get(s, "shipper"), "checks": passed("certificate-of-conformance", "traceable-to-manufacturer")}
+		if importer != nil {
+			hw["importer"] = importer
+		}
 		env, err := boardRecord(bundle, "distribution", ShipAtt(id), []Obj{subject},
-			Obj{"id": id, "shipDate": get(s, "shipDate")}, deps,
-			markSimulated(Obj{"site": get(s, "shipper"), "checks": passed("certificate-of-conformance", "traceable-to-manufacturer")}, sim),
-			filepath.Join(keys, role+".key.pem"))
+			Obj{"id": id, "shipDate": get(s, "shipDate")}, append(deps, exportDeps...),
+			markSimulated(hw, sim), filepath.Join(keys, role+".key.pem"))
 		if err != nil {
 			return err
 		}
@@ -503,6 +510,7 @@ func boardProduceWith(bundle, chipBundle, scenarioPath, designPath, policyPath, 
 		},
 		"parts": nonNil(parts),
 	}
+	addClaimedLevels(predicate, sc)
 	if extend != nil {
 		if err := extend(predicate); err != nil {
 			return err
@@ -627,6 +635,7 @@ func checkBoard(bundle string, trust *TrustRoot, policyPath string, received []s
 	// parts[]: every lot traces to a signed shipment whose data matches, through an allowed channel.
 	byRefDes := map[string]partLine{}
 	shipments := map[string]Obj{}
+	var exportNotes []string
 	inputs := []Obj{a1RD}
 	for _, part := range Objs(hb, "predicate", "parts") {
 		mpn, lot, mfr := S(part, "mpn"), S(part, "lot"), S(part, "manufacturer", "name")
@@ -656,6 +665,13 @@ func checkBoard(bundle string, trust *TrustRoot, policyPath string, received []s
 			data, err := ReadObj(filepath.Join(art, S(firstSubject(ship), "name")))
 			if err != nil {
 				return nil, failf("%s: shipment: %v", label, err)
+			}
+			note, err := shipmentExportsCheck(bundle, pol, ship, data, label)
+			if err != nil {
+				return nil, err
+			}
+			if note != "" {
+				exportNotes = append(exportNotes, note)
 			}
 			shipments[rel] = data
 			shipmentRels = append(shipmentRels, rel)
@@ -825,11 +841,16 @@ func checkBoard(bundle string, trust *TrustRoot, policyPath string, received []s
 	}
 	inputs = append(inputs, inspected...)
 	inputs = append([]Obj{relRD(bundle, "att/"+BoardHBOM)}, inputs...)
+	// Last, once every level the policy claims was checked: the HBOM may not claim more.
+	claimsLeft, err := claimedLevelsCheck(hb, get(pol, "claims", "board"), boardTracks, "board hbom")
+	if err != nil {
+		return nil, err
+	}
 	sim, err := simulatedCheck(bundle, pol, inputs, "board receipt check")
 	if err != nil {
 		return nil, err
 	}
-	return &LotResult{Lot: lotSubj, Inputs: inputs, Simulated: sim}, nil
+	return &LotResult{Lot: lotSubj, Inputs: inputs, Exports: exportNotes, Simulated: sim, ClaimsLeft: claimsLeft}, nil
 }
 
 // partCheck runs a part's own chain checks when it has an HBOM, checks the
@@ -998,7 +1019,14 @@ func BoardVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, vsaKey
 		msg += fmt.Sprintf(", %d received boards found in the lot", len(received))
 	}
 	fmt.Println(msg)
+	if len(result.Exports) > 0 {
+		fmt.Println("read again from the shippers' exports the distribution records carry:")
+		for _, line := range result.Exports {
+			fmt.Printf("  %s\n", line)
+		}
+	}
 	printSimulated(result.Simulated)
+	printClaimsLeft(result.ClaimsLeft, "board hbom")
 	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", BoardHBOM), "board hbom"); err != nil {
 		return nil, err
 	}

@@ -23,7 +23,13 @@
     "manufacturing": {"$ref": "#/$defs/manufacturing"},
     "firmware": {"type": "array", "items": {"$ref": "#/$defs/firmware"}},
     "parts": {"type": "array", "items": {"$ref": "#/$defs/part"}},
-    "redactions": {"type": "array", "items": {"$ref": "#/$defs/redaction"}}
+    "redactions": {"type": "array", "items": {"$ref": "#/$defs/redaction"}},
+    "claimedLevels": {
+      "description": "The levels the product owner claims for this product, one per track at most. A claim, not a result: a receipt check refuses an HBOM that claims more in a track than the check verified.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^HSLSA_(DESIGN|WAFER|PACKAGE_TEST|ASSEMBLY|FIRMWARE)_LEVEL_[1-4]$"}
+    }
   },
   "$defs": {
     "digestSet": {

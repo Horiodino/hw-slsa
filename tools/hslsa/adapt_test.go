@@ -472,9 +472,14 @@ func TestAdaptedLotVerifies(t *testing.T) {
 }
 
 func TestPolicyCanRequireExports(t *testing.T) {
-	// The main example's records carry no exports, so a policy that wants them refuses it.
-	rejects(t, chipCheckPolicy(t, chipBundle(t), nil, exportsPolicy),
-		"wafer-fab: the policy requires each record to carry its supplier's exports")
+	// The main example's records carry no exports, so a policy that wants them refuses it:
+	// first its transfers, then, with only the step records required, its first step.
+	bundle := chipBundle(t)
+	rejects(t, chipCheckPolicy(t, bundle, nil, exportsPolicy),
+		"transfer from wafer-fab: the policy requires each transfer to carry the sites' MES exports (manufacturing.requireTransferExports)")
+	steps := filepath.Join(t.TempDir(), "policy.json")
+	editJSON(t, ok(copyTo(exportsPolicy, steps)), func(p Obj) { delete(O(p, "manufacturing"), "requireTransferExports") })
+	rejects(t, chipCheckPolicy(t, bundle, nil, steps), "wafer-fab: the policy requires each record to carry its supplier's exports")
 }
 
 func TestChangedExportIsRejected(t *testing.T) {
@@ -534,8 +539,10 @@ func TestAdapterExamplesMatch(t *testing.T) {
 	// The proxy configuration and policies differ from the main ones only where they say so.
 	a, p := ok(ReadObj(exportsConfig)), ok(ReadObj(exportsProxyConfig))
 	delete(p, "unsigned")
+	delete(a, "claimedLevels")
+	delete(p, "claimedLevels")
 	if !jsonEqual(a, p) {
-		t.Error("adapter-proxy.json differs from adapter.json beyond its unsigned block")
+		t.Error("adapter-proxy.json differs from adapter.json beyond its unsigned block and claimed levels")
 	}
 	base, req, proxy := ok(ReadObj(e2ePolicy)), ok(ReadObj(exportsPolicy)), ok(ReadObj(exportsProxyPolicy))
 	if !jsonEqual(req["design"], base["design"]) || !jsonEqual(req["claims"], base["claims"]) || !jsonEqual(proxy["design"], base["design"]) {

@@ -1,0 +1,108 @@
+{
+  "@context": [
+    "https://ref.gs1.org/standards/epcis/epcis-context.jsonld"
+  ],
+  "type": "EPCISDocument",
+  "schemaVersion": "2.0",
+  "creationDate": "2026-09-14T18:00:00Z",
+  "epcisBody": {
+    "eventList": [
+      {
+        "type": "ObjectEvent",
+        "eventID": "ni:///sha-256;example-example-ship-0001-pack?ver=CBV2.0",
+        "eventTime": "2026-09-14T15:30:00Z",
+        "eventTimeZoneOffset": "+00:00",
+        "action": "OBSERVE",
+        "bizStep": "packing",
+        "disposition": "in_progress",
+        "quantityList": [
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000000.ASM-EXAMPLE-17",
+            "quantity": 8
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000001.EXAMPLE-WB-LOT-0001",
+            "quantity": 10
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000002.EXAMPLE-TI-LOT-0001",
+            "quantity": 10
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000003.EXAMPLE-TI-LOT-0002",
+            "quantity": 10
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000004.EXAMPLE-AB-LOT-0001",
+            "quantity": 10
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000005.EXAMPLE-MU-LOT-0001",
+            "quantity": 100
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000006.EXAMPLE-YG-LOT-0001",
+            "quantity": 100
+          }
+        ],
+        "readPoint": {
+          "id": "urn:epc:id:sgln:4012345.00001.0"
+        }
+      },
+      {
+        "type": "ObjectEvent",
+        "eventID": "ni:///sha-256;example-example-ship-0001-ship?ver=CBV2.0",
+        "eventTime": "2026-09-14T16:00:00Z",
+        "eventTimeZoneOffset": "+00:00",
+        "action": "OBSERVE",
+        "bizStep": "shipping",
+        "disposition": "in_transit",
+        "quantityList": [
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000000.ASM-EXAMPLE-17",
+            "quantity": 8
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000001.EXAMPLE-WB-LOT-0001",
+            "quantity": 10
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000002.EXAMPLE-TI-LOT-0001",
+            "quantity": 10
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000003.EXAMPLE-TI-LOT-0002",
+            "quantity": 10
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000004.EXAMPLE-AB-LOT-0001",
+            "quantity": 10
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000005.EXAMPLE-MU-LOT-0001",
+            "quantity": 100
+          },
+          {
+            "epcClass": "urn:epc:class:lgtin:4012345.000006.EXAMPLE-YG-LOT-0001",
+            "quantity": 100
+          }
+        ],
+        "readPoint": {
+          "id": "urn:epc:id:sgln:4012345.00001.0"
+        },
+        "sourceList": [
+          {
+            "type": "owning_party",
+            "source": "urn:epc:id:pgln:4012345.00000"
+          }
+        ],
+        "destinationList": [
+          {
+            "type": "owning_party",
+            "destination": "urn:epc:id:pgln:4098765.00000"
+          }
+        ]
+      }
+    ]
+  }
+}

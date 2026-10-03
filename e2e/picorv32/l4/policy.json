@@ -21,8 +21,9 @@
   "manufacturing": {"requireTransfers": true},
   "accreditations": ["dmea-trusted-supplier", "iso-iec-20243"],
   "inspection": {
-    "note": "Wafer L4 and Package/Test L4: an independent lab's seeded sample of at least five shipped units, with every metal layer and polysilicon imaged in the core and the register file.",
+    "note": "Wafer L4 and Package/Test L4: a seeded sample by an independent lab accredited under ISO/IEC 17025, of at least five shipped units, with every metal layer and polysilicon imaged in the core and the register file.",
     "minSample": 5,
+    "accreditations": ["iso-iec-17025"],
     "layers": ["met1", "met2", "met3", "met4", "met5", "poly"],
     "regions": ["core", "register-file"]
   },

@@ -142,6 +142,9 @@ func openEscrowVSA(path string, trust *TrustRoot, policy Obj, policyDigest strin
 	if err != nil {
 		return nil, err
 	}
+	if err := auditorAccredited(trust, policy, path); err != nil {
+		return nil, err
+	}
 	p := O(stmt, "predicate")
 	if S(p, "verifier", "id") != VerifierID {
 		return nil, failf("%s: verifier %s, want %s", label, S(p, "verifier", "id"), VerifierID)
@@ -165,6 +168,34 @@ func openEscrowVSA(path string, trust *TrustRoot, policy Obj, policyDigest strin
 		return nil, failf("%s: a VSA names one subject", label)
 	}
 	return stmt, nil
+}
+
+// auditorAccredited applies the policy's escrow.auditorAccreditations: when
+// it lists any, the VSA at path must be signed by an auditor key that the
+// buyer-run trust root enrolls with one of those accreditations, as sites
+// are at L3 and labs at L4.
+func auditorAccredited(trust *TrustRoot, policy Obj, path string) error {
+	accepted := Strs(policy, "escrow", "auditorAccreditations")
+	if len(accepted) == 0 {
+		return nil
+	}
+	what := filepath.Base(path)
+	k, err := trust.SignerKey(path, AuditorRole)
+	if err != nil {
+		return err
+	}
+	e, ok := trust.Enrolled[k.ID]
+	if !ok {
+		return failf("%s is signed by auditor key %s, which the trust root lists without an enrollment; escrow.auditorAccreditations needs a buyer-run trust root that records the auditor's accreditation", what, short(k.ID))
+	}
+	scheme := S(e, "accreditation", "scheme")
+	if scheme == "" {
+		return failf("%s is signed by auditor key %s of %s, which is enrolled with no accreditation; the policy accepts only an accredited auditor", what, short(k.ID), S(e, "organization", "name"))
+	}
+	if !contains(accepted, scheme) {
+		return failf("%s is signed by %s, accredited under %q, which the policy's escrow.auditorAccreditations do not list", what, S(e, "organization", "name"), scheme)
+	}
+	return nil
 }
 
 // EscrowCheck is the buyer's side: the auditor's two VSAs verify under the

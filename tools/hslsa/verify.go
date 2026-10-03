@@ -244,6 +244,7 @@ type LotResult struct {
 	OnBehalf    []string // records signed on a supplier's behalf, which hold their track at L1
 	Exports     []string // records checked against the supplier exports they carry
 	Simulated   []string // records made from simulated hardware, which the policy accepted
+	ClaimsLeft  []string // levels the HBOM claims in tracks this check does not cover
 }
 
 // LotCheck verifies F1 to F4, any transfers between them (all of them when
@@ -266,6 +267,7 @@ func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	by := map[string]string{}
 	capped := map[string]string{} // track -> the first record that holds it at L1
 	var transfers []Obj
+	var transferExports []string
 	var onBehalf []string
 	prev := design.Release
 	for i, step := range MfgSteps {
@@ -302,9 +304,12 @@ func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 			return nil, err
 		}
 		if i > 0 {
-			t, note, err := transferCheck(bundle, trust, policy, design, MfgSteps[i-1], stmts, stmt, prev)
+			t, note, exported, err := transferCheck(bundle, trust, policy, design, MfgSteps[i-1], stmts, stmt, prev)
 			if err != nil {
 				return nil, err
+			}
+			if exported != "" {
+				transferExports = append(transferExports, exported)
 			}
 			if note != "" {
 				onBehalf = append(onBehalf, note)
@@ -330,6 +335,7 @@ func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	}
 
 	exports, err := exportsCheck(bundle, policy, stmts)
+	exports = append(exports, transferExports...)
 	if err != nil {
 		return nil, err
 	}
@@ -469,6 +475,11 @@ func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	if err != nil {
 		return nil, err
 	}
+	// Last, once every level the policy claims was checked: the HBOM may not claim more.
+	claimsLeft, err := claimedLevelsCheck(hb, get(policy, "claims", "lot"), lotTracks, label)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, unit := range units {
 		if !contains(shipped, unit) {
@@ -486,7 +497,16 @@ func lotCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult,
 	if err != nil {
 		return nil, err
 	}
-	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded, OnBehalf: onBehalf, Exports: exports, Simulated: sim}, nil
+	logged, err := mfgLogCheck(bundle, trust, policy, inputs, "lot receipt check")
+	if err != nil {
+		return nil, err
+	}
+	proofs, err := unitCommitmentCheck(bundle, policy, stmts["final-test"], S(lotRD, "name"), shipped, units)
+	if err != nil {
+		return nil, err
+	}
+	inputs = append(append(inputs, logged...), proofs...)
+	return &LotResult{Lot: lotRD, Inputs: inputs, NotRecorded: notRecorded, OnBehalf: onBehalf, Exports: exports, Simulated: sim, ClaimsLeft: claimsLeft}, nil
 }
 
 // signVSA signs a SLSA Verification Summary Attestation for one subject,
@@ -578,6 +598,7 @@ func Verify(bundle string, trust *TrustRoot, policyPath, unitsPath, vsaKey, vsaD
 		}
 	}
 	printSimulated(lot.Simulated)
+	printClaimsLeft(lot.ClaimsLeft, "hbom")
 	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", "hbom.intoto.json"), "hbom"); err != nil {
 		return nil, nil, err
 	}

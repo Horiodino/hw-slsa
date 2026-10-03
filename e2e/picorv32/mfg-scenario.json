@@ -1,4 +1,5 @@
 {
+  "claimedLevels": ["HSLSA_DESIGN_LEVEL_3", "HSLSA_WAFER_LEVEL_2", "HSLSA_PACKAGE_TEST_LEVEL_2"],
   "simulated": {"simulator": "hand-written scenario", "standsIn": "wafer fab, wafer sort, packaging and final test: the lot, its wafer maps, genealogy and test results are made up"},
   "product": {
     "name": "picorv32-hslsa-e2e",

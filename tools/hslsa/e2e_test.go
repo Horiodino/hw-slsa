@@ -52,7 +52,7 @@ func TestLotDigestIsOrderIndependentAndRejectsDuplicates(t *testing.T) {
 
 func rebuildDownstream(bundle string) error {
 	keys := filepath.Join(filepath.Dir(bundle), "keys")
-	if err := DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy); err != nil {
+	if err := DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy, nil); err != nil {
 		return err
 	}
 	if err := Mfg(bundle, e2eScenario, keys, nil); err != nil {

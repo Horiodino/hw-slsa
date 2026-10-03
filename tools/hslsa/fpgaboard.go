@@ -705,14 +705,73 @@ type FPGAImages struct {
 	Inputs    []Obj
 }
 
+// fpgaImageSet is one flash image as fpgaImagesAt checked it.
+type fpgaImageSet struct {
+	FW, Flash        Obj // the firmware's and the flash image's provenance
+	FWImage, SBOM    Obj
+	FlashRD, CoRIMRD Obj
+	Manifest         Obj
+	RefValues        []RefValue
+	Want, Names      map[string]string // image digest and name by role
+}
+
 // FPGAImageCheck checks the images in the board's flash: the bitstream is the
 // design release, the firmware has provenance and an SBOM, the boot manifest
 // is signed by the board owner's code signer and lists exactly them, the
 // board CoRIM holds their reference values, and the board HBOM lists them.
 func FPGAImageCheck(bundle string, trust *TrustRoot, policy Obj, hb Obj, design *DesignResult) (*FPGAImages, error) {
-	d := filepath.Join(bundle, FPGADesignDir)
+	set, err := fpgaImagesAt(filepath.Join(bundle, FPGADesignDir), trust, policy, design, "")
+	if err != nil {
+		return nil, err
+	}
+	m, want, fwImage, sbom, corimRD := set.Manifest, set.Want, set.FWImage, set.SBOM, set.CoRIMRD
+	if S(m, "product") != S(hb, "predicate", "product", "partNumber") || S(m, "vendor") != S(hb, "predicate", "product", "manufacturer", "name") {
+		return nil, failf("boot manifest: names %s %s, not this board", S(m, "vendor"), S(m, "product"))
+	}
+
+	// The board HBOM lists both images, pointing at the records checked here.
+	listed := map[string]Obj{}
+	for _, f := range Objs(hb, "predicate", "firmware") {
+		listed[S(f, "name")] = f
+	}
+	for _, e := range []struct {
+		name, role, digest, prov string
+	}{
+		{S(design.Final, "name"), fpgaHBOMRoleBS, want[RoleBitstream], FPGADesignDir + "/att/" + AttName("release")},
+		{S(fwImage, "name"), fpgaHBOMRoleFW, want[RoleSoCFW], FPGADesignDir + "/att/" + FPGAFWAtt},
+	} {
+		f := listed[e.name]
+		if f == nil || S(f, "role") != e.role || S(f, "digest", "sha256") != e.digest {
+			return nil, failf("board hbom: firmware entry %s does not match the released image", e.name)
+		}
+		if S(f, "provenanceRef", "uri") != "file:"+e.prov || !jsonEqual(get(f, "provenanceRef", "digest"), relRD(bundle, e.prov)["digest"]) {
+			return nil, failf("board hbom: firmware entry %s does not point at its record", e.name)
+		}
+		if S(f, "referenceValuesRef", "uri") != "file:"+FPGADesignDir+"/artifacts/"+BoardCoRIMFile || !jsonEqual(get(f, "referenceValuesRef", "digest"), corimRD["digest"]) {
+			return nil, failf("board hbom: firmware entry %s does not point at the board CoRIM", e.name)
+		}
+	}
+	if len(listed) != 2 {
+		return nil, failf("board hbom: lists %d firmware images, the boot manifest 2", len(listed))
+	}
+	if !jsonEqual(get(listed[FPGAFWImage], "sbomRef", "digest"), get(sbom, "digest")) {
+		return nil, failf("board hbom: SBOM for %s does not match its provenance", FPGAFWImage)
+	}
+	return &FPGAImages{
+		Flash: set.FlashRD, Manifest: m, RefValues: set.RefValues,
+		Inputs: []Obj{relRD(bundle, FPGADesignDir+"/att/"+FPGAFWAtt), relRD(bundle, FPGADesignDir+"/att/"+FlashAtt)},
+	}, nil
+}
+
+// fpgaImagesAt checks a flash image laid out in directory d (the board
+// owner's design bundle, or an update's): the firmware's provenance and
+// SBOM, the flash image's provenance linking the design release, the
+// bitstream and the firmware, the boot manifest signed by the code signer
+// and naming exactly those images where the flash holds them, the policy's
+// minimum SVN, and the CoRIM's reference values. where prefixes messages.
+func fpgaImagesAt(d string, trust *TrustRoot, policy Obj, design *DesignResult, where string) (*fpgaImageSet, error) {
 	builder := S(policy, "firmware", "builder")
-	label := "firmware " + FPGAFWImage
+	label := where + "firmware " + FPGAFWImage
 	fw, err := trust.Open(filepath.Join(d, "att", FPGAFWAtt), builder, SLSAProvenance)
 	if err != nil {
 		return nil, err
@@ -737,7 +796,7 @@ func FPGAImageCheck(bundle string, trust *TrustRoot, policy Obj, hb Obj, design 
 		return nil, failf("%s: no SBOM, or the SBOM does not match its digest", label)
 	}
 
-	label = "flash image"
+	label = where + "flash image"
 	fl, err := trust.Open(filepath.Join(d, "att", FlashAtt), builder, SLSAProvenance)
 	if err != nil {
 		return nil, err
@@ -776,11 +835,11 @@ func FPGAImageCheck(bundle string, trust *TrustRoot, policy Obj, hb Obj, design 
 	}
 	blob, err := ReadObj(filepath.Join(d, "artifacts", BootManifest))
 	if err != nil {
-		return nil, failf("boot manifest: %v", err)
+		return nil, failf("%sboot manifest: %v", where, err)
 	}
 	payload, signer, err := openBlob(blob)
 	if err != nil {
-		return nil, failf("boot manifest: %v", err)
+		return nil, failf("%sboot manifest: %v", where, err)
 	}
 	ok := false
 	for _, k := range trust.Roles[S(policy, "firmware", "imageSigner")] {
@@ -789,18 +848,18 @@ func FPGAImageCheck(bundle string, trust *TrustRoot, policy Obj, hb Obj, design 
 		}
 	}
 	if !ok {
-		return nil, failf("boot manifest: not signed by the board owner's code signer")
+		return nil, failf("%sboot manifest: not signed by the board owner's code signer", where)
 	}
 	m, err := decodeObj(payload)
 	if err != nil {
-		return nil, failf("boot manifest: %v", err)
+		return nil, failf("%sboot manifest: %v", where, err)
 	}
 	if S(m, "format") != BootManifestFormat {
-		return nil, failf("boot manifest: format %q", S(m, "format"))
+		return nil, failf("%sboot manifest: format %q", where, S(m, "format"))
 	}
 	flash, err := os.ReadFile(filepath.Join(d, "artifacts", FlashImage))
 	if err != nil {
-		return nil, failf("flash image: %v", err)
+		return nil, failf("%sflash image: %v", where, err)
 	}
 	// The manifest the root of trust reads is in the flash image.
 	off, err := manifestOffsetOf(fl)
@@ -809,69 +868,37 @@ func FPGAImageCheck(bundle string, trust *TrustRoot, policy Obj, hb Obj, design 
 	}
 	inFlash, err := readBootManifest(flash, off)
 	if err != nil || !jsonEqual(inFlash, blob) {
-		return nil, failf("flash image: the boot manifest in flash is not the signed one")
+		return nil, failf("%sflash image: the boot manifest in flash is not the signed one", where)
 	}
 	want := map[string]string{RoleBitstream: S(design.Final, "digest", "sha256"), RoleSoCFW: S(fwImage, "digest", "sha256")}
 	names := map[string]string{RoleBitstream: S(design.Final, "name"), RoleSoCFW: S(fwImage, "name")}
 	images := Objs(m, "images")
 	if len(images) != len(want) {
-		return nil, failf("boot manifest: lists %d images, want the bitstream and the firmware", len(images))
+		return nil, failf("%sboot manifest: lists %d images, want the bitstream and the firmware", where, len(images))
 	}
 	for _, img := range images {
 		role := S(img, "role")
 		if want[role] == "" || S(img, "sha256") != want[role] || S(img, "name") != names[role] {
-			return nil, failf("boot manifest: %s (%s) is not the released image", S(img, "name"), role)
+			return nil, failf("%sboot manifest: %s (%s) is not the released image", where, S(img, "name"), role)
 		}
 		if sha256Bytes(sliceOf(flash, img)) != want[role] {
-			return nil, failf("flash image: %s at its manifest offset is not the released image", S(img, "name"))
+			return nil, failf("%sflash image: %s at its manifest offset is not the released image", where, S(img, "name"))
 		}
 	}
 	svn, _ := Int(m, "svn")
 	if minSVN, _ := Int(policy, "firmware", "minSvn"); svn < minSVN {
-		return nil, failf("boot manifest: SVN %d is below the policy minimum %d", svn, minSVN)
+		return nil, failf("%sboot manifest: SVN %d is below the policy minimum %d", where, svn, minSVN)
 	}
 	rim, err := OpenCoRIM(filepath.Join(d, "artifacts", BoardCoRIMFile), trust.Roles[builder], "board CoRIM")
 	if err != nil {
 		return nil, err
 	}
 	if !sameRefValues(rim.RefValues, BoardRefValues(images, S(m, "vendor"), S(m, "product"), svn)) {
-		return nil, failf("board CoRIM: reference values differ from the boot manifest")
+		return nil, failf("%sboard CoRIM: reference values differ from the boot manifest", where)
 	}
-	if S(m, "product") != S(hb, "predicate", "product", "partNumber") || S(m, "vendor") != S(hb, "predicate", "product", "manufacturer", "name") {
-		return nil, failf("boot manifest: names %s %s, not this board", S(m, "vendor"), S(m, "product"))
-	}
-
-	// The board HBOM lists both images, pointing at the records checked here.
-	listed := map[string]Obj{}
-	for _, f := range Objs(hb, "predicate", "firmware") {
-		listed[S(f, "name")] = f
-	}
-	for _, e := range []struct {
-		name, role, digest, prov string
-	}{
-		{S(design.Final, "name"), fpgaHBOMRoleBS, want[RoleBitstream], FPGADesignDir + "/att/" + AttName("release")},
-		{S(fwImage, "name"), fpgaHBOMRoleFW, want[RoleSoCFW], FPGADesignDir + "/att/" + FPGAFWAtt},
-	} {
-		f := listed[e.name]
-		if f == nil || S(f, "role") != e.role || S(f, "digest", "sha256") != e.digest {
-			return nil, failf("board hbom: firmware entry %s does not match the released image", e.name)
-		}
-		if S(f, "provenanceRef", "uri") != "file:"+e.prov || !jsonEqual(get(f, "provenanceRef", "digest"), relRD(bundle, e.prov)["digest"]) {
-			return nil, failf("board hbom: firmware entry %s does not point at its record", e.name)
-		}
-		if S(f, "referenceValuesRef", "uri") != "file:"+FPGADesignDir+"/artifacts/"+BoardCoRIMFile || !jsonEqual(get(f, "referenceValuesRef", "digest"), corimRD["digest"]) {
-			return nil, failf("board hbom: firmware entry %s does not point at the board CoRIM", e.name)
-		}
-	}
-	if len(listed) != 2 {
-		return nil, failf("board hbom: lists %d firmware images, the boot manifest 2", len(listed))
-	}
-	if !jsonEqual(get(listed[FPGAFWImage], "sbomRef", "digest"), get(sbom, "digest")) {
-		return nil, failf("board hbom: SBOM for %s does not match its provenance", FPGAFWImage)
-	}
-	return &FPGAImages{
-		Flash: flashRD, Manifest: m, RefValues: rim.RefValues,
-		Inputs: []Obj{relRD(bundle, FPGADesignDir+"/att/"+FPGAFWAtt), relRD(bundle, FPGADesignDir+"/att/"+FlashAtt)},
+	return &fpgaImageSet{
+		FW: fw, Flash: fl, FWImage: fwImage, SBOM: sbom, FlashRD: flashRD, CoRIMRD: corimRD,
+		Manifest: m, RefValues: rim.RefValues, Want: want, Names: names,
 	}, nil
 }
 
@@ -1088,7 +1115,30 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 		provInputs = append(provInputs, u.Inputs...)
 	}
 	fmt.Printf("provisioning check: PASSED for all %d boards in the lot\n", len(lotBoards))
-	provSim, err := simulatedCheck(bundle, policy, append(append([]Obj{}, rot.Inputs...), provInputs...), "provisioning check")
+	histories := map[string]*BoardHistory{}
+	var afterInputs, updates []string
+	var afterRDs []Obj
+	for _, serial := range lotBoards {
+		h, err := afterSaleCheck(bundle, trust, policy, hb, design, units[serial], images)
+		if err != nil {
+			return err
+		}
+		histories[serial] = h
+		updates = append(updates, h.Updates...)
+		afterRDs = append(afterRDs, h.Inputs...)
+		if h.Records > 0 {
+			afterInputs = append(afterInputs, fmt.Sprintf("%s (%d, %s)", serial, h.Records, h.State))
+		}
+	}
+	for _, serial := range received {
+		if err := histories[serial].inService(serial); err != nil {
+			return err
+		}
+	}
+	if len(afterInputs) > 0 {
+		fmt.Printf("after-sale check: PASSED, records for %s, %d field update(s)\n", strings.Join(afterInputs, ", "), len(updates))
+	}
+	provSim, err := simulatedCheck(bundle, policy, append(append(append([]Obj{}, rot.Inputs...), provInputs...), afterRDs...), "provisioning check")
 	if err != nil {
 		return err
 	}
@@ -1096,18 +1146,24 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 	sim := len(board.Simulated) > 0 || len(provSim) > 0
 	var fwL3Inputs []Obj
 	if trackClaim(policy, "FIRMWARE") >= 3 {
-		if fwL3Inputs, err = fpgaFirmwareLevels(bundle, trust, policy, design, rot, units, received, bootsDir); err != nil {
+		if fwL3Inputs, err = fpgaFirmwareLevels(bundle, trust, policy, design, rot, units, received, bootsDir, updates); err != nil {
 			return err
 		}
 	}
 	if bootsDir != "" {
 		for _, serial := range received {
-			if err := FPGADeviceCheck(units[serial], rot, images, policy, filepath.Join(bootsDir, serial)); err != nil {
+			if err := FPGADeviceCheck(units[serial], rot, histories[serial].Images, policy, filepath.Join(bootsDir, serial)); err != nil {
 				return err
 			}
 		}
 		fmt.Printf("at-boot check: PASSED for %d boards (%s)\n", len(received), strings.Join(received, ", "))
 	}
+	// The board receipt check covered Assembly; Firmware claims are this check's.
+	left, err := claimedLevelsCheck(hb, get(policy, "claims", "board"), fpgaTracks, "board hbom")
+	if err != nil {
+		return err
+	}
+	printClaimsLeft(left, "board hbom")
 	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", BoardHBOM), "board hbom"); err != nil {
 		return err
 	}
@@ -1125,7 +1181,7 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 	}
 	common := append(append(append(append([]Obj{}, board.Inputs...), images.Inputs...), rot.Inputs...), fwL3Inputs...)
 	common = append(common, designInputs[0])
-	if err := signVSA(fpgaTracks, board.Lot, S(board.Lot, "name"), vsaLevels(claims["board"], sim), append(common, provInputs...), policyPath, vsaKey, out("board.vsa.intoto.json")); err != nil {
+	if err := signVSA(fpgaTracks, board.Lot, S(board.Lot, "name"), vsaLevels(claims["board"], sim), append(append(common, provInputs...), afterRDs...), policyPath, vsaKey, out("board.vsa.intoto.json")); err != nil {
 		return err
 	}
 	n := 0
@@ -1134,7 +1190,7 @@ func FPGAVerify(bundle string, trust *TrustRoot, policyPath, boardsPath, bootsDi
 		for _, serial := range received {
 			u := units[serial]
 			subject := rd(boardURN(mfr, serial), sha256Bytes(u.IDevID.Raw))
-			if err := signVSA(fpgaTracks, subject, S(subject, "name"), vsaLevels(claims["device"], sim), append(append([]Obj{}, u.Inputs...), common...), policyPath, vsaKey,
+			if err := signVSA(fpgaTracks, subject, S(subject, "name"), vsaLevels(claims["device"], sim), append(append(append([]Obj{}, u.Inputs...), histories[serial].Inputs...), common...), policyPath, vsaKey,
 				out("board-"+serial+".vsa.intoto.json")); err != nil {
 				return err
 			}

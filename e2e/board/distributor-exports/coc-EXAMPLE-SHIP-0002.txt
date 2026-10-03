@@ -1,0 +1,12 @@
+CERTIFICATE OF CONFORMANCE (example document for the HSLSA board example; not a real certificate)
+
+Shipper: Example PCB Fab, US
+Shipment: EXAMPLE-SHIP-0002, shipped 2026-09-15
+
+We certify that the parts below were bought directly from their manufacturers
+or the manufacturers' authorized channels, are traceable to them, and conform
+to the manufacturers' specifications.
+
+  Example PCB Fab PSOC-DEVB-01-PCB, lot EXAMPLE-PCB-LOT-01, date code EXAMPLE-2637, quantity 8
+
+Signed for Example PCB Fab: Example Quality Manager

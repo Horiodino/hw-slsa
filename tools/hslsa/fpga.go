@@ -168,7 +168,7 @@ func (s *fpgaStep) sign(bundle, step, key string, subjects []Obj, external Obj, 
 		return err
 	}
 	pred := designPredicate(step, external, deps, tools, checks, byproducts, s.started)
-	return finish(bundle, step, subjects, pred, signer)
+	return finish(bundle, step, subjects, pred, signer, nil)
 }
 
 // stepSubject is the first subject of an earlier design step, read from its record.

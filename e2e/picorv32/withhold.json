@@ -1,5 +1,6 @@
 {
   "fields": {
+    "synthesis": ["/buildDefinition/externalParameters/script"],
     "wafer-fab": ["/buildDefinition/externalParameters/maskSetId"],
     "wafer-sort": ["/buildDefinition/externalParameters/probeProgram", "/hwMfg/yield"],
     "final-test": ["/buildDefinition/externalParameters/testProgram", "/hwMfg/yield"],

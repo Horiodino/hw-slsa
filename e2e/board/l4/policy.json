@@ -38,7 +38,8 @@
     ]
   },
   "inspection": {
-    "note": "Assembly L4: an independent lab X-rays a seeded sample of the boards, checks every marking against the HBOM and challenges every identity part.",
-    "minSample": 2
+    "note": "Assembly L4: an independent lab accredited under ISO/IEC 17025 X-rays a seeded sample of the boards, checks every marking against the HBOM and challenges every identity part.",
+    "minSample": 2,
+    "accreditations": ["iso-iec-17025"]
   }
 }

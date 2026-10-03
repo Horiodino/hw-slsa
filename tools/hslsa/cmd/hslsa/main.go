@@ -24,39 +24,41 @@ type command struct {
 }
 
 var commands = map[string]command{
-	"keygen":        {"generate ECDSA P-256 keys, one per role", keygen},
-	"pubkey":        {"write the public key for a private key file or HSM key", pubkey},
-	"keyid":         {"print the DSSE keyid for a public or private key", keyid},
-	"hsm":           {"generate site keys in an HSM over PKCS#11", hsm},
-	"trust-root":    {"build a trust root from <role>.pub.pem files", trustRoot},
-	"design":        {"run and attest one design flow step", design},
-	"adapt":         {"turn MES, STDF and SEMI E142 exports into a scenario for mfg and hbom", adapt},
-	"mfg":           {"emit signed F1 to F4 records for the scenario lot", mfg},
-	"fab-check":     {"the fab's check of the design release before mask making, signed as a VSA with its site key", fabCheck},
-	"challenge":     {"challenge parts for their identity and print their unit names", challenge},
-	"hbom":          {"build, validate and sign the HBOM", hbomCmd},
-	"verify":        {"tapeout and lot receipt checks, then VSAs", verify},
-	"escrow":        {"verifier escrow: the auditor's full check and VSAs, or the buyer's check of them", escrow},
-	"leaks":         {"measure what the signed records and the escrow VSAs reveal", leaks},
-	"openlane":      {"OpenLane 2 flow with a signed record per step", openlane},
-	"eda":           {"sign a record per step from the Tcl hook in an EDA tool, or check them", eda},
-	"caliptra":      {"the Caliptra example (e2e/caliptra)", caliptra},
-	"board":         {"board-level example: shipments, A1 and board HBOM, or the buyer's board check", board},
-	"fpga":          {"the FPGA board example with a board root of trust (e2e/fpga)", fpga},
-	"provision":     {"provisioning station adapter: clear a job's images, then sign records from the station's export", provision},
-	"lot-digest":    {"compute the lot digest of a unit list", lotDigest},
-	"subject":       {"print the name and sha256 of an envelope's first subject", subject},
-	"validate-hbom": {"validate HBOM statements or envelopes against the schema", validateHBOM},
-	"render":        {"render an HBOM as CycloneDX 1.6 or SPDX 3.1-RC1, or check a rendering", render},
-	"corim":         {"show a signed CoRIM, or appraise DICE certificates against it", corimCmd},
-	"safe":          {"sign, show or check an OCP S.A.F.E. short-form report", safeCmd},
-	"pilot":         {"a buyer-run pilot: enroll or revoke site keys, build the trust root from them, measure a lot", pilot},
-	"kit":           {"sign the pilot kit's provenance, or check a kit against it", kit},
-	"sim":           {"simulated hardware: the virtual shuttle makes a lot's supplier exports by simulating the released netlist", sim},
-	"pin":           {"print the toolPins entries for tools on this machine, for a policy to pin", pinCmd},
-	"tlog":          {"the buyer's private transparency log for firmware releases: add records, sign checkpoints, prove and check", tlogCmd},
-	"inspect":       {"an independent lab's L4 inspection: commit to a sampling seed before the lot is sealed, then inspect the sample it draws", inspectCmd},
-	"release":       {"two-person review of a firmware release: an approver signs their approval of a release record", releaseCmd},
+	"keygen":           {"generate ECDSA P-256 keys, one per role", keygen},
+	"pubkey":           {"write the public key for a private key file or HSM key", pubkey},
+	"keyid":            {"print the DSSE keyid for a public or private key", keyid},
+	"hsm":              {"generate site keys in an HSM over PKCS#11", hsm},
+	"trust-root":       {"build a trust root from <role>.pub.pem files", trustRoot},
+	"design":           {"run and attest one design flow step", design},
+	"adapt":            {"turn MES, STDF and SEMI E142 exports into a scenario for mfg and hbom", adapt},
+	"import-shipments": {"turn shippers' packing lists, certificates of conformance and EPCIS events into a board scenario's shipments", importShipments},
+	"mfg":              {"emit signed F1 to F4 records for the scenario lot", mfg},
+	"fab-check":        {"the fab's check of the design release before mask making, signed as a VSA with its site key", fabCheck},
+	"challenge":        {"challenge parts for their identity and print their unit names", challenge},
+	"hbom":             {"build, validate and sign the HBOM", hbomCmd},
+	"verify":           {"tapeout and lot receipt checks, then VSAs", verify},
+	"escrow":           {"verifier escrow: the auditor's full check and VSAs, or the buyer's check of them", escrow},
+	"leaks":            {"measure what the signed records and the escrow VSAs reveal", leaks},
+	"openlane":         {"OpenLane 2 flow with a signed record per step", openlane},
+	"eda":              {"sign a record per step from the Tcl hook in an EDA tool, or check them", eda},
+	"caliptra":         {"the Caliptra example (e2e/caliptra)", caliptra},
+	"board":            {"board-level example: shipments, A1 and board HBOM, or the buyer's board check", board},
+	"fpga":             {"the FPGA board example with a board root of trust (e2e/fpga)", fpga},
+	"provision":        {"provisioning station adapter: clear a job's images, then sign records from the station's export", provision},
+	"lot-digest":       {"compute the lot digest of a unit list", lotDigest},
+	"subject":          {"print the name and sha256 of an envelope's first subject", subject},
+	"validate-hbom":    {"validate HBOM statements or envelopes against the schema", validateHBOM},
+	"render":           {"render an HBOM as CycloneDX 1.6 or SPDX 3.1-RC1, or check a rendering", render},
+	"corim":            {"show a signed CoRIM, or appraise DICE certificates against it", corimCmd},
+	"safe":             {"sign, show or check an OCP S.A.F.E. short-form report", safeCmd},
+	"pilot":            {"a buyer-run pilot: enroll or revoke site keys, build the trust root from them, measure a lot", pilot},
+	"kit":              {"sign the pilot kit's provenance, or check a kit against it", kit},
+	"sim":              {"simulated hardware: the virtual shuttle makes a lot's supplier exports by simulating the released netlist", sim},
+	"pin":              {"print the toolPins entries for tools on this machine, for a policy to pin", pinCmd},
+	"tlog":             {"the buyer's private transparency log for releases and manufacturing records: add records, sign checkpoints, prove and check", tlogCmd},
+	"unit-check":       {"a buyer's check, without an auditor, that its units are in the lot final test committed to", unitCheck},
+	"inspect":          {"an independent lab's L4 inspection: commit to a sampling seed before the lot is sealed, then inspect the sample it draws", inspectCmd},
+	"release":          {"two-person review of a firmware release: an approver signs their approval of a release record", releaseCmd},
 }
 
 // usageError is a command line mistake: exit status 2, like argparse.
@@ -330,11 +332,16 @@ func design(args []string) error {
 	policy := f.str("policy", "", false)
 	isolate := f.Bool("isolate", false, "run the step's tools in a sandbox of their own, with no network and no signing key in reach (Design L3)")
 	reviewer := f.str("reviewer", "review: who approves, as \"Name <email>\" (default: the lock's freeze.reviewer); a second reviewer's approval goes beside the first", false)
+	withholdPath := f.str("withhold", "source-freeze, simulation, synthesis, signoff, release: JSON file naming the fields to withhold, by step (see e2e/picorv32/withhold-design.json)", false)
 	if err := f.parse(rest); err != nil {
 		return err
 	}
 	if *cache == "" {
 		*cache = ".hslsa-cache"
+	}
+	w, err := hslsa.LoadWithholding(*withholdPath)
+	if err != nil {
+		return err
 	}
 	switch step {
 	case "ip-release":
@@ -345,7 +352,7 @@ func design(args []string) error {
 		return hslsa.SourceReview(*bundle, *lock, *key, *reviewer)
 	case "source-freeze":
 		if *trust == "" && *policy == "" {
-			return hslsa.SourceFreeze(*bundle, *lock, *key, *cache)
+			return hslsa.SourceFreeze(*bundle, *lock, *key, *cache, w)
 		}
 		if err := need(trust, "trust-root", "source-freeze at Design L2"); err != nil {
 			return err
@@ -353,13 +360,13 @@ func design(args []string) error {
 		if err := need(policy, "policy", "source-freeze at Design L2"); err != nil {
 			return err
 		}
-		return hslsa.SourceFreezeL2(*bundle, *lock, *key, *cache, *trust, *policy)
+		return hslsa.SourceFreezeL2(*bundle, *lock, *key, *cache, *trust, *policy, w)
 	case "simulation":
-		return hslsa.Simulation(*bundle, *lock, *key, *isolate)
+		return hslsa.Simulation(*bundle, *lock, *key, *isolate, w)
 	case "synthesis":
-		return hslsa.Synthesis(*bundle, *lock, *key, *isolate)
+		return hslsa.Synthesis(*bundle, *lock, *key, *isolate, w)
 	case "signoff":
-		return hslsa.Equivalence(*bundle, *lock, *key, *isolate)
+		return hslsa.Equivalence(*bundle, *lock, *key, *isolate, w)
 	}
 	if err := need(trust, "trust-root", "release"); err != nil {
 		return err
@@ -367,7 +374,7 @@ func design(args []string) error {
 	if err := need(policy, "policy", "release"); err != nil {
 		return err
 	}
-	return hslsa.DesignRelease(*bundle, *lock, *key, *trust, *policy)
+	return hslsa.DesignRelease(*bundle, *lock, *key, *trust, *policy, w)
 }
 
 func adapt(args []string) error {
@@ -378,6 +385,17 @@ func adapt(args []string) error {
 		return err
 	}
 	return hslsa.Adapt(*config, *out)
+}
+
+func importShipments(args []string) error {
+	f := newFlags("import-shipments")
+	config := f.str("config", "importer configuration (JSON): each shipment's id and the exports its shipper hands over", true)
+	scenario := f.str("scenario", "the board scenario whose shipments the exports replace", true)
+	out := f.str("out", "the scenario to write", true)
+	if err := f.parse(args); err != nil {
+		return err
+	}
+	return hslsa.ImportShipments(*config, *scenario, *out)
 }
 
 func sim(args []string) error {
@@ -854,13 +872,18 @@ func board(args []string) error {
 
 func fpga(args []string) error {
 	act, rest, err := action(args, "rot-firmware", "rot-firmware-rebuild", "rot-job", "rot-station", "rot-hbom", "firmware", "firmware-rebuild", "design", "image",
-		"produce", "provision", "boot", "verify")
+		"produce", "provision", "boot", "update-build", "after-sale", "verify")
 	if err != nil {
 		return err
 	}
 	step := ""
 	if act == "design" {
 		if step, rest, err = action(rest, "simulation", "synthesis", "routing", "signoff", "bitstream"); err != nil {
+			return err
+		}
+	}
+	if act == "after-sale" {
+		if step, rest, err = action(rest, hslsa.AfterSaleEvents...); err != nil {
 			return err
 		}
 	}
@@ -995,6 +1018,74 @@ func fpga(args []string) error {
 			return err
 		}
 		return hslsa.FPGABootAll(*bundle, *boards, *list, *out, !*noSoC)
+	case "update-build":
+		bundle := f.str("bundle", "the board bundle; the update goes in its updates/<id>", true)
+		id := f.str("id", "the update's name", true)
+		lock := f.str("lock", "the inputs lock for the update: the same design, the firmware to ship", true)
+		scenario := f.str("scenario", "the board scenario (product)", true)
+		key, cs := f.str("key", "the firmware platform's key", true), f.str("code-signer", "", true)
+		cache := f.str("cache", "", false)
+		isolate := f.Bool("isolate", false, "build the firmware in a sandbox with no network and no signing key in reach (SLSA Build L3)")
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		if *cache == "" {
+			*cache = ".hslsa-cache"
+		}
+		dir, err := hslsa.FPGAUpdateBuild(*bundle, *id, *lock, *scenario, *key, *cs, *cache, *isolate)
+		if err == nil {
+			fmt.Printf("update %s built in %s\n", *id, dir)
+		}
+		return err
+	case "after-sale":
+		bundle, serial := f.str("bundle", "the board bundle", true), f.str("board", "the board's serial", true)
+		key := f.str("key", "the signer's key: field-updater, returns-site, repair-site or board-owner, by event", true)
+		site, country := f.str("site", "the signing site's name", true), f.str("country", "the signing site's country", false)
+		boards := f.str("boards", "field-update: directory of the boards, one per serial", false)
+		update := f.str("update", "field-update: the update's directory (<bundle>/updates/<id>)", false)
+		from := f.str("from", "return: who sent the board back", false)
+		reason := f.str("reason", "return: why it came back", false)
+		disposition := f.str("disposition", "return: repair or scrap", false)
+		order := f.str("order", "rework: the rework order (reason, and parts removed and placed by refDes)", false)
+		to := f.str("to", "reship: who the board ships to", false)
+		shipment := f.str("shipment", "reship: the shipment's id", false)
+		scenario := f.str("scenario", "a scenario whose afterSale.simulated marks the record as made by a simulation", false)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		sim, err := hslsa.AfterSaleSimulated(*scenario)
+		if err != nil {
+			return err
+		}
+		s := hslsa.Obj{"name": *site}
+		if *country != "" {
+			s["country"] = *country
+		}
+		switch step {
+		case "field-update":
+			if err := need(boards, "boards", "after-sale field-update"); err != nil {
+				return err
+			}
+			if err := need(update, "update", "after-sale field-update"); err != nil {
+				return err
+			}
+			return hslsa.FPGAFieldUpdate(*bundle, *boards, *serial, *update, *key, s, sim)
+		case "return":
+			if err := need(from, "from", "after-sale return"); err != nil {
+				return err
+			}
+			return hslsa.FPGAReturn(*bundle, *serial, *key, s, sim, *from, *reason, *disposition)
+		case "rework":
+			if err := need(order, "order", "after-sale rework"); err != nil {
+				return err
+			}
+			return hslsa.FPGARework(*bundle, *serial, *key, s, sim, *order)
+		default:
+			if err := need(to, "to", "after-sale reship"); err != nil {
+				return err
+			}
+			return hslsa.FPGAReship(*bundle, *serial, *key, s, sim, *to, *shipment)
+		}
 	}
 	bundle, trust, policy := f.str("bundle", "", true), f.str("trust-root", "", true), f.str("policy", "", true)
 	boards, boots := f.str("boards", "file with the serials of the boards received", false), f.str("boots", "what each received board returned at boot", false)
@@ -1415,6 +1506,23 @@ func tlogCmd(args []string) error {
 	}
 	fmt.Printf("log check: PASSED, in %q at tree size %d\n", cp.Origin, cp.Size)
 	return nil
+}
+
+func unitCheck(args []string) error {
+	f := newFlags("unit-check")
+	record := f.str("record", "final test's signed record (att/mfg-f4-final-test.intoto.json)", true)
+	trust := f.str("trust-root", "trust root holding the test site's key", true)
+	if err := f.parse(args); err != nil {
+		return err
+	}
+	if f.NArg() == 0 {
+		return usageError{"name the inclusion proofs of the units to check (artifacts/unit-proofs/<unit>.json)"}
+	}
+	t, err := hslsa.LoadTrustRoot(*trust)
+	if err != nil {
+		return err
+	}
+	return hslsa.UnitCheck(t, *record, f.Args())
 }
 
 func sortedRoles(t *hslsa.TrustRoot) []string {

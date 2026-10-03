@@ -139,8 +139,12 @@ jobs:
           go test -count=1 -run EDA ./tools/hslsa/
       - name: Build the board on the shipped chips and sign shipments, A1 and the board HBOM
         run: e2e/board/run.sh produce
+      - name: The board's shipments made from the shippers' packing lists, certificates and EPCIS events, and checked against them
+        run: e2e/board/run.sh import
       - name: Re-sign the lot with confidential fields withheld, for the escrow job
         run: e2e/escrow.sh produce
+      - name: The buyer's own checks without an auditor, its units against final test's commitment and the records in its log
+        run: e2e/escrow.sh direct
       - name: Remove private keys before upload
         run: rm -rf out/keys out/board-keys
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

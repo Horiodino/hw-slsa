@@ -1,0 +1,11 @@
+{
+  "note": "Rework order for a returned board: the 3.3 V regulator is replaced with the part the board design places there, from a new lot. Simulated, like the rest of the board example.",
+  "reason": "3.3 V rail measured at 3.05 V under load; U4 replaced",
+  "parts": [
+    {
+      "refDes": "U4",
+      "removed": {"manufacturer": "Texas Instruments", "mpn": "TLV75533PDBVR", "lot": "TI-LOT-EXAMPLE-0912"},
+      "placed": {"manufacturer": "Texas Instruments", "mpn": "TLV75533PDBVR", "lot": "TI-LOT-EXAMPLE-RW-0042"}
+    }
+  ]
+}

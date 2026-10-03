@@ -33,11 +33,14 @@ func proxyCheck(t *testing.T, bundle string) error {
 }
 
 func TestProxyExampleMatchesMainExample(t *testing.T) {
-	// The proxy example differs from the main one only where it says so.
+	// The proxy example differs from the main one only where it says so:
+	// which suppliers sign nothing, and so the lower levels its HBOM claims.
 	sc, base := ok(ReadObj(proxyScenario)), ok(ReadObj(e2eScenario))
 	delete(sc, "unsigned")
+	delete(sc, "claimedLevels")
+	delete(base, "claimedLevels")
 	if !jsonEqual(sc, base) {
-		t.Error("proxy scenario differs from mfg-scenario.json beyond its unsigned block")
+		t.Error("proxy scenario differs from mfg-scenario.json beyond its unsigned block and claimed levels")
 	}
 	p, bp := ok(ReadObj(proxyPolicy)), ok(ReadObj(e2ePolicy))
 	if !jsonEqual(p["design"], bp["design"]) || !jsonEqual(O(p, "claims")["design"], O(bp, "claims")["design"]) {

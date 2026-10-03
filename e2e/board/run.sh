@@ -6,6 +6,8 @@
 #   e2e/board/run.sh l3        Assembly L3 on the chips from e2e/run.sh l3: challenged at build,
 #                              a platform certificate per board, the boards challenged at receipt
 #   e2e/board/run.sh l4        Assembly L4 on the same chips: an independent lab inspects a seeded sample of the boards
+#   e2e/board/run.sh import    after produce: the shipments made from the shippers' packing lists, certificates
+#                              of conformance and EPCIS events, and checked against them
 #
 # Same privacy rules as the chip test: local ECDSA P-256 keys in DSSE
 # envelopes, nothing uploaded to a transparency log.
@@ -168,7 +170,8 @@ l4() {
   local not_after ent=$l/enrollments
   not_after=$(date -u -d '+90 days' +%Y-%m-%d)
   enroll_all "$ent" --accreditation ipc-1791 --accreditation-id IPC1791-0042
-  enroll "$ent" inspection-lab "Example Failure Analysis Lab" duns:100000041 "Example Failure Analysis Lab"
+  enroll "$ent" inspection-lab "Example Failure Analysis Lab" duns:100000041 "Example Failure Analysis Lab" \
+    --accreditation iso-iec-17025 --accreditation-id A2LA-4410.01
   hslsa pilot trust-root --buyer-pub "$k/buyer-root.pub.pem" --enrollments "$ent" --out "$l/trust-root.json" > /dev/null
   local b=$l/board
   mkdir -p "$b" && cp "$HERE/l4/policy.json" "$b/policy.json" && cp "$l/trust-root.json" "$b/trust-root.json"
@@ -207,10 +210,17 @@ l4() {
   local check=(--bundle "$b" --policy "$b/policy.json" --boards "$l/received" "${parts[@]}")
   # The same signers, with the lab enrolled under the EMS's own company.
   enroll_all "$l/ems-lab" --accreditation ipc-1791 --accreditation-id IPC1791-0042
-  enroll "$l/ems-lab" inspection-lab "Example EMS" duns:100000021 "Example EMS failure analysis"
+  enroll "$l/ems-lab" inspection-lab "Example EMS" duns:100000021 "Example EMS failure analysis" \
+    --accreditation iso-iec-17025 --accreditation-id A2LA-4410.02
   hslsa pilot trust-root --buyer-pub "$k/buyer-root.pub.pem" --enrollments "$l/ems-lab" --out "$l/ems-lab.json" > /dev/null
   refuses "boards inspected by the EMS's own lab" "the organization that holds the ems-site key; L4 needs an independent party" \
     hslsa board verify "${check[@]}" --trust-root "$l/ems-lab.json"
+  # The same lab, enrolled by the buyer without an accreditation.
+  enroll_all "$l/unaccredited-lab" --accreditation ipc-1791 --accreditation-id IPC1791-0042
+  enroll "$l/unaccredited-lab" inspection-lab "Example Failure Analysis Lab" duns:100000041 "Example Failure Analysis Lab"
+  hslsa pilot trust-root --buyer-pub "$k/buyer-root.pub.pem" --enrollments "$l/unaccredited-lab" --out "$l/unaccredited-lab.json" > /dev/null
+  refuses "boards inspected by a lab with no accreditation" "enrolled with no accreditation; L4 needs an accredited lab" \
+    hslsa board verify "${check[@]}" --trust-root "$l/unaccredited-lab.json"
   # A buyer that asks for more samples than the lab inspected.
   jq '.inspection.minSample = 3' "$b/policy.json" > "$l/min3.json"
   refuses "a sample smaller than the policy asks" "below the policy's minimum of 3" \
@@ -223,11 +233,40 @@ l4() {
   rm -rf "${k:?}"
 }
 
+# The board again, its shipments made from what the shippers hand over
+# (docs/distributor-importer.md): a packing list per shipment, the
+# certificate of conformance each line names, and the distributor's EPCIS
+# shipping event. The distribution records carry them, and the buyer's
+# policy requires them and reads them again. Runs after produce.
+import_shipments() {
+  local ib=$OUT/board-imported ex=$HERE/distributor-exports
+  rm -rf "$ib" && mkdir -p "$ib/bundle"
+  cp "$BUNDLE/trust-root.json" "$ib/bundle/trust-root.json"
+  jq '. + {requireShipmentExports: true}' "$HERE/policy.json" > "$ib/policy.json"
+  hslsa import-shipments --config "$ex/shipments.json" --scenario "$HERE/board-scenario.json" --out "$ib/scenario.json"
+  hslsa board produce --bundle "$ib/bundle" --chip-bundle "$CHIP" --scenario "$ib/scenario.json" \
+    --design "$HERE/board-design.json" --policy "$HERE/policy.json" --keys "$KEYS"
+  local check=(--bundle "$ib/bundle" --trust-root "$ib/bundle/trust-root.json" --boards "$HERE/received-boards.txt")
+  hslsa board verify "${check[@]}" --policy "$ib/policy.json"
+  refuses "shipments without their shippers' exports" "requireShipmentExports" \
+    hslsa board verify --bundle "$BUNDLE" --trust-root "$BUNDLE/trust-root.json" --boards "$HERE/received-boards.txt" --policy "$ib/policy.json"
+  cp "$ib/bundle/artifacts/coc-EXAMPLE-SHIP-0001.txt" "$ib/coc.saved"
+  echo "Revised after shipping." >> "$ib/bundle/artifacts/coc-EXAMPLE-SHIP-0001.txt"
+  refuses "a certificate of conformance changed after the shipment was signed" "export coc-EXAMPLE-SHIP-0001.txt is missing or does not match its attested digest" \
+    hslsa board verify "${check[@]}" --policy "$ib/policy.json"
+  mv "$ib/coc.saved" "$ib/bundle/artifacts/coc-EXAMPLE-SHIP-0001.txt"
+  cp -r "$ex" "$ib/exports"
+  sed -i 's/,coc-EXAMPLE-SHIP-0002.txt$/,/' "$ib/exports/packing-list-EXAMPLE-SHIP-0002.csv"
+  refuses "a packing list line with no certificate of conformance" "names no certificate of conformance" \
+    hslsa import-shipments --config "$ib/exports/shipments.json" --scenario "$HERE/board-scenario.json" --out "$ib/no-coc.json"
+}
+
 case "${1:-}" in
   produce) produce ;;
   verify) verify ;;
   l3) l3 ;;
   l4) l4 ;;
+  import) import_shipments ;;
   all) produce; verify ;;
-  *) echo "usage: $0 produce|verify|l3|l4|all" >&2; exit 2 ;;
+  *) echo "usage: $0 produce|verify|l3|l4|import|all" >&2; exit 2 ;;
 esac

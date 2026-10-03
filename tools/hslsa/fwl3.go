@@ -245,7 +245,7 @@ func firmwareL3Summary(releases []fwRelease) string {
 // them. At L4 an independent rebuilder also reproduces the SoC firmware, the
 // root of trust firmware and the bitstream, which is loaded from the same
 // flash, and two people approve each release.
-func fpgaFirmwareLevels(bundle string, trust *TrustRoot, policy Obj, design *DesignResult, rot *RoTResult, units map[string]*BoardUnit, received []string, bootsDir string) ([]Obj, error) {
+func fpgaFirmwareLevels(bundle string, trust *TrustRoot, policy Obj, design *DesignResult, rot *RoTResult, units map[string]*BoardUnit, received []string, bootsDir string, updates []string) ([]Obj, error) {
 	label := "Firmware L3"
 	level := trackClaim(policy, "FIRMWARE")
 	if bootsDir == "" || len(received) == 0 {
@@ -260,6 +260,19 @@ func fpgaFirmwareLevels(bundle string, trust *TrustRoot, policy Obj, design *Des
 	boardInputs, err := firmwareL3(trust, policy, board, label+": board")
 	if err != nil {
 		return nil, err
+	}
+	// A field update is a release like the shipped one, and meets the same rules.
+	updateDirs := map[string][]fwRelease{}
+	updateInputs := map[string][]Obj{}
+	for _, u := range updates {
+		dir := filepath.Join(bundle, filepath.FromSlash(u))
+		updateDirs[dir] = []fwRelease{
+			{Image: FPGAFWImage, Bundle: dir, Record: "att/" + FPGAFWAtt, Role: builder, Review: true},
+			{Image: FlashImage, Bundle: dir, Record: "att/" + FlashAtt, Role: builder},
+		}
+		if updateInputs[dir], err = firmwareL3(trust, policy, updateDirs[dir], label+": field update "+filepath.Base(dir)); err != nil {
+			return nil, err
+		}
 	}
 	rotFW := []fwRelease{{Image: RoTFWImage, Bundle: rot.Bundle, Record: "att/" + RoTFWAtt, Role: "firmware-platform", Review: true}}
 	rotInputs, err := firmwareL3(rot.Trust, rot.Policy, rotFW, label+": root of trust")
@@ -281,10 +294,20 @@ func fpgaFirmwareLevels(bundle string, trust *TrustRoot, policy Obj, design *Des
 			return nil, err
 		}
 		rotInputs = append(rotInputs, in...)
+		for dir, rel := range updateDirs {
+			if in, err = firmwareL4(trust, policy, rel, l4+": field update "+filepath.Base(dir)); err != nil {
+				return nil, err
+			}
+			updateInputs[dir] = append(updateInputs[dir], in...)
+		}
 	}
 	// Inputs are named relative to the board bundle.
 	var inputs []Obj
-	for dir, list := range map[string][]Obj{designDir: boardInputs, rot.Bundle: rotInputs} {
+	byDir := map[string][]Obj{designDir: boardInputs, rot.Bundle: rotInputs}
+	for dir, list := range updateInputs {
+		byDir[dir] = list
+	}
+	for dir, list := range byDir {
 		rel, err := filepath.Rel(bundle, dir)
 		if err != nil {
 			return nil, err
@@ -306,6 +329,13 @@ func fpgaFirmwareLevels(bundle string, trust *TrustRoot, policy Obj, design *Des
 		}
 	}
 	fmt.Println(firmwareL3Summary(append(board, rotFW...)))
+	if len(updates) > 0 {
+		var ids []string
+		for _, u := range updates {
+			ids = append(ids, filepath.Base(u))
+		}
+		fmt.Printf("%s: field update %s held to the same rules as the shipped release\n", site, strings.Join(ids, ", "))
+	}
 	fmt.Printf("%s: every provisioning site is rated L%d in its own track (the EMS for %d boards, the root of trust's test house for their units)\n", site, min(level, 4), len(units))
 	if level >= 4 {
 		fmt.Println(firmwareL4Summary("Firmware L4", []string{FPGAFWImage, RoTFWImage, S(design.Final, "name")}))

@@ -183,3 +183,14 @@ test_assembly_l3_claim_refused if {
 	doc := set(board_input, ["policy", "claims", "board"], ["HSLSA_ASSEMBLY_LEVEL_3"])
 	refused(doc, "policy claims Assembly L3; these Rego policies check Assembly up to L2, and L3 stays with the reference tool")
 }
+
+board_claimed(doc, levels) := json.patch(doc, [{"op": "add", "path": stmt(hbom, ["predicate", "claimedLevels"]), "value": levels}])
+
+test_board_hbom_claiming_the_verified_level_accepted if {
+	# Firmware is not this check's track; the claim is left to the check that covers it.
+	count(board.deny) == 0 with input as board_claimed(board_input, ["HSLSA_ASSEMBLY_LEVEL_2", "HSLSA_FIRMWARE_LEVEL_2"])
+}
+
+test_board_hbom_claiming_more_than_verified_refused if {
+	refused(board_claimed(board_input, ["HSLSA_ASSEMBLY_LEVEL_3"]), "board hbom: the HBOM claims Assembly L3, but this check verified Assembly L2; an HBOM may not claim more than its checks verify")
+}

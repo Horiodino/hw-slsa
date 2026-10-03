@@ -466,6 +466,9 @@ func inspectionCheck(bundle string, trust *TrustRoot, policy Obj, sc inspectionS
 	if err := independentOf(trust, iPath, role, sc.producers, label+": the inspection"); err != nil {
 		return nil, err
 	}
+	if err := labAccredited(trust, pol, ki, role, label+": the inspection"); err != nil {
+		return nil, err
+	}
 	commitRD := relRD(bundle, "att/"+InspectionCommitmentAtt)
 	if err := requireLink(sc.sealerRec, label+": "+sc.sealer, []Obj{commitRD}, "the lab's inspection commitment"); err != nil {
 		return nil, failf("%s; without it nothing shows the lab committed to its seed before the lot was sealed", strings.TrimPrefix(err.Error(), "verification failed: "))
@@ -553,6 +556,30 @@ func inspectionCheck(bundle string, trust *TrustRoot, policy Obj, sc inspectionS
 	fmt.Printf("%s: PASSED, %s inspected a seeded sample of %d of the %d in %s, none failed\n",
 		label, orgOf(trust, iPath, role), len(samples), len(sc.units), S(sc.lot, "name"))
 	return []Obj{commitRD, relRD(bundle, "att/"+InspectionAtt)}, nil
+}
+
+// labAccredited is the lab's half of the L3 site rule: the buyer enrolled the
+// lab's key with an accreditation (for a testing lab, ISO/IEC 17025 or a
+// scheme like it), and the policy's inspection.accreditations list that
+// scheme. Independence says the lab is not the producer; accreditation says
+// someone the buyer accepts has vetted its competence.
+func labAccredited(trust *TrustRoot, pol Obj, k Key, role, what string) error {
+	accepted := Strs(pol, "accreditations")
+	if len(accepted) == 0 {
+		return failf("%s: the policy accepts no lab accreditation (inspection.accreditations), so no lab qualifies", what)
+	}
+	e, ok := trust.Enrolled[k.ID]
+	if !ok {
+		return failf("%s is signed by %s key %s, which the trust root lists without an enrollment; L4 needs a buyer-run trust root that records the lab's accreditation", what, role, short(k.ID))
+	}
+	scheme := S(e, "accreditation", "scheme")
+	if scheme == "" {
+		return failf("%s is signed by %s key %s of %s, which is enrolled with no accreditation; L4 needs an accredited lab", what, role, short(k.ID), S(e, "organization", "name"))
+	}
+	if !contains(accepted, scheme) {
+		return failf("%s is signed by %s, accredited under %q, which the policy's inspection.accreditations do not list", what, S(e, "organization", "name"), scheme)
+	}
+	return nil
 }
 
 func failedDetails(checks []Obj) []string {

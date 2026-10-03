@@ -392,7 +392,7 @@ l4() {
       --org-name "$org" --org-id "$id" --site "$site" --country US \
       --custody "$custody" --not-after "$not_after" --out "$dir/$file.intoto.json" "$@" > /dev/null
   }
-  enroll_all() { # <dir> <lab org> <lab org id> <rebuilder org> <rebuilder org id>
+  enroll_all() { # <dir> <lab org> <lab org id> <rebuilder org> <rebuilder org id> [lab accreditation]
     mkdir -p "$1"
     local r
     for r in ip-vendor source-owner source-reviewer flow-platform product-owner; do
@@ -405,10 +405,10 @@ l4() {
     enroll "$1" sort-site sort-site hsm "Example Sort Services" duns:100000012 "Example Sort House" --accreditation iso-iec-20243 --accreditation-id OTTPS-0107
     enroll "$1" osat-site osat-site hsm "Example OSAT Group" duns:100000013 "Example OSAT" --accreditation dmea-trusted-supplier --accreditation-id DMEA-TA-0213
     enroll "$1" test-site test-site hsm "Example Test Services" duns:100000014 "Example Test House" --accreditation iso-iec-20243 --accreditation-id OTTPS-0233
-    enroll "$1" inspection-lab inspection-lab file "$2" "$3" "$2"
+    enroll "$1" inspection-lab inspection-lab file "$2" "$3" "$2" ${6:+--accreditation "$6" --accreditation-id A2LA-4410.01}
     enroll "$1" rebuilder rebuilder file "$4" "$5" "$4"
   }
-  enroll_all "$l/enrollments" "Example Failure Analysis Lab" duns:100000041 "Example Rebuild Services" duns:100000031
+  enroll_all "$l/enrollments" "Example Failure Analysis Lab" duns:100000041 "Example Rebuild Services" duns:100000031 iso-iec-17025
   hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$l/enrollments" --out "$l/trust-root.json" > /dev/null
   cp "$E2E/l4/policy.json" "$b/policy.json"
 
@@ -474,16 +474,22 @@ l4() {
   refuses "a copy of a part the lab destroyed" "is one the lab destroyed in its inspection" \
     hslsa verify "${check[@]}" --trust-root "$l/trust-root.json" --units "$l/copy"
   # The lab enrolled under the test house's company, the rebuilder under the design house's.
-  enroll_all "$l/lab-of-the-test-house" "Example Test Services" duns:100000014 "Example Rebuild Services" duns:100000031
+  enroll_all "$l/lab-of-the-test-house" "Example Test Services" duns:100000014 "Example Rebuild Services" duns:100000031 iso-iec-17025
   hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$l/lab-of-the-test-house" \
     --out "$l/lab-of-the-test-house.json" > /dev/null
   refuses "an inspection by the test house's own lab" "the organization that holds the test-site key; L4 needs an independent party" \
     hslsa verify "${check[@]}" --trust-root "$l/lab-of-the-test-house.json" --units "$l/received"
-  enroll_all "$l/rebuilder-of-the-design-house" "Example Failure Analysis Lab" duns:100000041 "Example Open Silicon Group" duns:100000002
+  enroll_all "$l/rebuilder-of-the-design-house" "Example Failure Analysis Lab" duns:100000041 "Example Open Silicon Group" duns:100000002 iso-iec-17025
   hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$l/rebuilder-of-the-design-house" \
     --out "$l/rebuilder-of-the-design-house.json" > /dev/null
   refuses "a rebuild by the design house itself" "L4 needs an independent party" \
     hslsa verify "${check[@]}" --trust-root "$l/rebuilder-of-the-design-house.json" --units "$l/received"
+  # The same lab, enrolled by the buyer without an accreditation.
+  enroll_all "$l/unaccredited-lab" "Example Failure Analysis Lab" duns:100000041 "Example Rebuild Services" duns:100000031
+  hslsa pilot trust-root --buyer-pub "$l/buyer/buyer-root.pub.pem" --enrollments "$l/unaccredited-lab" \
+    --out "$l/unaccredited-lab.json" > /dev/null
+  refuses "an inspection by a lab with no accreditation" "enrolled with no accreditation; L4 needs an accredited lab" \
+    hslsa verify "${check[@]}" --trust-root "$l/unaccredited-lab.json" --units "$l/received"
   # The lot sealed again without the lab's commitment, which is put in the
   # bundle afterwards: the sample could have been chosen once the lot was known.
   cp -r "$b" "$l/no-commitment"

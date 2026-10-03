@@ -530,6 +530,9 @@ func headFields(r *renderSource) [][2]string {
 	for _, alg := range sortedKeys(O(id, "certDigest")) {
 		out = append(out, [2]string{"hbom:deviceIdentity.certDigest", alg + ":" + S(id, "certDigest", alg)})
 	}
+	for _, c := range Strs(r.pred, "claimedLevels") {
+		out = append(out, [2]string{"hbom:claimedLevel", c})
+	}
 	for _, red := range Objs(r.pred, "redactions") {
 		for _, alg := range sortedKeys(O(red, "saltedDigest")) {
 			out = append(out, [2]string{"hbom:redaction", S(red, "path") + " " + alg + ":" + S(red, "saltedDigest", alg)})

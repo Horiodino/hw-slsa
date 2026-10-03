@@ -54,6 +54,8 @@ deny contains msg if msg := lib.open_error(hbom_path, "board-owner", lib.hbom_ty
 
 deny contains msg if msg := lib.hbom_schema_error("board hbom", hb.predicate)
 
+deny contains msg if some msg in lib.hbom_claim_errors("board hbom", hb.predicate, "board", ["ASSEMBLY"])
+
 deny contains msg if msg := lib.withheld_error("board hbom", hb)
 
 deny contains sprintf("board hbom: product level is %s, not a board", [object.get(hb, ["predicate", "product", "level"], "")]) if {

@@ -213,3 +213,49 @@ func enrolledInHSM(trust *TrustRoot, k Key, role, what string) error {
 	}
 	return nil
 }
+
+// claimedLevelsCheck compares the levels an HBOM claims (claimedLevels, the
+// product owner's statement, spec "Claimed levels") with the levels a check
+// verified: verified is the policy's claim list for the check, tracks the
+// tracks the check covers. A claim above what the check verified in a track
+// it covers is refused, so an HBOM cannot claim more than its checks
+// establish. A claim in a track the check does not cover is returned, for
+// the check that covers it.
+func claimedLevelsCheck(hbom Obj, verified any, tracks []string, label string) ([]string, error) {
+	best := map[string]int{}
+	for _, c := range Strs(Obj{"v": verified}, "v") {
+		if t, n, ok, err := parseClaim(c); err == nil && ok && t != "" && n > best[t] {
+			best[t] = n
+		}
+	}
+	var left []string
+	seen := map[string]bool{}
+	for _, c := range Strs(hbom, "predicate", "claimedLevels") {
+		t, n, ok, err := parseClaim(c)
+		if err != nil || !ok || t == "" {
+			return nil, failf("%s: claimedLevels lists %s, which is not an HSLSA track level", label, c)
+		}
+		if seen[t] {
+			return nil, failf("%s: claimedLevels claims the %s track twice", label, TrackTitle[t])
+		}
+		seen[t] = true
+		if !contains(tracks, t) {
+			left = append(left, c)
+			continue
+		}
+		if n > best[t] {
+			if best[t] == 0 {
+				return nil, failf("%s: the HBOM claims %s L%d, but this check verified no %s level; an HBOM may not claim more than its checks verify", label, TrackTitle[t], n, TrackTitle[t])
+			}
+			return nil, failf("%s: the HBOM claims %s L%d, but this check verified %s L%d; an HBOM may not claim more than its checks verify", label, TrackTitle[t], n, TrackTitle[t], best[t])
+		}
+	}
+	return left, nil
+}
+
+// printClaimsLeft names the HBOM's claims a check left to another check.
+func printClaimsLeft(left []string, label string) {
+	if len(left) > 0 {
+		fmt.Printf("claimed in the %s, for another check to verify: %s\n", label, strings.Join(left, ", "))
+	}
+}

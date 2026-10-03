@@ -346,6 +346,25 @@ func TestPolicyMinimumSVNAboveTheImage(t *testing.T) {
 	rejects(t, calCheck(t, work, nil, path), "image SVN 1 is below the anti-rollback fuse or policy minimum")
 }
 
+func TestPolicyRequiringTheMLDSAChain(t *testing.T) {
+	// The verifier cannot check ML-DSA-87, so it refuses a policy that requires it.
+	work := calWork(t)
+	policy := ok(ReadObj(calPolicy))
+	O(policy, "firmware")["identityChains"] = []any{"ecc-p384", "mldsa87"}
+	path := filepath.Join(t.TempDir(), "policy.json")
+	must(t, WriteJSON(path, policy))
+	rejects(t, calCheck(t, work, nil, path), "the policy requires the ML-DSA-87 identity chain")
+}
+
+func TestPolicyRequiringTheP384ChainOnlyPasses(t *testing.T) {
+	work := calWork(t)
+	policy := ok(ReadObj(calPolicy))
+	O(policy, "firmware")["identityChains"] = []any{"ecc-p384"}
+	path := filepath.Join(t.TempDir(), "policy.json")
+	must(t, WriteJSON(path, policy))
+	must(t, calCheck(t, work, nil, path))
+}
+
 // Firmware images
 
 func TestFirmwareProvenanceForAnotherFMC(t *testing.T) {
@@ -615,5 +634,40 @@ func TestFuseInfoDigestChangesWithEveryVendorFuse(t *testing.T) {
 	}
 	if digests(with("fw_svn", 2))[0] == base[0] {
 		t.Error("owner info digest ignores fw_svn")
+	}
+}
+
+func TestIdentityChainsInPolicy(t *testing.T) {
+	// Runs without a Caliptra bundle: the rule on the policy alone.
+	for _, c := range []struct {
+		chains []any
+		reason string
+	}{
+		{nil, ""},
+		{[]any{"ecc-p384"}, ""},
+		{[]any{"mldsa87"}, "which this verifier cannot check"},
+		{[]any{"ecc-p384", "mldsa87"}, "which this verifier cannot check"},
+		{[]any{"rsa-4096"}, `unknown chain "rsa-4096"`},
+	} {
+		policy := Obj{"firmware": Obj{}}
+		if c.chains != nil {
+			O(policy, "firmware")["identityChains"] = c.chains
+		}
+		err := identityChainsCheck(policy)
+		if c.reason == "" {
+			must(t, err)
+			continue
+		}
+		rejects(t, err, c.reason)
+	}
+	boots := t.TempDir()
+	must(t, os.MkdirAll(filepath.Join(boots, "U1"), 0o755))
+	must(t, os.MkdirAll(filepath.Join(boots, "U2"), 0o755))
+	if got := mldsaChainNote(boots, []string{"U1", "U2"}); got != "the ML-DSA-87 chain was not read and is not checked" {
+		t.Fatal(got)
+	}
+	must(t, os.WriteFile(filepath.Join(boots, "U1", "ldevid-mldsa87.der"), []byte{0x30}, 0o644))
+	if got := mldsaChainNote(boots, []string{"U1", "U2"}); got != "the ML-DSA-87 chain was returned by 1 of 2 units and is not checked" {
+		t.Fatal(got)
 	}
 }

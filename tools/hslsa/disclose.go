@@ -37,7 +37,8 @@ func saltOK(s string) bool {
 
 // Withholding says which fields and files a producer withholds, as in
 // e2e/picorv32/withhold.json: "fields" maps a record (a manufacturing step
-// name, or "hbom") to JSON Pointers into its predicate, and "saltFiles" names
+// name, a design step name such as "synthesis", or "hbom") to JSON Pointers
+// into its predicate, and "saltFiles" names
 // the data files that get a salt so their digests cannot be guessed.
 type Withholding struct {
 	Fields    map[string][]string
@@ -74,6 +75,8 @@ func withheldList(predicateType string) []string {
 	switch predicateType {
 	case MfgStep:
 		return []string{"hwMfg", "confidential"}
+	case DesignFlow:
+		return []string{"hwFlow", "confidential"}
 	case HBOMType:
 		return []string{"redactions"}
 	}
@@ -88,12 +91,22 @@ var protectedFields = map[string][]string{
 		"/buildDefinition/buildType", "/buildDefinition/resolvedDependencies",
 		"/runDetails/builder", "/hwMfg/step", "/hwMfg/designRef", "/hwMfg/checks", "/hwMfg/proxy", "/hwMfg/evidence",
 	},
+	// A design record keeps its input and output digests, its step, its pinned
+	// tools, its gate results and how it ran; metrics, tool arguments, file
+	// paths and IP names may be withheld.
+	DesignFlow: {
+		"/buildDefinition/buildType", "/buildDefinition/resolvedDependencies",
+		"/runDetails/builder", "/runDetails/byproducts",
+		"/hwFlow/step", "/hwFlow/ordinal", "/hwFlow/tools", "/hwFlow/checks",
+		"/hwFlow/isolation", "/hwFlow/network", "/hwFlow/reproducibility",
+	},
 	HBOMType: {"/hbomVersion", "/product"},
 }
 
 // requiredBlocks must stay in the record, but their members may be withheld.
 var requiredBlocks = map[string][]string{
-	MfgStep: {"/buildDefinition/externalParameters"},
+	MfgStep:    {"/buildDefinition/externalParameters"},
+	DesignFlow: {"/buildDefinition/externalParameters"},
 }
 
 // parsePointer splits an RFC 6901 JSON Pointer into its reference tokens.

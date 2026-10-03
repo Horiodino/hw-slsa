@@ -535,7 +535,7 @@ func CaliptraSourceFreeze(bundle, lockPath, key string) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "source-freeze", []Obj{subject}, pred, signer)
+	return finish(bundle, "source-freeze", []Obj{subject}, pred, signer, nil)
 }
 
 // CaliptraLint is step 1 (simulation): Verilator lint of the whole Caliptra top level from the frozen archive.
@@ -596,7 +596,7 @@ func CaliptraLint(bundle, lockPath, key string) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "simulation", []Obj{subject}, pred, signer)
+	return finish(bundle, "simulation", []Obj{subject}, pred, signer, nil)
 }
 
 // RomHex is the ROM in the format caliptra-rtl's testbench loads into its ROM
@@ -750,7 +750,7 @@ func CaliptraRomMerge(bundle, lockPath, key string) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "rom-merge", []Obj{designRD, hexRD}, pred, signer)
+	return finish(bundle, "rom-merge", []Obj{designRD, hexRD}, pred, signer, nil)
 }
 
 // CaliptraRelease is the tapeout release: run the tapeout check on the steps, then sign the merged design.
@@ -783,7 +783,7 @@ func CaliptraRelease(bundle, key, trustRoot, policyPath string) error {
 	if err != nil {
 		return err
 	}
-	return finish(bundle, "release", []Obj{subject}, pred, signer)
+	return finish(bundle, "release", []Obj{subject}, pred, signer, nil)
 }
 
 // CaliptraFab writes the mask ROM every unit carries, exactly as the released design holds it.
@@ -1629,11 +1629,47 @@ type DeviceResult struct {
 	Inputs []Obj
 }
 
+// identityChainsCheck reads the identity chains a policy requires
+// (firmware.identityChains, default ["ecc-p384"]). Caliptra 2.x issues an
+// ECC P-384 chain and an ML-DSA-87 chain. The verifier checks the P-384
+// chain; Go's crypto/x509 cannot verify ML-DSA-87, so a policy that requires
+// that chain is refused rather than passed unchecked.
+func identityChainsCheck(policy Obj) error {
+	for _, c := range Strs(policy, "firmware", "identityChains") {
+		switch c {
+		case "ecc-p384":
+		case "mldsa87":
+			return failf("the policy requires the ML-DSA-87 identity chain (firmware.identityChains), which this verifier cannot check: Go's crypto/x509 has no ML-DSA, so only the ECC P-384 chain is checked")
+		default:
+			return failf("firmware.identityChains: unknown chain %q (known: ecc-p384, mldsa87)", c)
+		}
+	}
+	return nil
+}
+
+// mldsaChainNote says what the at-boot check did with the units' ML-DSA-87
+// certificates: never checked, and read only when the device returned them.
+func mldsaChainNote(bootsDir string, units []string) string {
+	read := 0
+	for _, u := range units {
+		if found, _ := filepath.Glob(filepath.Join(bootsDir, u, "*-mldsa87.der")); len(found) > 0 {
+			read++
+		}
+	}
+	if read == 0 {
+		return "the ML-DSA-87 chain was not read and is not checked"
+	}
+	return fmt.Sprintf("the ML-DSA-87 chain was returned by %d of %d units and is not checked", read, len(units))
+}
+
 // DeviceCheck is the spec's at-boot check for one unit, from what the booted device returned.
 func DeviceCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResult, lot *LotResult,
 	fw *FirmwareResult, unit, bootDir string) (*DeviceResult, error) {
 	art := filepath.Join(bundle, "artifacts")
 	label := "device " + unit
+	if err := identityChainsCheck(policy); err != nil {
+		return nil, err
+	}
 	certs := map[string]*x509.Certificate{}
 	for _, name := range []string{"ldevid", "fmc-alias", "rt-alias"} {
 		path := filepath.Join(bootDir, name+"-ecc384.der")
@@ -1859,6 +1895,7 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 		devices = append(devices, dev)
 	}
 	fmt.Printf("at-boot check: PASSED for %d booted units (%s)\n", len(devices), strings.Join(units, ", "))
+	fmt.Printf("identity chain: ECC P-384 checked for every unit; %s\n", mldsaChainNote(bootsDir, units))
 	var devInputs []Obj
 	for _, dev := range devices {
 		devInputs = append(devInputs, dev.Inputs...)
@@ -1868,6 +1905,16 @@ func CaliptraVerify(bundle string, trust *TrustRoot, policyPath, unitsPath, boot
 		return err
 	}
 	printSimulated(append(append([]string{}, lot.Simulated...), devSim...))
+	// The lot receipt check left the HBOM's Firmware claim to the at-boot check.
+	hb, err := trust.Open(filepath.Join(bundle, "att", "hbom.intoto.json"), "product-owner", HBOMType)
+	if err != nil {
+		return err
+	}
+	left, err := claimedLevelsCheck(hb, get(policy, "claims", "device"), deviceTracks, "hbom")
+	if err != nil {
+		return err
+	}
+	printClaimsLeft(left, "hbom")
 	if err := renderingsCheck(bundle, filepath.Join(bundle, "att", "hbom.intoto.json"), "hbom"); err != nil {
 		return err
 	}

@@ -24,14 +24,24 @@ var (
 
 var labOrg = [2]string{"Example Failure Analysis Lab", "duns:100000041"}
 
-// l4TrustRoot is the L3 trust root plus the inspection lab, enrolled under org.
+// labAccreditation is the testing-lab accreditation the example labs hold
+// and the example L4 policies accept (inspection.accreditations).
+var labAccreditation = Accreditation{Scheme: "iso-iec-17025", ID: "A2LA-4410.01"}
+
+// l4TrustRoot is the L3 trust root plus the inspection lab, enrolled under
+// org with the example lab accreditation.
 func l4TrustRoot(keys, bundle, name string, org [2]string) (string, error) {
+	return l4TrustRootAccredited(keys, bundle, name, org, labAccreditation)
+}
+
+// l4TrustRootAccredited is l4TrustRoot with the lab enrolled under acc (none when empty).
+func l4TrustRootAccredited(keys, bundle, name string, org [2]string, acc Accreditation) (string, error) {
 	dir := filepath.Join(filepath.Dir(bundle), name)
 	if err := enrollL3(keys, dir, nil, l3Org); err != nil {
 		return "", err
 	}
 	e := Enrollment{Role: InspectionLabRole, OrgName: org[0], OrgID: org[1], Site: org[0], Custody: "file",
-		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(90 * 24 * time.Hour)}
+		Accreditation: acc, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(90 * 24 * time.Hour)}
 	if err := Enroll(filepath.Join(keys, "buyer-root.key.pem"), filepath.Join(keys, InspectionLabRole+".pub.pem"), e, filepath.Join(dir, InspectionLabRole+".intoto.json")); err != nil {
 		return "", err
 	}
@@ -188,6 +198,10 @@ func TestChipL4Accepts(t *testing.T) {
 		"another-independent-lab": {func(t *testing.T, b string, _ Obj) string {
 			return ok(l4TrustRoot(chipKeys(b), b, "enrollments-second-lab", [2]string{"Example Second Lab", "duns:100000042"}))
 		}, true},
+		"a-lab-under-another-accepted-accreditation": {func(t *testing.T, b string, p Obj) string {
+			O(p, "inspection")["accreditations"] = []any{"iso-iec-17025", "dmea-trusted-supplier"}
+			return ok(l4TrustRootAccredited(chipKeys(b), b, "enrollments-dmea-lab", labOrg, Accreditation{Scheme: "dmea-trusted-supplier", ID: "DMEA-FA-0007"}))
+		}, true},
 		"a-buyer-at-wafer-l3-and-package-test-l3": {func(t *testing.T, b string, p Obj) string {
 			l3 := ok(ReadObj(l3Policy))
 			for k := range p {
@@ -260,6 +274,16 @@ func TestChipL4Rejects(t *testing.T) {
 			tr := ok(l4TrustRoot(chipKeys(b), b, "same-org", [2]string{"Example Test Services", "duns:100000014"}))
 			return tr, ""
 		}, "the organization that holds the test-site key; L4 needs an independent party"},
+		"lab-not-accredited": {func(t *testing.T, b string, _ Obj) (string, string) {
+			return ok(l4TrustRootAccredited(chipKeys(b), b, "unaccredited-lab", labOrg, Accreditation{})), ""
+		}, "which is enrolled with no accreditation; L4 needs an accredited lab"},
+		"lab-accredited-under-an-unlisted-scheme": {func(t *testing.T, b string, _ Obj) (string, string) {
+			return ok(l4TrustRootAccredited(chipKeys(b), b, "other-scheme-lab", labOrg, Accreditation{Scheme: "lab-self-declared", ID: "SELF-1"})), ""
+		}, "accredited under \"lab-self-declared\", which the policy's inspection.accreditations do not list"},
+		"policy-accepting-no-lab-accreditation": {func(t *testing.T, b string, p Obj) (string, string) {
+			delete(O(p, "inspection"), "accreditations")
+			return "", ""
+		}, "the policy accepts no lab accreditation (inspection.accreditations)"},
 		"inspection-by-an-unlisted-key": {func(t *testing.T, b string, _ Obj) (string, string) {
 			resign(t, filepath.Join(b, "att", InspectionAtt), chipKeys(b), "attacker", nil)
 			return "", ""

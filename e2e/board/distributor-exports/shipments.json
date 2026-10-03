@@ -1,0 +1,35 @@
+{
+  "note": "Exports the shippers hand over with each shipment of the board example: a packing list, the certificate of conformance it names, and for the distributor its EPCIS 2.0 shipping event. Simulated: written for this example from board-scenario.json; parties, lots and documents are examples.",
+  "shipments": [
+    {
+      "id": "EXAMPLE-SHIP-0001",
+      "exports": [
+        {
+          "path": "packing-list-EXAMPLE-SHIP-0001.csv",
+          "format": "packing-list-csv"
+        },
+        {
+          "path": "coc-EXAMPLE-SHIP-0001.txt",
+          "format": "certificate-of-conformance"
+        },
+        {
+          "path": "epcis-EXAMPLE-SHIP-0001.json",
+          "format": "epcis-2.0-json"
+        }
+      ]
+    },
+    {
+      "id": "EXAMPLE-SHIP-0002",
+      "exports": [
+        {
+          "path": "packing-list-EXAMPLE-SHIP-0002.csv",
+          "format": "packing-list-csv"
+        },
+        {
+          "path": "coc-EXAMPLE-SHIP-0002.txt",
+          "format": "certificate-of-conformance"
+        }
+      ]
+    }
+  ]
+}

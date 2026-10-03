@@ -17,7 +17,7 @@
     "source": {"tagSigner": "source-owner", "reviewer": "source-reviewer"},
     "thirdPartyIP": [{"name": "picorv32", "signer": "ip-vendor", "files": ["picorv32.v"]}]
   },
-  "manufacturing": {"requireTransfers": true, "acceptOnBehalf": ["proxy"], "requireExports": true},
+  "manufacturing": {"requireTransfers": true, "acceptOnBehalf": ["proxy"], "requireExports": true, "requireTransferExports": true},
   "claims": {
     "design": ["HSLSA_DESIGN_LEVEL_3", "SLSA_BUILD_LEVEL_3"],
     "lot": ["HSLSA_WAFER_LEVEL_1", "HSLSA_PACKAGE_TEST_LEVEL_1", "HSLSA_DESIGN_LEVEL_3"]

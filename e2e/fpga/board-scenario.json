@@ -1,4 +1,5 @@
 {
+  "claimedLevels": ["HSLSA_ASSEMBLY_LEVEL_2", "HSLSA_FIRMWARE_LEVEL_2"],
   "simulated": {"simulator": "hand-written scenario and the simulated board in tools/hslsa/fpgaboard.go", "standsIn": "the distributors' shipments, the EMS line, the board's flash and the EXR-01 root of trust on it"},
   "note": "Manufacturers and part numbers are real, except the root of trust, EXR-01 from Example RoT Co, which this example simulates. Distributors, sites, shipment IDs, lot codes, date codes and dates are placeholders, so every such value starts with EXAMPLE or Example.",
   "product": {
@@ -53,5 +54,8 @@
     "id": "urn:hslsa:station:example-ems:prog-01",
     "site": {"name": "Example EMS", "country": "US"},
     "signer": "ems-site"
+  },
+  "afterSale": {
+    "simulated": {"simulator": "e2e/fpga/run.sh aftersale and the simulated board in tools/hslsa", "standsIn": "the board owner's field updater writing a released update to a board in service, its returns desk, the repair site and the reshipment"}
   }
 }

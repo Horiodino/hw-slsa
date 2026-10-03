@@ -1,0 +1,2 @@
+shipment_id,ship_date,shipper,shipper_country,manufacturer,mpn,lot,date_code,quantity,serials,coc
+EXAMPLE-SHIP-0002,2026-09-15,Example PCB Fab,US,Example PCB Fab,PSOC-DEVB-01-PCB,EXAMPLE-PCB-LOT-01,EXAMPLE-2637,8,,coc-EXAMPLE-SHIP-0002.txt

@@ -167,3 +167,18 @@ test_wafer_l3_claim_refused if {
 	doc := set(chip, ["policy", "claims", "lot"], ["HSLSA_WAFER_LEVEL_3", "HSLSA_PACKAGE_TEST_LEVEL_2", "HSLSA_DESIGN_LEVEL_3"])
 	refused(doc, "policy claims Wafer L3; these Rego policies check Wafer up to L2, and L3 stays with the reference tool")
 }
+
+claimed(doc, levels) := json.patch(doc, [{"op": "add", "path": stmt("att/hbom.intoto.json", ["predicate", "claimedLevels"]), "value": levels}])
+
+test_hbom_claiming_the_verified_levels_accepted if {
+	count(lot.deny) == 0 with input as claimed(chip, ["HSLSA_DESIGN_LEVEL_3", "HSLSA_WAFER_LEVEL_2", "HSLSA_PACKAGE_TEST_LEVEL_1"])
+}
+
+test_hbom_claiming_more_than_verified_refused if {
+	refused(claimed(chip, ["HSLSA_WAFER_LEVEL_3"]), "hbom: the HBOM claims Wafer L3, but this check verified Wafer L2; an HBOM may not claim more than its checks verify")
+}
+
+test_hbom_claiming_a_track_the_policy_does_not_claim_refused if {
+	doc := set(claimed(chip, ["HSLSA_PACKAGE_TEST_LEVEL_2"]), ["policy", "claims", "lot"], ["HSLSA_WAFER_LEVEL_2", "HSLSA_DESIGN_LEVEL_3"])
+	refused(doc, "hbom: the HBOM claims Package/Test L2, but this check verified no Package/Test level")
+}

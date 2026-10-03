@@ -3,7 +3,9 @@
 # "produce" plays the root of trust vendor, the board owner (FPGA design house
 # and firmware team) and the EMS: it builds the iCE40 bitstream with open
 # tools, signs every record, programs the boards, powers on the received ones
-# and runs the board tests while the keys still exist. "verify" is the buyer:
+# and runs the board tests while the keys still exist. On a copy, it then
+# signs after-sale records: a field update, a return, a rework and a
+# reshipment, and checks the boards again. "verify" is the buyer:
 # it gets only the board bundle and what the boards returned at boot, checks
 # the whole chain, signs VSAs and verifies them with slsa-verifier.
 #
@@ -84,6 +86,8 @@ jobs:
         run: e2e/fpga/run.sh boot | tee -a produce.log
       - name: Board tests, the valid chain accepted and broken or forged records refused
         run: e2e/unit-tests.sh "FPGA board tests" -count=1 -run 'FPGA|RoT|Board|ASC|UART|FlashHex|SoC|Provisioning|Released|Unreadable|HBOMLists|NoRoT' ./tools/hslsa/
+      - name: After-sale records, a field update with new firmware, a return, a rework and a reshipment, and what they refuse
+        run: e2e/fpga/run.sh aftersale | tee -a produce.log
       - name: Remove private keys and the boards' secrets before upload
         run: rm -rf out/fpga/keys out/fpga/rot-keys out/fpga/rot-devices out/fpga/boards
       - name: Summary

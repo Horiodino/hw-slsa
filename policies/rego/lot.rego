@@ -341,6 +341,8 @@ deny contains msg if msg := lib.open_error(hbom_path, "product-owner", lib.hbom_
 
 deny contains msg if msg := lib.hbom_schema_error("hbom", hb.predicate)
 
+deny contains msg if some msg in lib.hbom_claim_errors("hbom", hb.predicate, "lot", ["WAFER", "PACKAGE_TEST", "DESIGN"])
+
 hbom_subjects := {s.name: s.digest | some s in hb.subject}
 
 deny contains "hbom: design subject does not match the released design" if {

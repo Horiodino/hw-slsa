@@ -1,0 +1,18 @@
+CERTIFICATE OF CONFORMANCE (example document for the HSLSA board example; not a real certificate)
+
+Shipper: Example Franchised Distributor, US
+Shipment: EXAMPLE-SHIP-0001, shipped 2026-09-14
+
+We certify that the parts below were bought directly from their manufacturers
+or the manufacturers' authorized channels, are traceable to them, and conform
+to the manufacturers' specifications.
+
+  Example Open Silicon Group PSOC130-QFN64, lot ASM-EXAMPLE-17, date code EXAMPLE-2636, quantity 8
+  Winbond Electronics W25Q128JVSIQ, lot EXAMPLE-WB-LOT-0001, date code EXAMPLE-2621, quantity 10
+  Texas Instruments TLV75518PDBVR, lot EXAMPLE-TI-LOT-0001, date code EXAMPLE-2618, quantity 10
+  Texas Instruments TLV75533PDBVR, lot EXAMPLE-TI-LOT-0002, date code EXAMPLE-2619, quantity 10
+  Abracon ASE-12.000MHZ-LC-T, lot EXAMPLE-AB-LOT-0001, date code EXAMPLE-2611, quantity 10
+  Murata Electronics GRM188R61A106KE69D, lot EXAMPLE-MU-LOT-0001, date code EXAMPLE-2602, quantity 100
+  YAGEO RC0402FR-0710KL, lot EXAMPLE-YG-LOT-0001, date code EXAMPLE-2605, quantity 100
+
+Signed for Example Franchised Distributor: Example Quality Manager

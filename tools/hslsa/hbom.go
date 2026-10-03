@@ -225,6 +225,7 @@ func BuildChipHBOM(bundle, lockPath, scenarioPath, key string, w *Withholding, f
 	if len(firmware) > 0 {
 		predicate["firmware"] = firmware
 	}
+	addClaimedLevels(predicate, sc)
 	if err := signHBOM(bundle, final, S(sc, "finalTest", "lotId"), shipped, predicate, key, w); err != nil {
 		return err
 	}
@@ -250,4 +251,13 @@ func hbomIPBlocks(lock Obj) []Obj {
 		})
 	}
 	return out
+}
+
+// addClaimedLevels copies the levels the product owner claims, from its
+// scenario's claimedLevels, into an HBOM predicate. The schema allows one
+// claim per track, and the receipt checks hold each to what they verify.
+func addClaimedLevels(predicate, scenario Obj) {
+	if levels := Strs(scenario, "claimedLevels"); len(levels) > 0 {
+		predicate["claimedLevels"] = anyStrings(levels)
+	}
 }

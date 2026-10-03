@@ -132,10 +132,10 @@ func designL4Bundle(t *testing.T) string {
 		if err := SourceReview(bundle, e2eLock, filepath.Join(keys, "second-reviewer.key.pem"), secondReviewer); err != nil {
 			return err
 		}
-		if err := SourceFreezeL2(bundle, e2eLock, filepath.Join(keys, "flow-platform.key.pem"), e2eCache(), tr, pol); err != nil {
+		if err := SourceFreezeL2(bundle, e2eLock, filepath.Join(keys, "flow-platform.key.pem"), e2eCache(), tr, pol, nil); err != nil {
 			return err
 		}
-		if err := DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), tr, pol); err != nil {
+		if err := DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), tr, pol, nil); err != nil {
 			return err
 		}
 		return rebuildAs(bundle, rebuilderID)
@@ -177,8 +177,8 @@ func TestDesignL4Accepts(t *testing.T) {
 		keys, tr := chipKeys(b), filepath.Join(b, "trust-root.json")
 		pol := writePolicy(t, filepath.Dir(b), p)
 		must(t, SourceReview(b, e2eLock, filepath.Join(keys, "third-reviewer.key.pem"), "Example Third Reviewer <third-reviewer@example.com>"))
-		must(t, SourceFreezeL2(b, e2eLock, filepath.Join(keys, "flow-platform.key.pem"), e2eCache(), tr, pol))
-		must(t, DesignRelease(b, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), tr, pol))
+		must(t, SourceFreezeL2(b, e2eLock, filepath.Join(keys, "flow-platform.key.pem"), e2eCache(), tr, pol, nil))
+		must(t, DesignRelease(b, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), tr, pol, nil))
 		must(t, rebuildAs(b, rebuilderID))
 	}
 	cases := map[string]func(t *testing.T, bundle string, policy Obj){
@@ -329,7 +329,7 @@ func TestDesignRebuildCatchesAlteredNetlist(t *testing.T) {
 	keys := chipKeys(bundle)
 	appendFile(t, filepath.Join(bundle, "artifacts", "picorv32.netlist.v"), "// inserted after signoff\n")
 	resign(t, filepath.Join(bundle, "att", AttName("synthesis")), keys, "flow-platform", func(s Obj) { refresh(bundle, s) })
-	must(t, DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy))
+	must(t, DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy, nil))
 	must(t, rebuildAs(bundle, rebuilderID))
 	rb := ok(DecodeEnvelope(filepath.Join(bundle, "att", DesignRebuildAtt)))
 	for _, c := range Objs(rb, "predicate", "hwFlow", "checks") {

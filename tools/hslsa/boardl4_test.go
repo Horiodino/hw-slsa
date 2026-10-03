@@ -20,7 +20,7 @@ var (
 )
 
 func boardL4Org(lab [2]string) map[string][3]string {
-	org := map[string][3]string{InspectionLabRole: {lab[0], lab[1], ""}}
+	org := map[string][3]string{InspectionLabRole: {lab[0], lab[1], labAccreditation.Scheme}}
 	for k, v := range boardL3Org {
 		org[k] = v
 	}
@@ -182,6 +182,11 @@ func TestBoardL4Rejects(t *testing.T) {
 			tr := ok(boardTrustRoot(w, "same-org", boardL4Roles, boardL4Org([2]string{"Example EMS", "duns:100000021"})))
 			return tr, "", ""
 		}, "the organization that holds the ems-site key; L4 needs an independent party"},
+		"lab-not-accredited": {func(t *testing.T, w string) (string, string, string) {
+			org := boardL4Org(labOrg)
+			org[InspectionLabRole] = [3]string{labOrg[0], labOrg[1], ""}
+			return ok(boardTrustRoot(w, "unaccredited-lab", boardL4Roles, org)), "", ""
+		}, "Assembly L4: the inspection is signed by inspection-lab key"},
 		"trust-root-without-the-lab": {func(t *testing.T, w string) (string, string, string) {
 			tr := ok(boardTrustRoot(w, "no-lab", boardL3Roles, boardL3Org))
 			return tr, "", ""

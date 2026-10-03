@@ -10,6 +10,8 @@
 #                             trust's lot at Wafer L3 and Package/Test L3, and what Firmware L3 refuses
 #   e2e/fpga/run.sh l4        the chain at Firmware L4 and Assembly L4, with the root of trust's lot at
 #                             Wafer L4 and Package/Test L4: an independent rebuilder and an inspection lab
+#   e2e/fpga/run.sh aftersale on a copy of produce and boot: a field update with new firmware, a board
+#                             returned, reworked and shipped again, and what the after-sale check refuses
 #
 # Needs: Go, yosys, nextpnr-ice40, icestorm (icepack, iceunpack, icetime and
 # its chip database), iverilog, a RISC-V GCC, git and ssh-keygen; l3 and l4
@@ -202,7 +204,8 @@ softhsm_token() {
 # run in the sandbox with pinned tools, a review lab signs a S.A.F.E. report for
 # each image, and every release goes into the buyer's private transparency
 # log. The buyer checks the boards it received with what they reported at
-# boot, then the cases Firmware L3 refuses. Runs on its own, without produce.
+# boot, then the cases Firmware L3 refuses, and a field update held to the
+# same rules as the shipped release. Runs on its own, without produce.
 l3() {
   local l=$OUT/l3
   rm -rf "$l" && mkdir -p "$l"
@@ -363,6 +366,30 @@ l3() {
   sed 's/HSLSA_PACKAGE_TEST_LEVEL_3/HSLSA_PACKAGE_TEST_LEVEL_2/' "$HERE/l3/rot-policy.json" > "$l/rot-pt-l2.json"
   refuses "a root of trust provisioned at a test house rated below L3" "Firmware L3 needs every provisioning site at L3" \
     hslsa fpga verify "${check[@]}" --policy "$b/policy.json" --part-policy "rot=$l/rot-pt-l2.json"
+  # A field update at Firmware L3: built in the sandbox, reviewed and logged
+  # like the shipped release, and written to a board by an enrolled field updater.
+  echo "== a field update at Firmware L3"
+  local s1
+  read -r s1 < "$HERE/received-boards.txt"
+  hslsa keygen --out "$k" field-updater
+  enroll "$l/enrollments" "$k" field-updater file "Example Board Co" duns:100000026 "Example Board Co Field Service"
+  hslsa pilot trust-root --buyer-pub "$buyer/buyer-root.pub.pem" --enrollments "$l/enrollments" --out "$l/trust-root.json" > /dev/null
+  cp "$l/trust-root.json" "$b/trust-root.json"
+  jq '.firmware.version = "1.1.0" | .firmware.svn = 2 | .firmware.cflags += ["-Os"]' "$HERE/inputs.lock.json" > "$l/update.lock.json"
+  hslsa fpga update-build --bundle "$b" --id U1 --lock "$l/update.lock.json" --scenario "$HERE/board-scenario.json" \
+    --key "$k/firmware-platform.key.pem" --code-signer "$k/code-signer.key.pem" --cache "$CACHE" --isolate
+  hslsa safe simulate --bundle "$b/updates/U1" --record att/fw-picosoc.intoto.json --image picosoc-fw.bin \
+    --vendor "Example Board Co" --product FPGA-DEVB-01 --version 1.1.0 --key "$buyer/review-provider.key.pem"
+  hslsa fpga after-sale field-update --bundle "$b" --board "$s1" --boards "$l/received" --update "$b/updates/U1" \
+    --key "$k/field-updater.key.pem" --site "Example Board Co Field Service" --country US --scenario "$HERE/board-scenario.json"
+  echo "$s1" > "$l/one.txt"
+  hslsa fpga boot --bundle "$b" --boards "$l/received" --list "$l/one.txt" --out "$l/boots-update"
+  rm -rf "${l:?}/boots/$s1" && mv "$l/boots-update/$s1" "$l/boots/$s1"
+  refuses "a field update that is not in the release log" "Firmware L3: field update U1: picosoc-fw.bin: fw-picosoc.intoto.json is not in a transparency log" \
+    hslsa fpga verify "${check[@]}" --policy "$b/policy.json"
+  hslsa tlog add "${logkey[@]}" --record "$b/updates/U1/att/fw-picosoc.intoto.json"
+  hslsa tlog add "${logkey[@]}" --record "$b/updates/U1/att/fw-flash.intoto.json"
+  hslsa fpga verify "${check[@]}" --policy "$b/policy.json"
   # The log operator rewrites the first release and signs a new checkpoint.
   jq '.entries[0].record.digest.sha256 = "'"$(printf 'another release' | sha256sum | cut -c1-64)"'"' "$log/log.json" > "$l/forked.json"
   mv "$l/forked.json" "$log/log.json"
@@ -413,7 +440,7 @@ l4() {
   third_parties() { # <dir> <lab org> <lab org id> <rebuilder org> <rebuilder org id>
     enroll "$1" "$buyer" transparency-log transparency-log file "Example Buyer" duns:100000040 "Example Buyer Release Log"
     enroll "$1" "$buyer" review-provider review-provider file "Example Firmware Review Lab" duns:100000041 "Example Firmware Review Lab"
-    enroll "$1" "$lab" inspection-lab inspection-lab file "$2" "$3" "$2"
+    enroll "$1" "$lab" inspection-lab inspection-lab file "$2" "$3" "$2" --accreditation iso-iec-17025 --accreditation-id A2LA-4410.01
     enroll "$1" "$rb" rebuilder rebuilder file "$4" "$5" "$4"
   }
   rot_enroll() { # <dir> <third_parties args>
@@ -575,12 +602,91 @@ l4() {
   rm -rf "${k:?}" "${rk:?}" "${buyer:?}" "${rb:?}" "${lab:?}" "${l:?}/tokens"
 }
 
+# After-sale records (spec, "After-sale records") on a copy of what produce
+# and boot made. The board owner builds a field update with new firmware
+# (1.1.0 at SVN 2, the same bitstream); its field updater writes it to one
+# board, raises the anti-rollback fuse and signs. Another board comes back, a
+# repair site replaces a regulator, and the board owner ships it again. Both
+# boards are powered on again, the SoC on the new firmware too, and the buyer
+# checks the lot, then the cases the after-sale check refuses.
+aftersale() {
+  local a=$OUT/aftersale
+  rm -rf "$a" && mkdir -p "$a/keys/pub"
+  cp -r "$BUNDLE" "$a/board" && cp -r "$OUT/boards" "$a/boards"
+  local b=$a/board k=$a/keys s1 s2
+  { read -r s1; read -r s2; } < "$HERE/received-boards.txt"
+  hslsa keygen --out "$k" field-updater returns-site repair-site
+  cp "$KEYS"/pub/*.pub.pem "$k"/*.pub.pem "$k/pub/"
+  hslsa trust-root --keys "$k/pub" --out "$b/trust-root.json"
+  local sim=(--scenario "$HERE/board-scenario.json")
+
+  echo "== the board owner builds update U1: firmware 1.1.0 at SVN 2, around the same bitstream"
+  jq '.firmware.version = "1.1.0" | .firmware.svn = 2 | .firmware.cflags += ["-Os"]' "$HERE/inputs.lock.json" > "$a/update.lock.json"
+  hslsa fpga update-build --bundle "$b" --id U1 --lock "$a/update.lock.json" --scenario "$HERE/board-scenario.json" \
+    --key "$KEYS/firmware-platform.key.pem" --code-signer "$KEYS/code-signer.key.pem" --cache "$CACHE"
+  echo "== the field updater writes U1 to board $s1"
+  hslsa fpga after-sale field-update --bundle "$b" --board "$s1" --boards "$a/boards" --update "$b/updates/U1" \
+    --key "$k/field-updater.key.pem" --site "Example Board Co Field Service" --country US "${sim[@]}"
+  echo "== board $s2 comes back, is reworked and shipped again"
+  hslsa fpga after-sale return --bundle "$b" --board "$s2" --key "$k/returns-site.key.pem" --site "Example Board Co Returns" \
+    --country US --from "Example Buyer" --reason "3.3 V rail out of tolerance" --disposition repair "${sim[@]}"
+  hslsa fpga after-sale rework --bundle "$b" --board "$s2" --key "$k/repair-site.key.pem" --site "Example Repair Site" \
+    --country US --order "$HERE/rework-order.json" "${sim[@]}"
+  hslsa fpga after-sale reship --bundle "$b" --board "$s2" --key "$KEYS/board-owner.key.pem" --site "Example Board Co" \
+    --country US --to "Example Buyer" --shipment EXAMPLE-SHIP-0201 "${sim[@]}"
+
+  echo "== the buyer powers both boards on again and checks the lot"
+  hslsa fpga boot --bundle "$b" --boards "$a/boards" --list "$HERE/received-boards.txt" --out "$a/boots"
+  local check=(--bundle "$b" --trust-root "$b/trust-root.json" --policy "$b/policy.json" --boards "$HERE/received-boards.txt")
+  hslsa fpga verify "${check[@]}" --boots "$a/boots"
+
+  echo "== what the after-sale check refuses"
+  refuses() { # <what> <reason> <command...>: the command fails, and says why
+    local what=$1 reason=$2 out; shift 2
+    if out=$("$@" 2>&1); then echo "FAIL: accepted $what" >&2; exit 1; fi
+    grep -qF -- "$reason" <<< "$out" || { echo "FAIL: refused $what, but not because $reason: $out" >&2; exit 1; }
+    echo "ok: refuses $what"
+  }
+  # U1 written to the other board too, fuse and all, with no record: the root
+  # of trust boots it, and the buyer sees images the board's history does not name.
+  cp -r "$a/boards/$s2" "$a/$s2.saved"
+  cp "$b/updates/U1/artifacts/flash.bin" "$a/boards/$s2/flash.bin"
+  jq '.owner_min_svn = 2' "$a/$s2.saved/rot/fuses.json" > "$a/boards/$s2/rot/fuses.json"
+  echo "$s2" > "$a/one.txt"
+  hslsa fpga boot --bundle "$b" --boards "$a/boards" --list "$a/one.txt" --out "$a/boots-unrecorded" --no-soc
+  mv "$a/boots/$s2" "$a/$s2.boot" && cp -r "$a/boots-unrecorded/$s2" "$a/boots/$s2"
+  refuses "firmware changed with no update record" "in flash matches no reference value in the board CoRIM" \
+    hslsa fpga verify "${check[@]}" --boots "$a/boots"
+  rm -rf "${a:?}/boots/$s2" "${a:?}/boards/$s2" && mv "$a/$s2.boot" "$a/boots/$s2" && mv "$a/$s2.saved" "$a/boards/$s2"
+  # The reshipment record is not there: the board is still at the repair site.
+  mv "$b/att/after-sale-$s2-3.intoto.json" "$a/reship.intoto.json"
+  refuses "a board returned and not shipped again" "board $s2: was returned to Example Repair Site and not shipped again" \
+    hslsa fpga verify "${check[@]}" --boots "$a/boots"
+  mv "$a/reship.intoto.json" "$b/att/after-sale-$s2-3.intoto.json"
+  # The return record is not there, so the rework follows nothing it may follow.
+  mv "$b/att/after-sale-$s2-1.intoto.json" "$a/return.intoto.json"
+  refuses "a history with its first record cut" "has 2 after-sale records, but record 1 is missing" \
+    hslsa fpga verify "${check[@]}" --boots "$a/boots"
+  mv "$a/return.intoto.json" "$b/att/after-sale-$s2-1.intoto.json"
+  # The return signed by the repair site's key instead of the returns desk's.
+  cp "$b/att/after-sale-$s2-1.intoto.json" "$a/return.intoto.json"
+  hslsa fpga after-sale return --bundle "$a/board" --board "$s1" --key "$k/repair-site.key.pem" --site "Example Repair Site" \
+    --from "Example Buyer" --disposition repair "${sim[@]}" > /dev/null
+  refuses "a return signed by the wrong role" "after-sale-$s1-2.intoto.json: no valid signature from role 'returns-site'" \
+    hslsa fpga verify "${check[@]}" --boots "$a/boots"
+  rm -f "$b/att/after-sale-$s1-2.intoto.json" "$a/return.intoto.json"
+  hslsa fpga verify "${check[@]}" --boots "$a/boots" > /dev/null
+  echo "ok: the lot passes again once the cases are undone"
+  rm -rf "${k:?}"
+}
+
 case "${1:-}" in
   produce) produce_rot; produce_design; produce_board ;;
   boot) boot ;;
   verify) verify ;;
   l3) l3 ;;
   l4) l4 ;;
-  all) produce_rot; produce_design; produce_board; boot; verify; l3; l4 ;;
-  *) echo "usage: $0 produce|boot|verify|l3|l4|all" >&2; exit 2 ;;
+  aftersale) aftersale ;;
+  all) produce_rot; produce_design; produce_board; boot; verify; aftersale; l3; l4 ;;
+  *) echo "usage: $0 produce|boot|verify|aftersale|l3|l4|all" >&2; exit 2 ;;
 esac

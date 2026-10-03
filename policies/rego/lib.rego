@@ -254,6 +254,24 @@ slsa_error(name) := {sprintf("policy claims.%s: claims SLSA Build L%d but no Des
 	slsa > best
 } else := set()
 
+# hbom_claim_errors refuses an HBOM that claims more than the check verified
+# (hbom.claimedLevels, spec revision 18): for each track the check covers,
+# the HBOM's claim may not exceed the policy's claim in list name, which is
+# what the check verified. A track the check does not cover is left to the
+# check that does.
+hbom_claim_errors(label, predicate, name, covered) := {msg |
+	some c in object.get(predicate, "claimedLevels", [])
+	some t in covered
+	n := claim_level(c, t)
+	verified := max({m | some x in object.get(input.policy, ["claims", name], []); m := claim_level(x, t)} | {0})
+	n > verified
+	msg := hbom_claim_msg(label, t, n, verified)
+}
+
+hbom_claim_msg(label, t, n, v) := sprintf("%s: the HBOM claims %s L%d, but this check verified no %s level", [label, track_title[t], n, track_title[t]]) if {
+	v == 0
+} else := sprintf("%s: the HBOM claims %s L%d, but this check verified %s L%d; an HBOM may not claim more than its checks verify", [label, track_title[t], n, track_title[t], v])
+
 # A level above what the policies check, claimed in any list, for a track a
 # check covers: that check would have to run rules it does not have.
 unchecked_claim_errors(covered) := {msg |

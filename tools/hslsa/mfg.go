@@ -198,26 +198,27 @@ func mfgRecord(bundle, step string, subjects []Obj, external Obj, deps []Obj, hw
 // the transfer, or prev itself when there is none. The packing list names
 // what was shipped (wafer ids or unit serials), the lot they belong to and
 // the receiving site.
-func transfer(bundle, from string, enabled bool, prev, lot Obj, items []string, fromSite, toSite, designRef Obj, keys *mfgKeys, w *Withholding, by Obj) (Obj, error) {
+func transfer(bundle, scenarioDir, from string, enabled bool, ev, prev, lot Obj, items []string, fromSite, toSite, designRef Obj, keys *mfgKeys, w *Withholding, by Obj) (Obj, error) {
 	if !enabled {
 		return prev, removeStale(filepath.Join(bundle, "att", TransferAtt(from)), filepath.Join(bundle, "artifacts", TransferList(from)),
 			disclosurePath(filepath.Join(bundle, "att", TransferAtt(from))), filepath.Join(bundle, "artifacts", ExportName("transfer-"+from)))
 	}
 	path := filepath.Join(bundle, "artifacts", TransferList(from))
 	id := from + ":" + S(lot, "name")
-	if err := writeData(path, Obj{"id": id, "from": fromSite, "to": toSite, "lot": S(lot, "name"),
-		"items": anyStrings(items), "quantity": len(items)}, w); err != nil {
+	data := Obj{"id": id, "from": fromSite, "to": toSite, "lot": S(lot, "name"), "items": anyStrings(items), "quantity": len(items)}
+	hw := Obj{"site": fromSite, "receiver": toSite, "designRef": designRef, "checks": passed("packing-list-matches-lot")}
+	deps, err := attachTransferExports(bundle, scenarioDir, ev, []Obj{prev, lot}, hw, data)
+	if err != nil {
+		return nil, err
+	}
+	if err := writeData(path, data, w); err != nil {
 		return nil, err
 	}
 	list, err := fileRD(path, "")
 	if err != nil {
 		return nil, err
 	}
-	return mfgRecord(bundle, "transfer-"+from, []Obj{list},
-		Obj{"id": id, "lotId": S(lot, "name")},
-		[]Obj{prev, lot},
-		Obj{"site": fromSite, "receiver": toSite, "designRef": designRef, "checks": passed("packing-list-matches-lot")},
-		keys, w, shipperProxy(by))
+	return mfgRecord(bundle, "transfer-"+from, []Obj{list}, Obj{"id": id, "lotId": S(lot, "name")}, deps, hw, keys, w, shipperProxy(by))
 }
 
 // writeData writes a data file a record names, with a random salt when the
@@ -372,7 +373,7 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 	}
 	sort := O(sc, "sort")
 	transfers := Truthy(get(sc, "transfers"))
-	t1, err := transfer(bundle, "wafer-fab", transfers, f1, waferLot, wafers, O(fab, "site"), O(sort, "site"), designRef, keys, w, by["wafer-fab"])
+	t1, err := transfer(bundle, scenarioDir, "wafer-fab", transfers, O(sc, "transferEvents", "wafer-fab"), f1, waferLot, wafers, O(fab, "site"), O(sort, "site"), designRef, keys, w, by["wafer-fab"])
 	if err != nil {
 		return err
 	}
@@ -442,7 +443,7 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 	}
 
 	pkg := O(sc, "packaging")
-	t2, err := transfer(bundle, "wafer-sort", transfers, f2, waferLot, wafers, O(sort, "site"), O(pkg, "site"), designRef, keys, w, by["wafer-sort"])
+	t2, err := transfer(bundle, scenarioDir, "wafer-sort", transfers, O(sc, "transferEvents", "wafer-sort"), f2, waferLot, wafers, O(sort, "site"), O(pkg, "site"), designRef, keys, w, by["wafer-sort"])
 	if err != nil {
 		return err
 	}
@@ -498,7 +499,7 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 	}
 
 	ft := O(sc, "finalTest")
-	t3, err := transfer(bundle, "packaging", transfers, f3, packaged, packagedUnits, O(pkg, "site"), O(ft, "site"), designRef, keys, w, by["packaging"])
+	t3, err := transfer(bundle, scenarioDir, "packaging", transfers, O(sc, "transferEvents", "packaging"), f3, packaged, packagedUnits, O(pkg, "site"), O(ft, "site"), designRef, keys, w, by["packaging"])
 	if err != nil {
 		return err
 	}
@@ -573,6 +574,11 @@ func mfg(bundle, scenarioPath string, keys *mfgKeys, w *Withholding) error {
 		}
 		if commit != nil {
 			f4Deps = append(f4Deps, commit)
+		}
+		if Truthy(get(ft, "unitCommitment")) {
+			if f4HW["unitCommitment"], err = commitUnits(bundle, S(shippedLot, "name"), shipped); err != nil {
+				return err
+			}
 		}
 	}
 	_, err = mfgRecord(bundle, "final-test", f4Subjects,

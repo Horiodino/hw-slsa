@@ -150,7 +150,7 @@ func olProduce(t *testing.T, base string, steps []olStep, stamp int, tw *tweak) 
 	}
 	lockPath := filepath.Join(base, "lock.json")
 	must(t, WriteJSON(lockPath, lock))
-	must(t, SourceFreeze(bundle, lockPath, filepath.Join(keys, "flow-platform.key.pem"), cache))
+	must(t, SourceFreeze(bundle, lockPath, filepath.Join(keys, "flow-platform.key.pem"), cache, nil))
 
 	f := ok(NewFlow(bundle, lockPath, filepath.Join(keys, "flow-platform.key.pem"), work, base))
 	must(t, os.MkdirAll(f.meta, 0o755))

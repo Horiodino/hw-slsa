@@ -351,11 +351,28 @@ func AdaptScenario(configPath string) (Obj, error) {
 			"failedUnits": anyStrings(nonNilStrings(failedUnits))},
 		"adapter": Obj{"id": AdapterID, "steps": steps},
 	}
+	if t, isText := get(cfg, "transfers").(string); isText {
+		if t != TransfersFromMES {
+			return nil, fmt.Errorf("transfers: true, false or %q, not %q", TransfersFromMES, t)
+		}
+		sites := map[string]string{}
+		for _, step := range MfgSteps {
+			sites[step] = S(block(step), "site", "name")
+		}
+		events, err := adaptTransfers(steps, fab, pkg, genealogy, sites)
+		if err != nil {
+			return nil, err
+		}
+		sc["transferEvents"] = events
+	}
 	if S(block("wafer-fab"), "id") == "" {
 		return nil, fmt.Errorf("fab: needs an id, the fab's short name in wafer lot URNs")
 	}
 	if u := get(cfg, "unsigned"); u != nil {
 		sc["unsigned"] = u
+	}
+	if c := get(cfg, "claimedLevels"); c != nil {
+		sc["claimedLevels"] = c
 	}
 	// Exports a simulator wrote (the virtual shuttle's) say so in the
 	// configuration that comes with them, and every record made from them
@@ -389,15 +406,20 @@ func Adapt(configPath, out string) error {
 	if err != nil {
 		return err
 	}
+	var sources []Obj
 	for _, step := range MfgSteps {
-		for _, s := range Objs(sc, "adapter", "steps", step, "sources") {
-			abs, err := filepath.Abs(S(s, "path"))
-			if err != nil {
-				return err
-			}
-			if rel, err := filepath.Rel(base, abs); err == nil {
-				s["path"] = filepath.ToSlash(rel)
-			}
+		sources = append(sources, Objs(sc, "adapter", "steps", step, "sources")...)
+	}
+	for _, from := range TransferFrom {
+		sources = append(sources, Objs(sc, "transferEvents", from, "sources")...)
+	}
+	for _, s := range sources {
+		abs, err := filepath.Abs(S(s, "path"))
+		if err != nil {
+			return err
+		}
+		if rel, err := filepath.Rel(base, abs); err == nil {
+			s["path"] = filepath.ToSlash(rel)
 		}
 	}
 	return WriteJSON(out, sc)

@@ -94,8 +94,9 @@
     ]
   },
   "inspection": {
-    "note": "Wafer L4 and Package/Test L4 for the root of trust: an independent lab's seeded sample of at least two shipped units, with every metal layer and polysilicon imaged in the core and the register file.",
+    "note": "Wafer L4 and Package/Test L4 for the root of trust: a seeded sample by an independent lab accredited under ISO/IEC 17025, of at least two shipped units, with every metal layer and polysilicon imaged in the core and the register file.",
     "minSample": 2,
+    "accreditations": ["iso-iec-17025"],
     "layers": [
       "met1",
       "met2",

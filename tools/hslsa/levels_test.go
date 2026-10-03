@@ -108,7 +108,7 @@ func resignStep(t *testing.T, bundle, step string, mutate func(Obj)) {
 	t.Helper()
 	chipResign(t, bundle, AttName(step), "flow-platform", mutate)
 	keys := chipKeys(bundle)
-	must(t, DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy))
+	must(t, DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy, nil))
 }
 
 func hwFlow(stmt Obj) Obj { return O(stmt, "predicate", "hwFlow") }
@@ -251,7 +251,7 @@ func TestRerunEquivalenceCatchesAlteredNetlist(t *testing.T) {
 		})
 	}
 	keys := chipKeys(bundle)
-	must(t, DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy))
+	must(t, DesignRelease(bundle, e2eLock, filepath.Join(keys, "tapeout-authority.key.pem"), filepath.Join(bundle, "trust-root.json"), e2ePolicy, nil))
 	must(t, designCheck(t, bundle, designL3Policy(t)))
 
 	trust := ok(LoadTrustRoot(filepath.Join(bundle, "trust-root.json")))

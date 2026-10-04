@@ -97,6 +97,8 @@ The results go out as the files each site would export, in the formats the [MES 
 
 Bins: 1 pass, 5 wrong signature, 6 hang, 8 wrong die id.
 
+The example configuration sets `"transfers": "mes"`, so the adapter also makes the three transfers between sites from the fab's ship event and the OSAT's receive and ship events ([Transfers](mes-stdf-adapter.md#transfers)).
+
 ### The example lot
 
 `e2e/shuttle/shuttle.json`, seed `hslsa-virtual-shuttle-2026-10-lot-a`:

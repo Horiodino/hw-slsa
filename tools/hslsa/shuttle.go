@@ -1059,13 +1059,24 @@ func (e *shuttleExports) adapterConfig(sim Obj) Obj {
 				Obj{"operation": "MARK", "check": "marking"},
 			},
 		},
-		"transfers": Truthy(get(cfg, "transfers")),
+		"transfers": shuttleTransfers(get(cfg, "transfers")),
 		"finalTest": Obj{
 			"site":    get(block("finalTest"), "site"),
 			"sources": []any{Obj{"path": e.ftSTDF(), "format": FmtSTDF}},
 		},
 	}
 	return out
+}
+
+// shuttleTransfers is the adapter's transfers setting for the shuttle's
+// configuration: "mes" makes the transfers from the shipping events the
+// shuttle writes into the fab's and the OSAT's lot histories; otherwise the
+// adapter makes them from the lot, as before.
+func shuttleTransfers(v any) any {
+	if v == TransfersFromMES {
+		return TransfersFromMES
+	}
+	return Truthy(v)
 }
 
 // report is what only the simulator knows: each die's defects and what

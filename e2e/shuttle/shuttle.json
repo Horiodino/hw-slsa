@@ -36,7 +36,7 @@
     "bondDefectRate": 0.06,
     "labelSwaps": [["PSOC130-S-00030", "PSOC130-S-00031"]]
   },
-  "transfers": true,
+  "transfers": "mes",
   "finalTest": {
     "site": {"name": "Example Virtual Test House", "country": "US"},
     "facility": "VFT-1",

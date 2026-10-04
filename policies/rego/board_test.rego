@@ -194,3 +194,13 @@ test_board_hbom_claiming_the_verified_level_accepted if {
 test_board_hbom_claiming_more_than_verified_refused if {
 	refused(board_claimed(board_input, ["HSLSA_ASSEMBLY_LEVEL_3"]), "board hbom: the HBOM claims Assembly L3, but this check verified Assembly L2; an HBOM may not claim more than its checks verify")
 }
+
+test_policy_requiring_shipment_exports_refused if {
+	doc := json.patch(board_input, [{"op": "add", "path": ["policy", "requireShipmentExports"], "value": true}])
+	refused(doc, "policy: requireShipmentExports asks for shipments to be read again from their shippers' exports, which these Rego policies do not do")
+}
+
+test_shipment_made_from_exports_refused if {
+	doc := json.patch(board_input, [{"op": "add", "path": stmt(ship1, ["predicate", "hwMfg", "importer"]), "value": {"id": "https://github.com/Horiodino/hw-slsa/tools/hslsa/import/distributor@v0.1"}}])
+	refused(doc, "distribution mfg-distribution-EXAMPLE-SHIP-0001.intoto.json: made from its shipper's exports (hwMfg.importer), which these Rego policies do not read again")
+}

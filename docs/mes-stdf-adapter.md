@@ -82,6 +82,26 @@ The tests in [`adapt_test.go`](../tools/hslsa/adapt_test.go) cover:
 - an assembly lot started from another wafer lot;
 - an MES export missing an operation a check needs.
 
+## Transfers
+
+With `"transfers": "mes"` in its configuration, the adapter also makes the three [transfers](../spec/hslsa-v0.1.md#transfers-between-manufacturing-sites) between the four sites from the shipping events in their MES lot histories (spec revision 18). For each transfer it looks for the one `SHIP` of the lot in the sending site's history, addressed to the receiving site (`ship_to=`), and the one `RECEIVE` of it in the receiving site's history, from the sending site (`from=`). A site whose exports hold no lot history, such as the sort house here, which hands over only STDF files and wafer maps, gives no event; at least one side must be there. The samples hold three:
+
+| Transfer | Event read | From |
+| --- | --- | --- |
+| Wafer fab to sort house | `SHIP` of `LOT-EXAMPLE-A`, wafers W01 and W02, to Example Sort House | `fab-mes-lot-history.csv` |
+| Sort house to OSAT | `RECEIVE` of `LOT-EXAMPLE-A`, wafers W01 and W02, from Example Sort House | `osat-mes-lot-history.csv` |
+| OSAT to test house | `SHIP` of `ASM-EXAMPLE-17`, 40 units, to Example Test House | `osat-mes-lot-history.csv` |
+
+Each event must move the lot's quantity, and the wafers themselves when it lists them, and a `RECEIVE` may not come before its `SHIP`. The packing list then also carries `shipped` and `received` (time, facility, quantity) from the events, and the transfer record carries the histories by digest and names them in `hwMfg.adapter.sources[]` with the `step` whose site exported each. The verifier reads them again:
+
+```
+  transfer from wafer-fab: matches fab-mes-lot-history.csv
+  transfer from wafer-sort: matches osat-mes-lot-history.csv
+  transfer from packaging: matches osat-mes-lot-history.csv
+```
+
+[`policy.json`](../e2e/picorv32/supplier-exports/policy.json) also sets `manufacturing.requireTransferExports`, so a transfer that carries no exports is refused. The tests in [`mestransfer_test.go`](../tools/hslsa/mestransfer_test.go) accept the three transfers and refuse a packing list that differs from the `SHIP` event, a history changed after signing, a `SHIP` to another site, a `RECEIVE` from another site, a `SHIP` of fewer units, a `RECEIVE` of other wafers, a receipt before its shipment, two `SHIP` events for one lot, and a lot neither site's history ships.
+
 ## A test house that signs nothing
 
 [`adapter-proxy.json`](../e2e/picorv32/supplier-exports/adapter-proxy.json) is the same configuration plus `"unsigned": {"final-test": {"cover": "proxy"}}`. The test house runs no adapter and signs nothing. It hands its STDF file to the product owner, which runs the adapter and [proxy-signs](proxy-signing.md) F4. The record carries the STDF file like any other, so the verifier still checks every unit's result against it. The proxy's export is still there too. The Package/Test track is held at L1, as for any proxy-signed record, and [`policy-proxy.json`](../e2e/picorv32/supplier-exports/policy-proxy.json) accepts that. An evidence record cannot be made this way: it is for a supplier that hands over no data.
@@ -91,5 +111,6 @@ The tests in [`adapt_test.go`](../tools/hslsa/adapt_test.go) cover:
 - **The exports are samples.** They are written the way a site would write them, but no tester or MES wrote them. The roadmap's exit for this adapter is a real export turned into valid records without manual editing, which needs a site's real files (phase 4).
 - **Carrying exports discloses them.** A buyer holding the bundle sees every parametric value, die position and MES operation. The tool refuses to combine exports with [withheld fields](selective-disclosure.md) for now, since the exports would show the withheld values. A supplier that will not disclose its data can still sign records without exports, and [verifier escrow](selective-disclosure.md) is the way to have an auditor check them.
 - **Agreement is not truth.** The check shows that the record says what the supplier's own files say. It cannot show that the tester measured what its file reports, which is the same limit as for any signed record.
-- **Transfers and receipts still come from the scenario.** The MES lot histories have `SHIP` and `RECEIVE` events, but the adapter does not yet read the packing lists of the [transfers](../spec/hslsa-v0.1.md#transfers-between-manufacturing-sites) from them.
+- **Receipt records still come from the scenario.** Transfers are read from the MES events (above); a receipt record is a VSA the receiver signs after its own check, not an export.
+- **A transfer is one shipment.** The adapter takes one `SHIP` and one `RECEIVE` per lot and refuses a history with two. A lot split across shipments needs one transfer per shipment, which the spec does not define yet.
 - **Only the subset of E142 a sort map uses.** The adapter reads one bin code map per wafer, `HexaDecimal` or `ASCII` bin codes, and an origin at the upper or lower left.

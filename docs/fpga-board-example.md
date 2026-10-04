@@ -18,6 +18,7 @@ It runs in [`.github/workflows/fpga-board-e2e.yml`](../.github/workflows/fpga-bo
 e2e/fpga/run.sh produce   # root of trust vendor, board owner, EMS
 e2e/fpga/run.sh boot      # power on the received boards
 e2e/fpga/run.sh verify    # the buyer's checks and VSAs
+e2e/fpga/run.sh aftersale # after produce and boot: a field update, a return, a rework, a reshipment
 e2e/fpga/run.sh l3        # the whole chain again at Firmware L3 and Assembly L3, then the refusals
 e2e/fpga/run.sh l4        # and at Firmware L4 and Assembly L4, then the refusals
 ```
@@ -89,6 +90,8 @@ The board VSA claims `HSLSA_ASSEMBLY_LEVEL_2` and `HSLSA_FIRMWARE_LEVEL_2` for t
 - **Every release is in the buyer's release log.** The root of trust firmware, the SoC firmware and the flash image each go into a private log with `hslsa tlog add`, and each carries its inclusion proof. The buyer keeps a checkpoint from its first look and later checks that the log only grew.
 - **Boot evidence is required.** The buyer passes the boards it received, which answer a challenge, and what they reported at boot.
 
+Last, the board owner builds a field update the same way, in the sandbox, with its own S.A.F.E. report, and a field updater the buyer enrolls writes it to one board. The buyer refuses the board until the update's firmware and flash image are in the release log, then accepts it: a field update is held to the same Firmware L3 rules as the release the board shipped with ([After-sale records](#after-sale-records)).
+
 Then it shows what Firmware L3 refuses: a flash image not in the log, releases in a log the buyer does not read, firmware built with a compiler the policy does not pin, firmware no lab reviewed, boards with no boot evidence, a root of trust provisioned at a test house the buyer rates below L3, and a log that rewrote a release it had shown. The CI job `l3` runs it with the RISC-V packages at the versions the policy pins.
 
 ## At Firmware L4
@@ -101,6 +104,30 @@ Then it shows what Firmware L3 refuses: a flash image not in the log, releases i
 - **Per-unit data is read back.** Every provisioning record's image and fuse readback must pass, and every provisioning site must be rated L4 in its own track.
 
 Then it shows what L4 refuses: a flash image only one person approved, SoC firmware nobody else rebuilt, a rebuild by the board owner itself, boards inspected by the EMS's own lab, and a root of trust provisioned at a test house the buyer rates below L4. The same CI job runs it after `l3`.
+
+## After-sale records
+
+The board's story goes on after the buyer receives it. `e2e/fpga/run.sh aftersale` works on a copy of what `produce` and `boot` made and records four events with the spec's [after-sale records](../spec/hslsa-v0.1.md#after-sale-records), one signed record per event, each linked to the one before and the first to the board's provisioning record:
+
+| Event | Signed by | What happens |
+| --- | --- | --- |
+| Field update | The field updater (`field-updater`), Example Board Co Field Service | The board owner builds update U1 in `updates/U1/` of the bundle: SoC firmware 1.1.0 at SVN 2 (built with `-Os` added), a new flash image around the same released bitstream, its boot manifest and its CoRIM (`hslsa fpga update-build`). The field updater checks the flash image's provenance, writes it to the first received board, raises the anti-rollback fuse to 2, reads both back, powers the board once and signs (`hslsa fpga after-sale field-update`) |
+| Return | The returns site (`returns-site`) | The second board comes back from the buyer with its 3.3 V rail out of tolerance, for repair |
+| Rework | The repair site (`repair-site`) | The regulator at U4 is replaced with one from a named lot, from [`rework-order.json`](../e2e/fpga/rework-order.json) |
+| Reship | The board owner | The board is shipped back to the buyer |
+
+Both boards are then powered on again, the first one's SoC on the new firmware, and the buyer's check reads each board's history before the at-boot check. It accepts them, and expects at boot what the latest record says: the first board's root of trust must report the update's images and match the update's CoRIM.
+
+The stage then shows what the after-sale check refuses:
+
+- **Firmware changed with no record.** U1 written to the second board too, fuse and all, with no field update record. The root of trust boots it, since it is signed by the owner, but what it reports matches no reference value the board's history allows.
+- **A board returned and not shipped again.** The reshipment record taken away: the board is still at the repair site.
+- **A history with its first record cut.** The return record taken away, so the rework follows nothing it may follow.
+- **A return signed by the wrong role.** A return signed with the repair site's key.
+
+[`tools/hslsa/aftersale_test.go`](../tools/hslsa/aftersale_test.go) accepts two field updates in a row (SVN 2, then 3) and a return, rework and reshipment, and refuses ten more cases: firmware changed with no record, an update signed by another role, an update that rolls the SVN back, an update whose files are outside `updates/`, a history cut, records out of order, a reshipment of a board never returned, a record after the board was scrapped, a rework that replaces the root of trust, and a rework that places a part the board design does not place there. The records carry the `simulated` mark, as every record made from simulated hardware must.
+
+What it leaves out: a rework that replaces the root of trust is refused rather than recorded, since the board would need a new identity and new provisioning; a history cut at its end cannot be seen without logging each record as it is signed; the field updater's site is not rated under rule 2; and while a field update at Firmware L4 is held to the release's L4 rules in the tool, no stage runs one.
 
 ## What the tests prove
 
@@ -118,6 +145,7 @@ The others forge records or evidence: boot certificates copied from another boar
 - **The board.** Nothing here touches hardware. The bitstream is built for the real part, but no FPGA loads it; the SoC boots in RTL simulation of the frozen design (the same testbench as the `simulation` step, with the firmware read from each board's flash). A simulation of the routed design would tie the boot to the bitstream itself, but it did not run here: Icarus is too slow for it, and the routed netlist uses iCE40 RAM and DSP cells with no simulation models in the open tools.
 - **The root of trust.** EXR-01 is a model. Its die is the PicoRV32 example's design under another name, and its ROM, fuses and DICE derivation are Go code in the tool. Its firmware is real code, but runs on the host, not on a root of trust core.
 - **Manufacturing.** As in the other examples, shipments, lots, yields, test results and every site are placeholders, and every party's key is generated per run.
+- **After sale.** The field updater, returns site and repair site are names and keys made in the run, the return and the rework happen to simulated boards, and their records say so.
 
 ## Moving to a real board
 

@@ -4,7 +4,7 @@ HSLSA is a framework for proving how a chip or board was made, the way [SLSA](ht
 
 This README is the entry point for anyone new to the project, whether you are here to contribute, to review the spec, or to run the pilot as a buyer or supplier. It explains the ideas, says where everything lives, and links to the documents that go deeper.
 
-**Status:** working draft, spec version 0.1, [revision 17](spec/hslsa-v0.1.md#changelog) (2026-10-02). Everything runs in CI on real open-source designs and tools, with simulated fab, packaging and test data, and every record made from simulated hardware says so. No company outside this repository signs records yet; the [pilot kit](pilot/README.md) is how that starts. The repository is private by the owner's choice.
+**Status:** working draft, spec version 0.1, [revision 18](spec/hslsa-v0.1.md#changelog) (2026-10-04). Everything runs in CI on real open-source designs and tools, with simulated fab, packaging and test data, and every record made from simulated hardware says so. No company outside this repository signs records yet; the [pilot kit](pilot/README.md) is how that starts. The repository is private by the owner's choice.
 
 ## Contents
 
@@ -95,7 +95,8 @@ Which keys count, which levels are required and whether records signed on a supp
 - **Selective disclosure and verifier escrow.** Records can withhold confidential fields behind salted digests; an auditor sees everything, the buyer sees only the auditor's VSAs ([docs](docs/selective-disclosure.md)).
 - **Simulated hardware, marked.** A record made from a simulator says so, the verifier refuses it unless the buyer's policy accepts simulated evidence, and every VSA over it states `HSLSA_SIMULATED`. The virtual shuttle makes a lot's supplier exports by simulating the released netlist on every die, with seeded defects ([docs](docs/simulated-hardware.md)).
 - **Firmware L2 through a board root of trust.** A part with no secure-boot ROM can reach Firmware L2 on a board whose attested root of trust verifies the flash before the SoC runs ([spec](spec/hslsa-v0.1.md#core-requirements), [example](docs/fpga-board-example.md)).
-- **Private transparency logs.** Every L3 log requirement can be met by a private log, since no foundry publishes lot ids or yields.
+- **Private transparency logs.** Every L3 log requirement can be met by a private log, since no foundry publishes lot ids or yields. A buyer can also keep a lot's manufacturing records in its own log and require them there.
+- **After-sale records.** A board with a root of trust keeps its chain after it ships: field updates, returns, rework and reshipment are signed records the at-boot check reads in order ([spec](spec/hslsa-v0.1.md#after-sale-records), [example](docs/fpga-board-example.md#after-sale-records)).
 
 The spec's [Terminology](spec/hslsa-v0.1.md#terminology) table defines every term used in the records.
 
@@ -108,7 +109,7 @@ A signature proves which party made a claim and that nobody changed it afterward
 | You are | Read, in order |
 | --- | --- |
 | New to the project | This README, then the spec's [Overview](spec/hslsa-v0.1.md#overview) and [Tracks and levels](spec/hslsa-v0.1.md#tracks-and-levels), then one example: [e2e-test.md](docs/e2e-test.md) (PicoRV32) is the simplest |
-| Reviewing the spec | [spec/hslsa-v0.1.md](spec/hslsa-v0.1.md), [threat model](spec/hslsa-v0.1.md#threat-model), [open questions](spec/hslsa-v0.1.md#open-questions), [NIST IR 8536 profile](spec/nist-ir-8536-profile.md) |
+| Reviewing the spec | [spec/hslsa-v0.1.md](spec/hslsa-v0.1.md), [threat model](spec/hslsa-v0.1.md#threat-model), [questions decided in revision 18](spec/hslsa-v0.1.md#decided-in-revision-18), [open questions](spec/hslsa-v0.1.md#open-questions), [NIST IR 8536 profile](spec/nist-ir-8536-profile.md) |
 | Contributing code | [Building and testing](#building-and-testing), [Contributing](#contributing), then the example closest to what you are changing |
 | A buyer in the pilot | [pilot/README.md](pilot/README.md), then [pilot/buyer.md](pilot/buyer.md) |
 | A supplier (OSAT, RoT vendor) in the pilot | [pilot/README.md](pilot/README.md), then [pilot/supplier.md](pilot/supplier.md) |
@@ -150,10 +151,11 @@ site/            the documentation website: page generator, templates, build.sh
 | [`docs/board-example.md`](docs/board-example.md) | Board example: signed shipments, A1 board build, board HBOM |
 | [`docs/openlane2-flow.md`](docs/openlane2-flow.md) | OpenLane 2 RTL-to-GDS with a record per step and a bit-exact rebuild |
 | [`docs/caliptra-e2e.md`](docs/caliptra-e2e.md) | Caliptra: pinned RTL, ROM and firmware to units that boot and prove their identity |
-| [`docs/fpga-board-example.md`](docs/fpga-board-example.md) | iCE40 FPGA board whose attested root of trust verifies the flash, checked to Firmware L2 |
-| [`docs/selective-disclosure.md`](docs/selective-disclosure.md) | Withheld fields, verifier escrow, and a measurement of what each view reveals |
+| [`docs/fpga-board-example.md`](docs/fpga-board-example.md) | iCE40 FPGA board whose attested root of trust verifies the flash, checked to Firmware L2, with after-sale records (field update, return, rework, reshipment) |
+| [`docs/selective-disclosure.md`](docs/selective-disclosure.md) | Withheld fields in design and manufacturing records, verifier escrow, a buyer's own check against final test's per-unit commitment, and a measurement of what each view reveals |
 | [`docs/proxy-signing.md`](docs/proxy-signing.md) | Records signed on behalf of a supplier that signs nothing |
-| [`docs/mes-stdf-adapter.md`](docs/mes-stdf-adapter.md) | Manufacturing records from MES, STDF and SEMI E142 exports |
+| [`docs/mes-stdf-adapter.md`](docs/mes-stdf-adapter.md) | Manufacturing records from MES, STDF and SEMI E142 exports, and transfers from MES shipping events |
+| [`docs/distributor-importer.md`](docs/distributor-importer.md) | Distribution records from a shipper's packing list, certificates of conformance and EPCIS events |
 | [`docs/provisioning-adapter.md`](docs/provisioning-adapter.md) | Per-unit provisioning records from a programming station's export |
 | [`docs/hsm-signing.md`](docs/hsm-signing.md) | Site keys held in an HSM over PKCS#11 |
 | [`docs/simulated-hardware.md`](docs/simulated-hardware.md) | The virtual shuttle, the simulated mark on records, and what simulation proves and cannot |
@@ -222,9 +224,9 @@ One binary, built from [`tools/hslsa/cmd/hslsa`](tools/hslsa/cmd/hslsa/main.go).
 | Purpose | Commands |
 | --- | --- |
 | Keys and trust | `keygen`, `pubkey`, `keyid`, `hsm` (keys on a PKCS#11 token), `trust-root` |
-| Producing records | `design` (one design step), `mfg` (F1 to F4), `hbom`, `openlane`, `eda`, `board`, `fpga`, `caliptra` |
-| From supplier exports | `adapt` (MES, STDF, SEMI E142), `provision` (programming station), `eda` (Tcl hook) |
-| Checking | `verify` (tapeout and lot receipt, then VSAs), `board`, `fpga` and `caliptra` verify actions, `escrow`, `validate-hbom`, `render --check`, `corim`, `safe` |
+| Producing records | `design` (one design step), `mfg` (F1 to F4), `hbom`, `openlane`, `eda`, `board`, `fpga` (with `fpga after-sale` for field updates, returns, rework and reshipment), `caliptra` |
+| From supplier exports | `adapt` (MES, STDF, SEMI E142), `import-shipments` (packing lists, certificates, EPCIS), `provision` (programming station), `eda` (Tcl hook) |
+| Checking | `verify` (tapeout and lot receipt, then VSAs), `board`, `fpga` and `caliptra` verify actions, `escrow`, `unit-check` (a buyer's units against final test's commitment), `validate-hbom`, `render --check`, `corim`, `safe` |
 | L3 and L4 | `fab-check` (the fab's release check), `challenge` (a part's identity), `pin` (tool pins), `tlog` (the private release log), `design rerun-equivalence`, `design rebuild` and `design review` (a second builder and reviewer), `inspect` (an independent lab's seeded inspection), `release approve` (two-person release review) |
 | Measuring | `leaks` (what records and VSAs reveal), `pilot measure` |
 | Pilot | `pilot enroll`, `pilot revoke`, `pilot trust-root`, `pilot measure`, `kit sign`, `kit verify` |
@@ -238,10 +240,10 @@ Five examples run end to end in CI. Each plays every party, signs every record, 
 
 | Example | What is real | Levels verified | Docs |
 | --- | --- | --- | --- |
-| PicoRV32 on SKY130 | The RTL at a pinned commit, simulated in Icarus Verilog and synthesized in Yosys; a signed source tag, review and IP provenance. The fab, sort, package and test data are simulated. Also runs the lot with withheld fields (escrow), with proxy signers, from sample MES and STDF exports, with keys in SoftHSM2, and from the virtual shuttle, which simulates every die of the released netlist gate-level with seeded defects. Design steps run in a sandbox with pinned tools, and an equivalence proof is rerun independently; a second run makes the lot with HSM site keys, an identity per die and challenged parts; a third adds a second builder's rebuild, two source reviewers and an independent lab's seeded inspection | Design L3, Wafer L2, Package/Test L2; Wafer L3 and Package/Test L3 in the second run; Design L4, Wafer L4 and Package/Test L4 in the third (lot VSAs state `HSLSA_SIMULATED`) | [e2e-test.md](docs/e2e-test.md) |
-| Board with the PicoSoC | Distribution records, A1 board build, board HBOM with `parts[]`; on the L3 chip lot, chips challenged at build and at receipt and a platform certificate per board; then a lab's seeded inspection of the boards | Assembly L2; Assembly L3; Assembly L4 | [board-example.md](docs/board-example.md) |
+| PicoRV32 on SKY130 | The RTL at a pinned commit, simulated in Icarus Verilog and synthesized in Yosys; a signed source tag, review and IP provenance. The fab, sort, package and test data are simulated. Also runs the lot with withheld fields (escrow), against final test's per-unit commitment and the buyer's own log, with proxy signers, from sample MES and STDF exports (transfers included), with keys in SoftHSM2, and from the virtual shuttle, which simulates every die of the released netlist gate-level with seeded defects. Design steps run in a sandbox with pinned tools, and an equivalence proof is rerun independently; a second run makes the lot with HSM site keys, an identity per die and challenged parts; a third adds a second builder's rebuild, two source reviewers and an independent lab's seeded inspection | Design L3, Wafer L2, Package/Test L2; Wafer L3 and Package/Test L3 in the second run; Design L4, Wafer L4 and Package/Test L4 in the third (lot VSAs state `HSLSA_SIMULATED`) | [e2e-test.md](docs/e2e-test.md) |
+| Board with the PicoSoC | Distribution records, also made from sample shipper exports (packing lists, certificates of conformance, an EPCIS event), A1 board build, board HBOM with `parts[]`; on the L3 chip lot, chips challenged at build and at receipt and a platform certificate per board; then a lab's seeded inspection of the boards | Assembly L2; Assembly L3; Assembly L4 | [board-example.md](docs/board-example.md) |
 | OpenLane 2 `spm` | A real RTL-to-GDS run with the pinned OpenLane image and SKY130 PDK, a record per step, and a second build that matches the GDS byte for byte | Design L4 rebuild evidence (same operator, so not an L4 claim) | [openlane2-flow.md](docs/openlane2-flow.md) |
-| FPGA board with a root of trust | An iCE40UP5K bitstream built with Yosys, nextpnr and IceStorm; a simulated root of trust that verifies the flash before the FPGA runs, provisioned through the station adapter; again at L3 with isolated firmware builds, pinned toolchains, reviews and a private release log; again at L4 with every image and the bitstream rebuilt by a second builder, two approvers per release and seeded inspections of both lots | Design L2, Assembly L2, Firmware L2 for the board; Assembly L3 and Firmware L3; Assembly L4 and Firmware L4 | [fpga-board-example.md](docs/fpga-board-example.md) |
+| FPGA board with a root of trust | An iCE40UP5K bitstream built with Yosys, nextpnr and IceStorm; a simulated root of trust that verifies the flash before the FPGA runs, provisioned through the station adapter; again at L3 with isolated firmware builds, pinned toolchains, reviews and a private release log; again at L4 with every image and the bitstream rebuilt by a second builder, two approvers per release and seeded inspections of both lots; after-sale records for a field update, a return, a rework and a reshipment | Design L2, Assembly L2, Firmware L2 for the board; Assembly L3 and Firmware L3; Assembly L4 and Firmware L4 | [fpga-board-example.md](docs/fpga-board-example.md) |
 | Caliptra | The real Caliptra ROM and firmware built from pinned sources, ROM merge with readback, CoRIM reference values, S.A.F.E. report check, per-unit provisioning, units booted on the emulator; on demand, a boot on the Verilated RTL | Design L1, Wafer L2, Package/Test L2, Firmware L2 | [caliptra-e2e.md](docs/caliptra-e2e.md) |
 
 What each level checks, and the refusals each example shows, is in [levels.md](docs/levels.md). What the examples do not show yet: nothing runs on real silicon or a real FPGA board; the L4 second parties (the rebuilder, the inspection lab, the release approvers) are enrolled as separate companies but run in the same CI job as everyone else, and the lab is simulated; and the second OpenLane builder runs under the same account as the first. The spec's [Worked examples](spec/hslsa-v0.1.md#worked-examples-and-reference-implementation) section has the full list.
@@ -253,12 +255,13 @@ Suppliers will only sign if it costs them little, so adapters turn exports they 
 | Adapter | Reads | Emits | Entry point | Docs |
 | --- | --- | --- | --- | --- |
 | EDA Tcl hook | Step markers from a flow's Tcl script (Yosys and OpenROAD in CI; notes for Innovus, Genus, ICC2, Fusion Compiler, PrimeTime, Calibre) | A `design-flow` record per step | [`adapters/eda-tcl/hslsa.tcl`](adapters/eda-tcl/hslsa.tcl), `hslsa eda run` | [README](adapters/eda-tcl/README.md) |
-| MES and test | MES lot histories and genealogy, STDF V4, SEMI E142 wafer maps | F1 to F4 records carrying the exports by digest | `hslsa adapt` | [mes-stdf-adapter.md](docs/mes-stdf-adapter.md) |
+| MES and test | MES lot histories, genealogy and shipping events, STDF V4, SEMI E142 wafer maps | F1 to F4 records and the transfers between sites, carrying the exports by digest | `hslsa adapt` | [mes-stdf-adapter.md](docs/mes-stdf-adapter.md) |
+| Distributor | A shipper's packing list (CSV), certificates of conformance, GS1 EPCIS 2.0 shipping events | Distribution records carrying the exports by digest | `hslsa import-shipments` | [distributor-importer.md](docs/distributor-importer.md) |
 | Provisioning station | A station's job file, log, readback and identity files, through a per-model profile | A `fw-provisioning` record per unit | `hslsa provision gate`, `hslsa provision adapt` | [provisioning-adapter.md](docs/provisioning-adapter.md) |
 | HSM signing | Any key named by a PKCS#11 URI or a `<role>.pkcs11` file | Site-key signatures, as L3 asks | `hslsa hsm keygen` | [hsm-signing.md](docs/hsm-signing.md) |
 | Proxy signing | A non-signing supplier's own data, or a certificate or audit report | Proxy-signed or evidence records (track capped at L1) | `hslsa mfg` with an `unsigned` block in the scenario | [proxy-signing.md](docs/proxy-signing.md) |
 
-The sample supplier exports live in [`e2e/picorv32/supplier-exports/`](e2e/picorv32/supplier-exports).
+The sample supplier exports live in [`e2e/picorv32/supplier-exports/`](e2e/picorv32/supplier-exports), and the sample shipper exports in [`e2e/board/distributor-exports/`](e2e/board/distributor-exports).
 
 ## The pilot kit
 
@@ -301,7 +304,7 @@ The [roadmap](docs/roadmap.md) has six phases, ordered by dependency:
 | 4 | A pilot with one buyer | Kit ready; needs a buyer and its OSAT |
 | 5 | A neutral home (OpenSSF, CHIPS Alliance or OCP) and v1.0 | Not started; needs the repository public first |
 
-The decisions only the owner can make are listed at the end of the roadmap ([Decisions the owner needs to make](docs/roadmap.md#decisions-the-owner-needs-to-make)), and the spec's own [open questions](spec/hslsa-v0.1.md#open-questions) list what the text has not settled.
+The decisions only the owner can make are listed at the end of the roadmap ([Decisions the owner needs to make](docs/roadmap.md#decisions-the-owner-needs-to-make)), and the spec lists the questions [decided in revision 18](spec/hslsa-v0.1.md#decided-in-revision-18) and the [open questions](spec/hslsa-v0.1.md#open-questions) it has not settled.
 
 ## Contributing
 

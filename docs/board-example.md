@@ -41,8 +41,13 @@ The EMS receives 8 chips from shipped lot `ASM-EXAMPLE-17`, runs the chip's tape
 5. `parts[]` covers exactly the board design's reference designators; every placement is a listed lot; no chip is placed twice or placed without being shipped; no lot is placed more often than it was shipped.
 6. The board lot is the set of boards that passed test, A1's yield accounts for the rest, and every shipped board is an A1 subject. Received boards are in the lot.
 7. The board HBOM's CycloneDX and SPDX renderings in `att/` are exactly what the signed board HBOM renders to, with the digests it lists ([Renderings](../spec/hslsa-v0.1.md#renderings)). In the SPDX rendering each part is a `hardware_PhysicalHardware` with its lot as batch number, and each shipment is a custody transfer from the distributor to the EMS.
+8. The board HBOM claims no more than the check verified in the Assembly track ([Claimed levels](../spec/hslsa-v0.1.md#claimed-levels)). The example's board HBOM claims `HSLSA_ASSEMBLY_LEVEL_2`.
 
 [`tools/hslsa/board_test.go`](../tools/hslsa/board_test.go) breaks these links in 24 ways and requires each to fail for the stated reason, including a swapped part lot, a changed date code, flash bought from a broker (both marked unauthorized and falsely marked authorized), more parts placed than shipped, a board that claims a chip lot it did not receive, a chip that failed final test shipped to the EMS, a chip on two boards, a shipment signed by the wrong party, and a tampered record in the chip chain under the board. [`tools/hslsa/receipt_test.go`](../tools/hslsa/receipt_test.go) adds six for the receipt: missing, missing along with other records (all named in one report), signed by the shipper instead of the EMS, covering other chips, recording a failed check, and not linked from A1.
+
+## Shipments from the shippers' own files
+
+The shipments in the scenario are typed in. `e2e/board/run.sh import` makes the same board again with each shipment read from what its shipper hands over: a packing list, the certificate of conformance each line names, and, from the distributor, a GS1 EPCIS shipping event. Each distribution record carries those files, and a policy with `requireShipmentExports` makes the board check read them again and refuse a record that says anything else. The run then refuses the main bundle under that policy, a certificate changed after the shipment was signed, and a packing list line with no certificate. See [distributor-importer.md](distributor-importer.md).
 
 ## Levels claimed
 

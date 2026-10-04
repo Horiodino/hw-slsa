@@ -182,3 +182,21 @@ test_hbom_claiming_a_track_the_policy_does_not_claim_refused if {
 	doc := set(claimed(chip, ["HSLSA_PACKAGE_TEST_LEVEL_2"]), ["policy", "claims", "lot"], ["HSLSA_WAFER_LEVEL_2", "HSLSA_DESIGN_LEVEL_3"])
 	refused(doc, "hbom: the HBOM claims Package/Test L2, but this check verified no Package/Test level")
 }
+
+policy_with(doc, key, value) := json.patch(doc, [{"op": "add", "path": ["policy", "manufacturing", key], "value": value}])
+
+test_policy_requiring_transfer_exports_refused if {
+	refused(policy_with(chip, "requireTransferExports", true), "policy: manufacturing.requireTransferExports asks for transfers to be read again from MES shipping events, which these Rego policies do not check")
+}
+
+test_policy_requiring_a_manufacturing_log_refused if {
+	refused(policy_with(chip, "transparencyLog", {"origin": "example buyer manufacturing log"}), "policy: manufacturing.transparencyLog asks for the lot's records to be in the buyer's manufacturing log, which these Rego policies do not check")
+}
+
+test_policy_requiring_unit_proofs_refused if {
+	refused(policy_with(chip, "unitCommitment", true), "policy: manufacturing.unitCommitment asks for a proof for each received unit against final test's commitment, which these Rego policies do not check")
+}
+
+test_policy_leaving_those_rules_off_accepted if {
+	count(lot.deny) == 0 with input as policy_with(policy_with(chip, "unitCommitment", false), "requireTransferExports", false)
+}

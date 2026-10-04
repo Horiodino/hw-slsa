@@ -49,7 +49,7 @@ var sections = []section{
 	{"spec", "Specification", "The framework itself: tracks, levels, the attestation chain, the records and how a buyer checks them.", 10},
 	{"concepts", "Concepts", "The ideas the specification relies on, explained one at a time.", 20},
 	{"examples", "Worked examples", "Real open-source designs taken through the chain end to end, as CI runs them.", 30},
-	{"adapters", "Supplier adapters", "How existing supplier systems (EDA tools, MES and test data, provisioning stations, HSMs) produce signed records without changing how they work.", 40},
+	{"adapters", "Supplier adapters", "How existing supplier systems (EDA tools, MES and test data, shippers' exports, provisioning stations, HSMs) produce signed records without changing how they work.", 40},
 	{"pilot", "Pilot kit", "", 50},
 	{"reference", "Reference", "The command line tool, schemas and formats.", 60},
 	{"project", "Project", "Where the project stands, where it is going, and how it is released.", 70},
@@ -75,6 +75,7 @@ var pages = []page{
 
 	{src: "adapters/eda-tcl/README.md", out: "adapters/eda-tcl.md"},
 	{src: "docs/mes-stdf-adapter.md", out: "adapters/mes-stdf-adapter.md", nav: "MES and STDF adapter"},
+	{src: "docs/distributor-importer.md", out: "adapters/distributor-importer.md", nav: "Distributor importer"},
 	{src: "docs/provisioning-adapter.md", out: "adapters/provisioning-adapter.md"},
 	{src: "docs/hsm-signing.md", out: "adapters/hsm-signing.md", nav: "HSM signing"},
 

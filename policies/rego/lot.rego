@@ -83,6 +83,21 @@ deny contains "policy: manufacturing.requireExports asks for supplier exports to
 	lib.truthy(object.get(input.policy, ["manufacturing", "requireExports"], null))
 }
 
+# Policy rules from spec revision 18 that read evidence these policies do not
+# model: MES shipping events, the buyer's manufacturing log, and the per-unit
+# commitment's proofs. A policy that sets one is refused rather than passed
+# without it.
+unread_manufacturing_keys := {
+	"requireTransferExports": "asks for transfers to be read again from MES shipping events",
+	"transparencyLog": "asks for the lot's records to be in the buyer's manufacturing log",
+	"unitCommitment": "asks for a proof for each received unit against final test's commitment",
+}
+
+deny contains sprintf("policy: manufacturing.%s %s, which these Rego policies do not check", [key, what]) if {
+	some key, what in unread_manufacturing_keys
+	lib.truthy(object.get(input.policy, ["manufacturing", key], null))
+}
+
 # Records the reference tool reads with rules these policies do not have.
 # The payload is read before its signature is checked, as the reference
 # tool does to pick the role to check it against.

@@ -109,6 +109,7 @@ It runs only after the tapeout check passes.
   - It binds the released design and the shipped lot.
   - It points by digest at F1 to F4 and at every design step's record.
   - Its renderings have the digests it lists.
+  - It claims no more in Wafer, Package/Test and Design than this check verified (`claimedLevels`, [Claimed levels](../spec/hslsa-v0.1.md#claimed-levels)).
 - **Simulated evidence.** Records made from simulated hardware are refused unless the policy sets `simulated.accept`. When it does, the report lists them.
 
 ### Board receipt check: Assembly L1 and L2 ([`board.rego`](../policies/rego/board.rego))
@@ -117,6 +118,7 @@ It runs only after the tapeout check passes.
   - It is signed by `board-owner` and matches the HBOM schema.
   - It describes a board, module or system.
   - It names the board design, whose file digest is checked, and the board lot.
+  - It claims no more in Assembly than this check verified (`claimedLevels`).
 - **A1.**
   - The A1 record is signed by `ems-site`, with its `buildType`, every gate passed and its file subjects in the bundle.
   - Its `designRef` names the board design, and it links the design.
@@ -148,7 +150,9 @@ It runs only after the tapeout check passes.
 | The at-boot check (Firmware track, provisioning records, CoRIM appraisal) | Not written | Out of scope for this path. The at-boot check stays with the reference tool. |
 | Design L4; Wafer and Package/Test L3 and L4; Assembly L3 and L4; any Firmware level | Refuse a policy that claims them | These levels read evidence the policies do not model: HSM key custody in the trust root's enrollments, die-identity challenges, part attestations and platform certificates, rebuilds, release approvals, the private release log, and inspection reports. |
 | That the source archive holds exactly the files of the tagged git tree | Recompute the tag, commit and tree ids, and check the IP files in the archive and the archive's digest | Not feasible in Rego. Walking a git tree means parsing git's binary tree objects, which Rego has no builtin for. Doing it in the glue would move a rule out of Rego. |
-| Proxy-signed and evidence records; records made from supplier exports (`hwMfg.adapter`); a policy that requires exports | Refuse them, naming the record | Each is its own rule set ([proxy-signing.md](proxy-signing.md), [mes-stdf-adapter.md](mes-stdf-adapter.md)), not written here. |
+| Proxy-signed and evidence records; records made from supplier exports (`hwMfg.adapter`), including transfers made from MES shipping events; shipments made from a shipper's exports (`hwMfg.importer`); a policy that requires any of these exports | Refuse them, naming the record or the policy key | Each is its own rule set ([proxy-signing.md](proxy-signing.md), [mes-stdf-adapter.md](mes-stdf-adapter.md), [distributor-importer.md](distributor-importer.md)), not written here. |
+| The buyer's manufacturing log and the per-unit commitment (`manufacturing.transparencyLog`, `manufacturing.unitCommitment`, [selective-disclosure.md](selective-disclosure.md#without-an-auditor)) | Refuse a policy that sets them | Log proofs and unit proofs are Merkle paths over files the input document does not carry. |
+| After-sale records ([after-sale records](../spec/hslsa-v0.1.md#after-sale-records)) | Not covered | They belong to the at-boot check, which stays with the reference tool. |
 | Withheld fields and their disclosures ([selective-disclosure.md](selective-disclosure.md)) | Refuse records that withhold fields | Checking a disclosure means recomputing salted digests over canonical JSON. That is feasible, but not written here. |
 | Re-rendering the HBOM as CycloneDX and SPDX and comparing bytes ([Renderings](../spec/hslsa-v0.1.md#renderings)) | Check each rendering's digest against the HBOM | Rendering is a converter. Writing a second one in Rego would only duplicate it. |
 | Signing VSAs | Print the reports, sign nothing | This path only checks. The receipt VSA the board check reads is the EMS's, signed with the reference tool. |
@@ -191,7 +195,9 @@ Each check has a test that requires the valid fixture to pass with no refusal. E
 - a part bought outside an authorized channel;
 - a chip placed twice;
 - a receipt over other units;
-- a claim above what the policies check.
+- a claim above what the policies check;
+- an HBOM that claims more than its check verified;
+- a policy that asks for a manufacturing log, unit proofs, or transfers or shipments read again from exports.
 
 To rebuild the fixtures after the examples change:
 

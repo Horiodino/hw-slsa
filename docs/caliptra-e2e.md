@@ -28,7 +28,7 @@ All sources are pinned in [`e2e/caliptra/caliptra.lock.json`](../e2e/caliptra/ca
 
 - Physical design. Caliptra's SystemVerilog does not go through Yosys, so there is no synthesis, place and route or GDS. The release subject is the RTL with the ROM merged, standing in for the GDS.
 - A full boot on the RTL in every run. It takes hours, so it runs on demand on a self-hosted runner, where one unit has booted to runtime; see [Booting on the RTL](#booting-on-the-rtl). Pull requests and pushes boot the emulator.
-- Only the ECC P-384 half of Caliptra's certificate chain is checked. Caliptra 2.x also issues an ML-DSA-87 chain; Go's `crypto/x509`, which the verifier uses, cannot verify ML-DSA certificates.
+- Only the ECC P-384 half of Caliptra's certificate chain is checked. Caliptra 2.x also issues an ML-DSA-87 chain; Go's `crypto/x509`, which the verifier uses, cannot verify ML-DSA certificates. Since spec revision 18 the policy names the chains it requires in `firmware.identityChains` (by default `ecc-p384`), the verifier refuses a policy that requires `mldsa87` rather than pass it unchecked, and its output says what it did with the ML-DSA-87 chain: `identity chain: ECC P-384 checked for every unit; the ML-DSA-87 chain was not read and is not checked`. The device tool reads only the P-384 certificates, so no ML-DSA-87 certificate is read yet.
 
 ## Booting on the RTL
 
@@ -94,6 +94,8 @@ Firmware L3 is out of reach here. The tool checks it ([levels](levels.md#firmwar
 4. **ROM coverage.** The ROM's provenance names the TAC-frozen image, the `rom-merge` step consumed that image and its provenance, and `rom-readback` passed.
 5. **Anti-rollback.** The SVN the device reports equals the image's SVN, and it is not below the fuse or the policy minimum.
 
+After the five steps, the check holds the HBOM's `claimedLevels` to what it verified: the HBOM claims Design L1, Wafer L2, Package/Test L2 and Firmware L2, and the lot receipt check leaves the Firmware claim to the at-boot check, which refuses it if the units did not reach Firmware L2.
+
 ## Firmware reference values (CoRIM)
 
 `hslsa caliptra firmware` signs `artifacts/caliptra-fw.corim` along with the bundle's provenance, which lists it as a byproduct. It is a signed CoRIM (a COSE_Sign1 envelope, [draft-ietf-rats-corim-11](https://datatracker.ietf.org/doc/draft-ietf-rats-corim/)), signed with the firmware platform's key and naming the profile `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1`. It holds one CoMID with two reference values, one for each layer Caliptra measures:
@@ -129,7 +131,7 @@ Real reports exist for Caliptra: NCC Group reviewed the ROM, FMC and runtime of 
 
 ## What the tamper tests prove
 
-[`tools/hslsa/caliptra_test.go`](../tools/hslsa/caliptra_test.go) breaks the chain in 33 ways and requires each to fail for the stated reason. As in the PicoRV32 tests, the fixture re-signs the bundle with test keys so it can forge validly signed records:
+[`tools/hslsa/caliptra_test.go`](../tools/hslsa/caliptra_test.go) breaks the chain in 34 ways and requires each to fail for the stated reason. As in the PicoRV32 tests, the fixture re-signs the bundle with test keys so it can forge validly signed records:
 
 - **The device:** a certificate from another unit, a missing alias certificate, an LDevID certificate with the right names signed by the wrong key, a received unit that failed final test.
 - **Provisioning:** another unit's record, a record signed by the wrong site, a record edited without re-signing, an IDevID endorsed by another CA. Also records that lie about the vendor fuses, the SVN fuse or the design release, and a policy minimum SVN above the image.
@@ -137,6 +139,7 @@ Real reports exist for Caliptra: NCC Group reviewed the ROM, FMC and runtime of 
 - **The CoRIM:** one signed by a key outside the firmware platform's role, one edited after the build, one whose runtime digest, SVN or runtime entry differs from the provenance, and an HBOM pointing at another CoRIM.
 - **The mask ROM:** a ROM merge that does not consume the ROM, a failed `rom-readback`, a swapped released design, a failed lint, a unit added to the lot.
 - **The firmware review:** the FMC's report put in place of the runtime's, reports signed by a key the policy does not list, no reports at all, a policy that allows no open issue as severe as the placeholder one, and a policy claiming Firmware L3.
+- **The identity chains:** a policy that requires the ML-DSA-87 chain, which is refused; a policy that requires only the P-384 chain passes.
 
 The verify job also runs slsa-verifier three times expecting failure: Firmware L3 for a unit verified at L2, SLSA Build L3 for the firmware, and one unit's VSA presented for another unit.
 

@@ -56,8 +56,8 @@ All the examples' manufacturing is simulated, so their policies set `simulated.a
 | [PicoRV32](e2e-test.md), its proxy and HSM runs | The fab, sort, packaging and test data | hand-written scenario |
 | [MES and STDF adapter](mes-stdf-adapter.md), pilot rehearsal | The suppliers' exports | sample exports written by the adapter's tests |
 | Virtual shuttle (this page) | Fab, sort, packaging and test, from the netlist | `.../tools/hslsa/sim/shuttle@v0.1` |
-| [Board](board-example.md) | Shipments and the EMS line | hand-written scenario |
-| [FPGA board](fpga-board-example.md) | The EMS line, the board, the EXR-01 root of trust and its programming station | hand-written scenario, the board and RoT models, the simulated XG-8 station |
+| [Board](board-example.md) | Shipments (typed in, or read from sample shipper exports by the [distributor importer](distributor-importer.md)) and the EMS line | hand-written scenario |
+| [FPGA board](fpga-board-example.md) | The EMS line, the board, the EXR-01 root of trust and its programming station, and the after-sale sites (field updater, returns site, repair site) | hand-written scenario, the board and RoT models, the simulated XG-8 station |
 | [Caliptra](caliptra-e2e.md) | The lot, and each unit's silicon during provisioning (the emulator, or the Verilated RTL) | hand-written scenario and the caliptra-sw hardware model |
 
 The mark is the signer's own statement, like every other field. A record without it is not thereby proven to come from real equipment; the mark exists so that the tool cannot produce simulated records that look like real ones, for example when a supplier rehearses the pilot with its real, enrolled key.
@@ -133,8 +133,7 @@ CI runs it in the produce job of the [HSLSA end-to-end workflow](../.github/work
 
 ## What is still open
 
-The roadmap keeps the real items open: a shuttle tapeout, the packaging and test data it returns, a real board build and a real board boot. Things the simulation could do next, none started:
+The roadmap keeps the real items open: a shuttle tapeout, the packaging and test data it returns, a real board build and a real board boot. Events after the first buyer (roadmap phase 2 item 6) run on the simulated FPGA board since spec revision 18: a field firmware update, a return, a rework and a reshipment ([after-sale records](fpga-board-example.md#after-sale-records)). Things the simulation could do next, none started:
 
-- events after the first buyer (roadmap phase 2 item 6): a field firmware update, rework and a return on the simulated FPGA board, which the spec defers to after the first buyer;
 - gate-level simulation of the OpenLane 2 netlist in SKY130 standard cells, so the shuttle fabricates the design whose GDS was signed;
 - a die identity rooted in hardware (a DICE key on the die instead of a burned id), to exercise Package/Test L3.

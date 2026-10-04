@@ -164,6 +164,15 @@ deny contains msg if {
 	msg := lib.open_error(rel, role, lib.mfg_step)
 }
 
+deny contains "policy: requireShipmentExports asks for shipments to be read again from their shippers' exports, which these Rego policies do not do" if {
+	lib.truthy(object.get(pol, "requireShipmentExports", null))
+}
+
+deny contains sprintf("distribution %s: made from its shipper's exports (hwMfg.importer), which these Rego policies do not read again", [lib.base(rel)]) if {
+	some rel, s in ships
+	"importer" in object.keys(object.get(s.predicate, "hwMfg", {}))
+}
+
 deny contains sprintf("distribution %s: wrong buildType", [lib.base(rel)]) if {
 	some rel, s in ships
 	lib.build_type(s) != lib.mfg_step_type("distribution")

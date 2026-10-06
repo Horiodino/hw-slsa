@@ -77,6 +77,7 @@ The data type identifier of an HSLSA record is its predicate type. Where several
 | Firmware rebuild (L4) | `https://slsa.dev/provenance/v1` | The release's; the record names the release it rebuilt |
 | Release approval (Firmware L4) | `https://github.com/Horiodino/hw-slsa/release-approval/v0.1` | None; one person's sign-off of a firmware release record |
 | Firmware provisioning | `https://github.com/Horiodino/hw-slsa/fw-provisioning/v0.1` | `.../fw-provisioning/step/provision@v1` |
+| After-sale event | `https://github.com/Horiodino/hw-slsa/after-sale/v0.1` | `.../after-sale/<event>@v1`, where the event is `field-update`, `return`, `rework` or `reship` |
 | Firmware review | The OCP S.A.F.E. short-form report's own CoRIM profile | None |
 | Firmware reference values | The HSLSA CoRIM profile, `https://github.com/Horiodino/hw-slsa/corim-profile/v0.1` | None |
 | HBOM | `https://github.com/Horiodino/hw-slsa/hbom/v0.1` | None |
@@ -116,6 +117,7 @@ Most HSLSA steps are run by a different company from the step before them, so th
 | R. Receipt | Receive | Shared | Signed by the receiver after its lot receipt check; from Assembly L2 the EMS signs one for each chip lot and A1 links it |
 | A1. Board assembly | Assemble | Shared | |
 | X. Inspection (L4) | None | Supplemental evidence | Independent physical verification |
+| After-sale events (boards with a root of trust) | Make, Receive, Assemble, Ship | Shared | One record per event after the first buyer: a field update changes the unit (Make), a return is received by the returns site (Receive), a rework replaces parts (Assemble), and a reshipment sends the board back (Ship) |
 
 Two events have no HSLSA step of their own:
 

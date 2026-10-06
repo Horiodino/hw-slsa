@@ -185,6 +185,8 @@ func TestLoadWithholding(t *testing.T) {
 		pt := MfgStep
 		if record == "hbom" {
 			pt = HBOMType
+		} else if contains(DesignSteps, record) {
+			pt = DesignFlow
 		} else if !contains(MfgSteps, record) {
 			t.Fatalf("withhold.json names %s, which is not a record the example signs", record)
 		}

@@ -1020,8 +1020,32 @@ func uuid4() (string, error) {
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], nil
 }
 
-// CaliptraProvision programs every shipped unit at the final test station, then signs one record per unit.
-func CaliptraProvision(bundle, devices, keysDir, deviceBin, scenarioPath, lockPath string) error {
+// The test house's station, ps-01, is another simulated Example XG-8 gang
+// programmer (rot.go), with Caliptra's emulator answering for each unit's ROM.
+// It writes its own export, and the provisioning adapter signs one record per
+// unit from it (e2e/caliptra/station/ps-01.json, e2e/stations/xg8-profile.json).
+
+// CaliptraJob writes the test station's job file for the shipped lot: the firmware bundle into flash.
+func CaliptraJob(bundle, scenarioPath, export string) error {
+	sc, err := ReadObj(scenarioPath)
+	if err != nil {
+		return err
+	}
+	if err := xg8Job(export, filepath.Join(bundle, "artifacts"), sc, Images["bundle"]); err != nil {
+		return err
+	}
+	fmt.Printf("station job: FT-%s loads %s\n", S(sc, "finalTest", "lotId"), Images["bundle"])
+	return nil
+}
+
+// CaliptraStation runs the job on every shipped unit, as the test station
+// would: the HSM injects the UDS seed and field entropy, the station burns the
+// public fuses in the Manufacturing lifecycle, has the ROM export its IDevID
+// CSR and stores the certificate the identity CA endorses, writes the
+// firmware bundle to flash and reads it back, moves the unit to Production
+// and reads every fuse back. devices gets each unit's fuse bank and flash;
+// export gets what the station writes.
+func CaliptraStation(bundle, devices, keysDir, deviceBin, scenarioPath, lockPath, export string) error {
 	sc, err := ReadObj(scenarioPath)
 	if err != nil {
 		return err
@@ -1031,10 +1055,9 @@ func CaliptraProvision(bundle, devices, keysDir, deviceBin, scenarioPath, lockPa
 		return err
 	}
 	art := filepath.Join(bundle, "artifacts")
-	station := O(sc, "provisioning")
-	trust, err := LoadTrustRoot(filepath.Join(bundle, "trust-root.json"))
-	if err != nil {
-		return err
+	hsm := S(sc, "provisioning", "hsm")
+	if hsm == "" {
+		return fmt.Errorf("%s: provisioning.hsm names no HSM to inject the secrets", scenarioPath)
 	}
 	caKey, err := loadECKey(filepath.Join(keysDir, "identity-ca.key.pem"))
 	if err != nil {
@@ -1044,45 +1067,43 @@ func CaliptraProvision(bundle, devices, keysDir, deviceBin, scenarioPath, lockPa
 	if err != nil {
 		return err
 	}
-	caName := string(caNameBytes)
+	caName := strings.TrimSpace(string(caNameBytes))
 	manifest, err := ReadObj(filepath.Join(art, "fw-manifest.json"))
 	if err != nil {
 		return err
 	}
-	image := filepath.Join(art, Images["bundle"])
-
-	// The station checks the image's provenance before it writes a single unit.
-	fw, err := trust.Open(filepath.Join(bundle, "att", FWAtt["bundle"]), "firmware-platform", SLSAProvenance)
+	jobData, err := os.ReadFile(filepath.Join(export, "job.ini"))
 	if err != nil {
 		return err
 	}
-	imageDigest, err := sha256File(image)
+	job, err := parseINI(jobData)
 	if err != nil {
 		return err
-	}
-	verified := sha256Set(Objs(fw, "subject"))[imageDigest]
-	if !verified {
-		return fmt.Errorf("provisioning: firmware bundle does not match its provenance; refusing to write")
-	}
-	imageRD, err := rd2(image, "")
-	if err != nil {
-		return err
-	}
-
-	for _, d := range []string{"identity", "provisioning"} {
-		if err := os.MkdirAll(filepath.Join(art, d), 0o755); err != nil {
-			return err
-		}
 	}
 	units, err := ReadUnits(filepath.Join(art, "shipped-lot.txt"))
 	if err != nil {
 		return err
 	}
-	for _, unit := range units {
+	for _, d := range []string{"readback", "identity"} {
+		if err := os.MkdirAll(filepath.Join(export, d), 0o755); err != nil {
+			return err
+		}
+	}
+	log, err := newXG8Log(export)
+	if err != nil {
+		return err
+	}
+	defer log.f.Close()
+	for i, unit := range units {
+		socket := i%xg8Sockets + 1
 		udir := filepath.Join(devices, unit)
 		if err := os.MkdirAll(udir, 0o755); err != nil {
 			return err
 		}
+		if err := log.row(socket, unit, "BEGIN", "", job.values["job"]["id"], true); err != nil {
+			return err
+		}
+		// The HSM injects the secrets; the station logs only their key ids.
 		uds, err := randomHex(64)
 		if err != nil {
 			return err
@@ -1092,24 +1113,26 @@ func CaliptraProvision(bundle, devices, keysDir, deviceBin, scenarioPath, lockPa
 			return err
 		}
 		secrets := [][2]string{{"uds_seed", uds}, {"field_entropy", entropy}}
-		fuses := FuseMap(unit, manifest, "manufacturing", get(lock, "firmware", "fwSvnFuse"))
-		if err := WriteJSON(filepath.Join(udir, "fuses.json"), deviceFuses(unit, fuses, secrets)); err != nil {
+		for _, s := range secrets {
+			keyID, err := uuid4()
+			if err != nil {
+				return err
+			}
+			if err := log.row(socket, unit, "KEY_INJECT", s[0], hsm+":"+keyID, true); err != nil {
+				return err
+			}
+		}
+		// The public fuses, burned in the Manufacturing lifecycle, which lets the ROM export its CSR.
+		bank := FuseMap(unit, manifest, "manufacturing", get(lock, "firmware", "fwSvnFuse"))
+		for _, k := range sortedKeys(bank) {
+			if err := log.row(socket, unit, "FUSE_WRITE", k, xg8Value(bank[k]), true); err != nil {
+				return err
+			}
+		}
+		if err := writeFuseBank(udir, unit, bank, secrets); err != nil {
 			return err
 		}
-		work, err := os.MkdirTemp("", "hslsa-csr-")
-		if err != nil {
-			return err
-		}
-		out, err := runCmd("", nil, deviceBin, "csr", "--rom", filepath.Join(devices, "rom.bin"),
-			"--fuses", filepath.Join(udir, "fuses.json"), "--out", work)
-		if err == nil && out.Code != 0 {
-			err = fmt.Errorf("%s csr for %s exited %d: %s", deviceBin, unit, out.Code, strings.TrimSpace(out.Stderr))
-		}
-		var csrDER []byte
-		if err == nil {
-			csrDER, err = os.ReadFile(filepath.Join(work, "idevid-csr-ecc384.der"))
-		}
-		os.RemoveAll(work)
+		csrDER, err := caliptraCSR(deviceBin, devices, unit)
 		if err != nil {
 			return err
 		}
@@ -1117,197 +1140,92 @@ func CaliptraProvision(bundle, devices, keysDir, deviceBin, scenarioPath, lockPa
 		if err != nil {
 			return fmt.Errorf("%s IDevID CSR: %w", unit, err)
 		}
-		if err := csr.CheckSignature(); err != nil {
-			return failf("%s IDevID CSR: CSR self-signature is invalid", unit)
+		csrFile, certFile := "identity/"+unit+".csr.der", "identity/"+unit+".crt.der"
+		if err := os.WriteFile(filepath.Join(export, csrFile), csrDER, 0o644); err != nil {
+			return err
 		}
+		if err := log.row(socket, unit, "CSR_EXPORT", "IDEVID", csrFile, csr.CheckSignature() == nil); err != nil {
+			return err
+		}
+		// The identity CA endorses the CSR the die signed; the station stores the certificate.
 		cert, err := Endorse(csr, caKey, caName)
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(art, "identity", unit+".csr.der"), csrDER, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(export, certFile), cert, 0o644); err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(art, "identity", unit+".idevid.der"), cert, 0o644); err != nil {
+		if err := log.row(socket, unit, "CERT_IMPORT", "IDEVID", certFile, true); err != nil {
 			return err
 		}
-
-		if err := copyFile(image, filepath.Join(udir, "flash.bin")); err != nil {
+		for _, sec := range job.sections {
+			if !strings.HasPrefix(sec, "image ") {
+				continue
+			}
+			if err := xg8Image(log, export, socket, unit, job.values[sec], filepath.Join(udir, "flash.bin")); err != nil {
+				return err
+			}
+		}
+		bank["life_cycle"] = "production"
+		if err := log.row(socket, unit, "FUSE_WRITE", "life_cycle", "production", true); err != nil {
 			return err
 		}
-		fuses["life_cycle"] = "production"
-		if err := WriteJSON(filepath.Join(udir, "fuses.json"), deviceFuses(unit, fuses, secrets)); err != nil {
+		if err := writeFuseBank(udir, unit, bank, secrets); err != nil {
 			return err
 		}
 		burned, err := ReadObj(filepath.Join(udir, "fuses.json"))
 		if err != nil {
 			return err
 		}
-		readback := Obj{}
-		for _, k := range []string{"vendorPkHash", "ownerPkHash", "fwSvnFuse", "pqcKeyType", "lifecycle"} {
-			readback[k] = burned[k]
+		for _, k := range sortedKeys(bank) {
+			if err := log.row(socket, unit, "FUSE_READ", k, xg8Value(get(burned, "bank", k)), true); err != nil {
+				return err
+			}
 		}
-		flash, err := sha256File(filepath.Join(udir, "flash.bin"))
-		if err != nil {
+		if err := log.row(socket, unit, "END", "", "", true); err != nil {
 			return err
 		}
 		idevidKey, err := spkiDigest(csr.PublicKey)
 		if err != nil {
 			return err
 		}
-		var secretList []Obj
-		for _, s := range secrets {
-			keyID, err := uuid4()
-			if err != nil {
-				return err
-			}
-			secretList = append(secretList, Obj{
-				"field":  s[0],
-				"keyId":  S(station, "hsm") + ":" + keyID,
-				"origin": "injected by " + S(station, "hsm"),
-			})
-		}
-		log := Obj{
-			"unit":         unit,
-			"lotId":        S(sc, "finalTest", "lotId"),
-			"stage":        "final-test",
-			"station":      station,
-			"fuses":        fuses,
-			"fuseReadback": Obj{"sha256": canonicalDigest(readback)},
-			"secrets":      secretList,
-			"images": []Obj{{
-				"name":               Images["bundle"],
-				"role":               "firmware bundle (FMC and runtime)",
-				"storage":            "external-flash",
-				"digest":             imageRD["digest"],
-				"readback":           Obj{"sha256": flash},
-				"provenanceVerified": verified,
-			}},
-			"identity": Obj{
-				"scheme":          "Caliptra",
-				"ueid":            fuses["idevid_cert_attr.ueid"],
-				"idevidPublicKey": Obj{"sha256": idevidKey},
-				"csr":             "identity/" + unit + ".csr.der",
-				"certificate":     "identity/" + unit + ".idevid.der",
-				"endorsingCa":     caName,
-			},
-		}
-		if m := O(sc, "simulated"); m != nil {
-			log["simulated"] = m
-		}
-		if err := WriteJSON(filepath.Join(art, "provisioning", unit+".json"), log); err != nil {
-			return err
-		}
-		fmt.Printf("provision: %s IDevID %s... endorsed\n", unit, idevidKey[:16])
+		fmt.Printf("station ps-01: %s IDevID %s... endorsed\n", unit, idevidKey[:16])
 	}
-	return SignProvisioning(bundle, filepath.Join(keysDir, S(station, "signer")+".key.pem"))
+	if err := log.close(); err != nil {
+		return err
+	}
+	fmt.Printf("station ps-01: %d units programmed, export in %s\n", len(units), export)
+	return nil
+}
+
+// writeFuseBank writes a unit's fuse bank: the fields the device model reads,
+// and every public fuse as the station burned it, which is what it reads back.
+func writeFuseBank(udir, unit string, bank Obj, secrets [][2]string) error {
+	f := deviceFuses(unit, bank, secrets)
+	f["bank"] = bank
+	return WriteJSON(filepath.Join(udir, "fuses.json"), f)
+}
+
+// caliptraCSR runs a unit's ROM on the device model until it exports its IDevID CSR.
+func caliptraCSR(deviceBin, devices, unit string) ([]byte, error) {
+	work, err := os.MkdirTemp("", "hslsa-csr-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(work)
+	out, err := runCmd("", nil, deviceBin, "csr", "--rom", filepath.Join(devices, "rom.bin"),
+		"--fuses", filepath.Join(devices, unit, "fuses.json"), "--out", work)
+	if err == nil && out.Code != 0 {
+		err = fmt.Errorf("%s csr for %s exited %d: %s", deviceBin, unit, out.Code, strings.TrimSpace(out.Stderr))
+	}
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(filepath.Join(work, "idevid-csr-ecc384.der"))
 }
 
 // ProvAtt is the envelope file name of one unit's provisioning record.
 func ProvAtt(unit string) string { return "prov-" + unit + ".intoto.json" }
-
-// SignProvisioning signs one fw-provisioning record per unit, from the station's logs, with the site key.
-func SignProvisioning(bundle, key string) error {
-	art := filepath.Join(bundle, "artifacts")
-	relRDv := envRD(bundle, AttName("release"))
-	final, err := releasedSubject(bundle)
-	if err != nil {
-		return err
-	}
-	signer, err := LoadSigner(key)
-	if err != nil {
-		return err
-	}
-	logs, err := filepath.Glob(filepath.Join(art, "provisioning", "*.json"))
-	if err != nil {
-		return err
-	}
-	sort.Strings(logs)
-	for _, path := range logs {
-		log, err := ReadObj(path)
-		if err != nil {
-			return err
-		}
-		unit, ident, fuses := S(log, "unit"), O(log, "identity"), O(log, "fuses")
-		expected := Obj{
-			"vendorPkHash": fuses["vendor_pk_hash"],
-			"ownerPkHash":  fuses["owner_pk_hash"],
-			"fwSvnFuse":    fuses["fw_svn"],
-			"pqcKeyType":   fuses["fuse_pqc_key_type"],
-			"lifecycle":    fuses["life_cycle"],
-		}
-		images := Objs(log, "images")
-		if len(images) == 0 {
-			return fmt.Errorf("%s: no images", path)
-		}
-		image := images[0]
-		csrOK := false
-		if der, err := os.ReadFile(filepath.Join(art, S(ident, "csr"))); err == nil {
-			if csr, err := x509.ParseCertificateRequest(der); err == nil {
-				csrOK = csr.CheckSignature() == nil
-			}
-		}
-		checks := []Obj{
-			check("image-provenance-verified", Truthy(image["provenanceVerified"]), ""),
-			check("image-readback", S(image, "readback", "sha256") == S(image, "digest", "sha256"), ""),
-			check("fuse-readback", S(log, "fuseReadback", "sha256") == canonicalDigest(expected), ""),
-			check("csr-self-signature", csrOK, ""),
-			check("lifecycle-production", S(fuses, "life_cycle") == "production" && Truthy(fuses["debug_locked"]), ""),
-		}
-		var deps []Obj
-		for _, f := range []struct{ path, name string }{
-			{filepath.Join(art, Images["bundle"]), ""},
-			{filepath.Join(art, S(ident, "csr")), S(ident, "csr")},
-			{filepath.Join(art, S(ident, "certificate")), S(ident, "certificate")},
-		} {
-			d, err := fileRD(f.path, f.name)
-			if err != nil {
-				return err
-			}
-			deps = append(deps, d)
-		}
-		deps = append([]Obj{envRD(bundle, FWAtt["bundle"])}, deps...)
-		identity := Obj{"certificate": deps[3]}
-		for _, k := range []string{"scheme", "ueid", "idevidPublicKey", "endorsingCa"} {
-			identity[k] = ident[k]
-		}
-		pred := Obj{
-			"buildDefinition": Obj{
-				"buildType":            ProvisionType,
-				"externalParameters":   Obj{"unit": unit, "lotId": get(log, "lotId"), "stage": get(log, "stage")},
-				"resolvedDependencies": deps,
-			},
-			"runDetails": Obj{
-				"builder":  Obj{"id": "urn:hslsa:site:" + slug(S(log, "station", "site", "name"))},
-				"metadata": Obj{"invocationId": "provision:" + unit, "finishedOn": Now()},
-			},
-			"hwProvision": markSimulated(Obj{
-				"station":   get(log, "station", "id"),
-				"site":      get(log, "station", "site"),
-				"unit":      "urn:hslsa:unit:" + unit,
-				"lot":       "urn:hslsa:lot:" + S(log, "lotId"),
-				"designRef": Obj{"name": final["name"], "digest": final["digest"], "release": relRDv},
-				"images":    get(log, "images"),
-				"fuses":     fuses,
-				"secrets":   get(log, "secrets"),
-				"identity":  identity,
-				"checks":    checks,
-			}, O(log, "simulated")),
-		}
-		subject := []Obj{rd("urn:hslsa:unit:"+unit, S(ident, "idevidPublicKey", "sha256"))}
-		stmt, err := statement(subject, FWProvisioning, pred)
-		if err != nil {
-			return err
-		}
-		if _, err := Sign(stmt, signer, filepath.Join(bundle, "att", ProvAtt(unit))); err != nil {
-			return err
-		}
-		if failed := failedChecks(checks); len(failed) > 0 {
-			return fmt.Errorf("provisioning %s: %s failed (recorded in the attestation)", unit, strings.Join(failed, ", "))
-		}
-	}
-	fmt.Printf("provisioning: %d records signed\n", len(logs))
-	return nil
-}
 
 // HBOM
 
@@ -1790,7 +1708,7 @@ func DeviceCheck(bundle string, trust *TrustRoot, policy Obj, design *DesignResu
 			written = i
 		}
 	}
-	if written == nil || !jsonEqual(get(written, "digest"), get(fw.Bundle, "digest")) {
+	if written == nil || S(written, "digest", "sha256") != S(fw.Bundle, "digest", "sha256") {
 		return nil, failf("%s: provisioning record wrote a different firmware bundle", label)
 	}
 

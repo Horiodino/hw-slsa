@@ -1,0 +1,15 @@
+{
+  "simulated": {"simulator": "the simulated Example ICP-2 in-circuit programmer (hslsa fpga board-station)", "standsIn": "the EMS's board programming station and the boards it programs"},
+  "note": "Station prog-01 at the EMS, programming the FPGA development boards. What the adapter needs that the station does not know: the board's maker, where the flash image's provenance is, the owner fuse types, and where the root of trust's own records are, to check the part the station found at U5 against them.",
+  "station": "urn:hslsa:station:example-ems:prog-01",
+  "site": {"name": "Example EMS", "country": "US"},
+  "stage": "board-programming",
+  "lotId": "BRD-EXAMPLE-FPGA-01",
+  "board": {"manufacturer": "Example Board Co"},
+  "images": {
+    "flash.bin": {"role": "configuration", "storage": "external-flash", "provenance": "design/att/fw-flash.intoto.json", "signer": "firmware-platform"}
+  },
+  "fuseTypes": {"owner_key_hash": "hex", "manifest_offset": "int", "owner_min_svn": "int"},
+  "secrets": [],
+  "rootOfTrust": {"refDes": "U5", "bundle": "parts/rot", "scheme": "DICE", "caRole": "identity-ca"}
+}

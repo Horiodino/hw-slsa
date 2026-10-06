@@ -715,7 +715,7 @@ func eda(args []string) error {
 }
 
 func caliptra(args []string) error {
-	act, rest, err := action(args, "ca", "firmware", "firmware-rebuild", "design", "fab", "rtl-model", "provision", "hbom", "review", "verify")
+	act, rest, err := action(args, "ca", "firmware", "firmware-rebuild", "design", "fab", "rtl-model", "job", "station", "hbom", "review", "verify")
 	if err != nil {
 		return err
 	}
@@ -784,13 +784,21 @@ func caliptra(args []string) error {
 			return err
 		}
 		return hslsa.CaliptraRTLModel(*bundle, *lock, *out)
-	case "provision":
-		bundle, devices, keys := f.str("bundle", "", true), f.str("devices", "", true), f.str("keys", "", true)
-		deviceBin, scenario, lock := f.str("device-bin", "", true), f.str("scenario", "", true), f.str("lock", "", true)
+	case "job":
+		bundle, scenario := f.str("bundle", "", true), f.str("scenario", "", true)
+		export := f.str("export", "the test station's export directory, where its job file goes", true)
 		if err := f.parse(rest); err != nil {
 			return err
 		}
-		return hslsa.CaliptraProvision(*bundle, *devices, *keys, *deviceBin, *scenario, *lock)
+		return hslsa.CaliptraJob(*bundle, *scenario, *export)
+	case "station":
+		bundle, devices, keys := f.str("bundle", "", true), f.str("devices", "", true), f.str("keys", "the identity CA's key and name", true)
+		deviceBin, scenario, lock := f.str("device-bin", "", true), f.str("scenario", "", true), f.str("lock", "", true)
+		export := f.str("export", "the test station's export directory, with its job file", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.CaliptraStation(*bundle, *devices, *keys, *deviceBin, *scenario, *lock, *export)
 	case "hbom":
 		bundle, lock := f.str("bundle", "", true), f.str("lock", "", true)
 		scenario, key := f.str("scenario", "", true), f.str("key", "", true)
@@ -872,7 +880,7 @@ func board(args []string) error {
 
 func fpga(args []string) error {
 	act, rest, err := action(args, "rot-firmware", "rot-firmware-rebuild", "rot-job", "rot-station", "rot-hbom", "firmware", "firmware-rebuild", "design", "image",
-		"produce", "provision", "boot", "update-build", "after-sale", "verify")
+		"produce", "board-job", "board-station", "boot", "update-build", "after-sale", "verify")
 	if err != nil {
 		return err
 	}
@@ -1003,13 +1011,23 @@ func fpga(args []string) error {
 			phys = &hslsa.BoardParts{Chips: *chipParts, Boards: *boardsOut, Commitment: *commitment}
 		}
 		return hslsa.FPGABoardProduce(*bundle, *rot, *design, *scenario, *designPath, *policy, *keys, phys)
-	case "provision":
-		bundle, devices := f.str("bundle", "", true), f.str("devices", "the root of trust units as shipped", true)
-		boards, scenario, keys := f.str("boards", "directory for the programmed boards", true), f.str("scenario", "", true), f.str("keys", "", true)
+	case "board-job":
+		bundle, scenario := f.str("bundle", "", true), f.str("scenario", "", true)
+		codeSigner := f.str("code-signer", "the board owner's code signer public key, whose hash goes into the owner fuses", true)
+		export := f.str("export", "the EMS station's export directory, where its program file goes", true)
 		if err := f.parse(rest); err != nil {
 			return err
 		}
-		return hslsa.FPGAProvision(*bundle, *devices, *boards, *scenario, *keys)
+		return hslsa.FPGABoardJob(*bundle, *scenario, *codeSigner, *export)
+	case "board-station":
+		bundle := f.str("bundle", "", true)
+		devices := f.str("devices", "the root of trust units as shipped, for boards that have none placed yet", false)
+		boards := f.str("boards", "directory for the programmed boards", true)
+		export := f.str("export", "the EMS station's export directory, with its program file", true)
+		if err := f.parse(rest); err != nil {
+			return err
+		}
+		return hslsa.FPGABoardStation(*bundle, *devices, *boards, *export)
 	case "boot":
 		bundle, boards := f.str("bundle", "", true), f.str("boards", "directory of programmed boards", true)
 		list, out := f.str("list", "file with the serials to boot", true), f.str("out", "", true)

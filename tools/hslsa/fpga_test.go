@@ -286,6 +286,28 @@ func TestProvisioningNamesAnotherRoT(t *testing.T) {
 	fpgaRejects(t, work, "but A1 placed")
 }
 
+func TestBoardWhoseRootOfTrustWasSwapped(t *testing.T) {
+	// The roots of trust of the two received boards were swapped after A1
+	// recorded the placements, by a rework or a mix-up on the line. The EMS's
+	// station reads each part where it is now and every check at the station
+	// passes; the board check finds that each record names another unit than
+	// the one A1 placed there.
+	work := fpgaWork(t)
+	bundle, boards := filepath.Join(work, "board"), filepath.Join(work, "boards")
+	got := fpgaReceived(t)
+	a, b, tmp := filepath.Join(boards, got[0], "rot"), filepath.Join(boards, got[1], "rot"), filepath.Join(work, "swap")
+	must(t, os.Rename(a, tmp))
+	must(t, os.Rename(b, a))
+	must(t, os.Rename(tmp, b))
+	export := filepath.Join(work, "ems-station")
+	must(t, FPGABoardJob(bundle, filepath.Join(root, "e2e", "fpga", "board-scenario.json"), filepath.Join(work, "keys", "code-signer.pub.pem"), export))
+	must(t, ProvisionGate(bundle, icp2Profile, prog01, export))
+	must(t, FPGABoardStation(bundle, "", boards, export))
+	must(t, ProvisionAdapt(bundle, icp2Profile, prog01, export, filepath.Join(work, "keys", "ems-site.key.pem")))
+	placed := ok(rotUnitOn(bundle, got[0], "U5"))
+	fpgaRejects(t, work, "but A1 placed "+placed+" at U5")
+}
+
 func TestProvisioningBurnsAnotherOwnerKey(t *testing.T) {
 	work := fpgaWork(t)
 	serial := fpgaReceived(t)[0]
@@ -299,7 +321,11 @@ func TestProvisioningGateFailed(t *testing.T) {
 	work := fpgaWork(t)
 	serial := fpgaReceived(t)[0]
 	fpgaResign(t, work, "att/"+BoardProvAtt(serial), emsRole, func(s Obj) {
-		Objs(s, "predicate", "hwProvision", "checks")[4]["result"] = "fail"
+		for _, c := range Objs(s, "predicate", "hwProvision", "checks") {
+			if S(c, "name") == "first-boot-released" {
+				c["result"] = "fail"
+			}
+		}
 	})
 	fpgaRejects(t, work, "provisioning gate failed: first-boot-released")
 }

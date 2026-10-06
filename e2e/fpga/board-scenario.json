@@ -50,11 +50,6 @@
     "boards": 4,
     "failedBoards": ["FPGB-A-0003"]
   },
-  "provisioning": {
-    "id": "urn:hslsa:station:example-ems:prog-01",
-    "site": {"name": "Example EMS", "country": "US"},
-    "signer": "ems-site"
-  },
   "afterSale": {
     "simulated": {"simulator": "e2e/fpga/run.sh aftersale and the simulated board in tools/hslsa", "standsIn": "the board owner's field updater writing a released update to a board in service, its returns desk, the repair site and the reshipment"}
   }

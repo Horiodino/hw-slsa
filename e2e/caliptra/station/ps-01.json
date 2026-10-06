@@ -1,0 +1,30 @@
+{
+  "simulated": {"simulator": "the simulated Example XG-8 gang programmer (hslsa caliptra station), with Caliptra's emulator answering for each unit's ROM", "standsIn": "the test house's programming station and the parts it programs"},
+  "note": "Station ps-01 at the Caliptra example's test house, programming each unit at final test. What the adapter needs that the station does not know: where the firmware bundle's provenance is, the type of each Caliptra fuse field, which fields are secrets, the lifecycle fuses and the identity scheme.",
+  "station": "urn:hslsa:station:example-test-house:ps-01",
+  "site": {"name": "Example Test House", "country": "US"},
+  "stage": "final-test",
+  "lotId": "ASM-CLP-03",
+  "hsm": "urn:hslsa:hsm:example-test-house:hsm-01",
+  "images": {
+    "caliptra-fw-bundle.bin": {"role": "firmware bundle (FMC and runtime)", "storage": "external-flash", "provenance": "fw-bundle.intoto.json", "signer": "firmware-platform"}
+  },
+  "fuseTypes": {
+    "vendor_pk_hash": "hex",
+    "owner_pk_hash": "hex",
+    "fuse_pqc_key_type": "int",
+    "fw_svn": "int",
+    "anti_rollback_disable": "bool",
+    "fuse_ecc_revocation": "int",
+    "fuse_lms_revocation": "int",
+    "fuse_mldsa_revocation": "int",
+    "soc_manifest_svn": "int",
+    "soc_manifest_max_svn": "int",
+    "idevid_cert_attr.ueid": "hex",
+    "life_cycle": "string",
+    "debug_locked": "bool"
+  },
+  "secrets": ["uds_seed", "field_entropy"],
+  "lifecycle": {"fuse": "life_cycle", "production": "production", "debugLock": "debug_locked"},
+  "identity": {"scheme": "Caliptra", "ueidFuse": "idevid_cert_attr.ueid", "caRole": "identity-ca"}
+}

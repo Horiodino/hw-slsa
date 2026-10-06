@@ -22,11 +22,13 @@ package hslsa
 import (
 	"bytes"
 	"crypto/x509"
-	"encoding/hex"
+	"encoding/csv"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -116,22 +118,38 @@ func rotUnitOn(bundle, serial, refDes string) (string, error) {
 	return unit, nil
 }
 
-// FPGAProvision is the EMS's programming station: for every board in the
-// board lot it burns the owner fuses into the root of trust, writes the flash
-// image, powers the board once, and signs one provisioning record per board.
-// devices holds the root of trust units as their vendor shipped them; each
-// board's state goes to boards/<serial>.
-func FPGAProvision(bundle, devices, boards, scenarioPath, keys string) error {
-	art := filepath.Join(bundle, "artifacts")
+// The EMS's programming station, prog-01, is a simulated in-circuit
+// programmer, the "Example ICP-2". Like a real one it knows nothing about
+// HSLSA: it runs a program file and writes its own export (program.ini, a
+// tab-separated log, readback/, identity/), and the provisioning adapter
+// (provadapter.go) signs one record per board from it, with the root of
+// trust the station found on each board. Its profile is
+// e2e/stations/icp2-profile.json; the station file is
+// e2e/fpga/station/prog-01.json.
+
+const (
+	icp2Program  = "program.ini"
+	icp2Log      = "icp2.log"
+	icp2Region   = "SPI0"
+	icp2Time     = "02.01.2006 15:04:05"
+	icp2Pass     = "P"
+	icp2Fail     = "F"
+	icp2RoTField = "rot"
+)
+
+// icp2OTPInt are the owner fuses the program file gives as numbers.
+var icp2OTPInt = map[string]bool{ownerFuseMan: true, ownerFuseSVN: true}
+
+// FPGABoardJob writes the EMS's program file for the board lot: the flash
+// image to write, the owner fuses to burn into the root of trust (the hash of
+// the board owner's code signer key, the boot manifest's offset and the
+// anti-rollback value), and where the root of trust sits on the board.
+func FPGABoardJob(bundle, scenarioPath, codeSigner, export string) error {
 	sc, err := ReadObj(scenarioPath)
 	if err != nil {
 		return err
 	}
-	station := O(sc, "provisioning")
-	trust, err := LoadTrustRoot(filepath.Join(bundle, "trust-root.json"))
-	if err != nil {
-		return err
-	}
+	art := filepath.Join(bundle, "artifacts")
 	boardDesign, err := ReadObj(filepath.Join(art, BoardDesign))
 	if err != nil {
 		return err
@@ -140,212 +158,240 @@ func FPGAProvision(bundle, devices, boards, scenarioPath, keys string) error {
 	if err != nil {
 		return err
 	}
-	rotRef := Strs(rot, "refDes")[0]
-	rotRel := S(sc, "chip", "bundle")
 	design := filepath.Join(bundle, FPGADesignDir)
 	lock, err := ReadObj(filepath.Join(design, "inputs.lock.json"))
 	if err != nil {
 		return err
 	}
-	ownerHash, err := keyHash(filepath.Join(keys, "code-signer.pub.pem"))
+	ownerHash, err := keyHash(codeSigner)
 	if err != nil {
 		return err
 	}
 	svn, _ := Int(lock, "firmware", "svn")
 	manOff, _ := Int(lock, "flash", "manifestOffset")
-	owner := Obj{ownerFuseHash: ownerHash, ownerFuseMan: manOff, ownerFuseSVN: svn}
+	if err := os.RemoveAll(export); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(export, "images"), 0o755); err != nil {
+		return err
+	}
+	if err := copyFile(filepath.Join(design, "artifacts", FlashImage), filepath.Join(export, "images", FlashImage)); err != nil {
+		return err
+	}
+	d, err := sha256File(filepath.Join(export, "images", FlashImage))
+	if err != nil {
+		return err
+	}
+	lot := S(sc, "assembly", "boardLot")
+	name := "PRG-" + lot
+	var b strings.Builder
+	fmt.Fprintf(&b, "; Example ICP-2 program\n[program]\nname = %s\nassembly = %s rev %s\nlot = %s\n",
+		name, S(sc, "product", "partNumber"), S(sc, "product", "revision"), lot)
+	fmt.Fprintf(&b, "\n[load flash]\nimage = images/%s\ntarget = %s\nsha256 = %s\n", FlashImage, icp2Region, d)
+	fmt.Fprintf(&b, "\n[otp]\n%s = %s\n%s = 0x%x\n%s = %d\n", ownerFuseHash, ownerHash, ownerFuseMan, manOff, ownerFuseSVN, svn)
+	fmt.Fprintf(&b, "\n[parts]\n%s = %s\n", icp2RoTField, Strs(rot, "refDes")[0])
+	if err := os.WriteFile(filepath.Join(export, icp2Program), []byte(b.String()), 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("board program: %s writes %s and burns the owner fuses into the root of trust at %s\n", name, FlashImage, Strs(rot, "refDes")[0])
+	return nil
+}
 
-	// The station checks the flash image's provenance before it writes it anywhere.
-	flashPath := filepath.Join(design, "artifacts", FlashImage)
-	flashRD, err := fileRD(flashPath, FPGADesignDir+"/artifacts/"+FlashImage)
+// icp2Logger is the ICP-2's log as it writes it.
+type icp2Logger struct {
+	w    *csv.Writer
+	last time.Time
+}
+
+func (l *icp2Logger) row(board, step, ref, data string, ok bool) error {
+	t := time.Now().UTC().Truncate(time.Second)
+	if t.Before(l.last) {
+		t = l.last
+	}
+	l.last = t
+	outcome := icp2Pass
+	if !ok {
+		outcome = icp2Fail
+	}
+	return l.w.Write([]string{t.Format(icp2Time), board, step, ref, data, outcome})
+}
+
+// FPGABoardStation runs the program on every board of the board lot: it
+// reads the serial of the root of trust it finds on the board, burns the
+// owner fuses into it, writes the flash and reads it back, reads the fuses
+// back, asks the root of trust for its IDevID CSR, and powers the board once
+// to see the root of trust release the FPGA. A board without its root of
+// trust yet gets the unit the A1 record placed there, from devices, which
+// stands in for the assembly line; a board that has one keeps it. boards
+// gets each board's state; export gets what the station writes.
+func FPGABoardStation(bundle, devices, boards, export string) error {
+	data, err := os.ReadFile(filepath.Join(export, icp2Program))
 	if err != nil {
 		return err
 	}
-	prov, provErr := trust.Open(filepath.Join(design, "att", FlashAtt), "firmware-platform", SLSAProvenance)
-	provOK := provErr == nil && sha256Set(Objs(prov, "subject"))[S(flashRD, "digest", "sha256")]
-	flash, err := os.ReadFile(flashPath)
+	job, err := parseINI(data)
 	if err != nil {
 		return err
 	}
-	manifest, err := ReadObj(filepath.Join(design, "artifacts", BootManifest))
+	rotRef := job.get("parts." + icp2RoTField)
+	if rotRef == "" {
+		return fmt.Errorf("%s: no [parts] %s", icp2Program, icp2RoTField)
+	}
+	lotBoards, err := ReadUnits(filepath.Join(bundle, "artifacts", BoardLot))
 	if err != nil {
 		return err
 	}
-	payload, _, err := openBlob(manifest)
-	if err != nil {
-		return fmt.Errorf("boot manifest: %v", err)
+	for _, d := range []string{"readback", "identity"} {
+		if err := os.MkdirAll(filepath.Join(export, d), 0o755); err != nil {
+			return err
+		}
 	}
-	m, err := decodeObj(payload)
-	if err != nil {
-		return err
-	}
-	lotBoards, err := ReadUnits(filepath.Join(art, BoardLot))
+	f, err := os.Create(filepath.Join(export, icp2Log))
 	if err != nil {
 		return err
 	}
-	mfr := S(sc, "product", "manufacturer", "name")
-	lotURN := "urn:hslsa:lot:" + S(sc, "assembly", "boardLot")
-	signer, err := LoadSigner(filepath.Join(keys, S(station, "signer")+".key.pem"))
-	if err != nil {
+	defer f.Close()
+	log := &icp2Logger{w: csv.NewWriter(f)}
+	log.w.Comma = '\t'
+	if err := log.w.Write([]string{"When", "Board", "Step", "Ref", "Data", "Outcome"}); err != nil {
 		return err
 	}
+	load := job.values["load flash"]
+	otp := job.values["otp"]
 	for _, serial := range lotBoards {
-		unit, err := rotUnitOn(bundle, serial, rotRef)
+		board := filepath.Join(boards, serial)
+		rotDir, err := placedRoT(bundle, devices, board, serial, rotRef)
 		if err != nil {
 			return err
 		}
-		board := filepath.Join(boards, serial)
-		rotDir := filepath.Join(board, rotRef)
-		if hasDie(rotDir) {
-			// The EMS placed the part itself (Assembly L3), so it is on the board already.
-			if err := os.RemoveAll(filepath.Join(board, FlashImage)); err != nil {
-				return err
-			}
-		} else {
-			if err := os.RemoveAll(board); err != nil {
-				return err
-			}
-			rotDir = filepath.Join(board, "rot")
-			if err := copyTree(filepath.Join(devices, unit), rotDir); err != nil {
-				return fmt.Errorf("board %s: root of trust %s: %v", serial, unit, err)
-			}
+		if err := log.row(serial, "OPEN", "", job.get("program.name"), true); err != nil {
+			return err
 		}
-		// Burn the owner fuses, write the flash, then read both back.
+		// The root of trust tells the station which unit it is.
 		fuses, err := ReadObj(filepath.Join(rotDir, "fuses.json"))
 		if err != nil {
 			return err
 		}
-		for k, v := range owner {
+		if err := log.row(serial, "ROT_SERIAL", rotRef, S(fuses, "serial"), S(fuses, "serial") != ""); err != nil {
+			return err
+		}
+		for _, k := range sortedKeys(otp) {
+			var v any = otp[k]
+			if icp2OTPInt[k] {
+				n, err := strconv.ParseInt(otp[k], 0, 64)
+				if err != nil {
+					return fmt.Errorf("%s: [otp] %s: %v", icp2Program, k, err)
+				}
+				v = n
+			}
 			fuses[k] = v
+			if err := log.row(serial, "ROT_OTP_SET", k, otp[k], true); err != nil {
+				return err
+			}
 		}
 		if err := WriteJSON(filepath.Join(rotDir, "fuses.json"), fuses); err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(board, FlashImage), flash, 0o644); err != nil {
+		image, err := os.ReadFile(filepath.Join(export, filepath.FromSlash(load["image"])))
+		if err != nil {
 			return err
 		}
-		readback, err := sha256File(filepath.Join(board, FlashImage))
+		flash := filepath.Join(board, FlashImage)
+		if err := os.WriteFile(flash, image, 0o644); err != nil {
+			return err
+		}
+		if err := log.row(serial, "SPI_PROG", load["target"], load["image"], true); err != nil {
+			return err
+		}
+		back, err := os.ReadFile(flash)
 		if err != nil {
+			return err
+		}
+		dump := "readback/" + serial + "/" + load["target"] + ".bin"
+		if err := os.MkdirAll(filepath.Join(export, "readback", serial), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(export, filepath.FromSlash(dump)), back, 0o644); err != nil {
+			return err
+		}
+		if err := log.row(serial, "SPI_VERIFY", load["target"], dump, sha256Bytes(back) == load["sha256"]); err != nil {
 			return err
 		}
 		burned, err := ReadObj(filepath.Join(rotDir, "fuses.json"))
 		if err != nil {
 			return err
 		}
-		got := Obj{}
-		for k := range owner {
-			got[k] = burned[k]
+		for _, k := range sortedKeys(otp) {
+			if err := log.row(serial, "ROT_OTP_GET", k, xg8Value(burned[k]), true); err != nil {
+				return err
+			}
 		}
-
-		// The root of trust on the board is the unit its vendor provisioned:
-		// its ROM's IDevID key is the one the vendor's certificate endorses.
-		rotRec, err := DecodeEnvelope(filepath.Join(bundle, rotRel, "att", RoTProvAtt(unit)))
-		if err != nil {
-			return fmt.Errorf("board %s: root of trust %s has no provisioning record: %v", serial, unit, err)
-		}
-		certRel := rotRel + "/artifacts/" + S(rotRec, "predicate", "hwProvision", "identity", "certificate", "name")
-		cert, err := loadCert(filepath.Join(bundle, certRel))
-		if err != nil {
-			return fmt.Errorf("board %s: root of trust %s has no IDevID certificate: %v", serial, unit, err)
-		}
-		idevid, err := spkiDigest(cert.PublicKey)
-		if err != nil {
-			return err
-		}
+		// The root of trust answers with a CSR signed by its IDevID key.
 		csrDER, err := RoTCSR(rotDir)
 		if err != nil {
 			return err
 		}
-		csr, err := x509.ParseCertificateRequest(csrDER)
-		if err != nil {
+		csrFile := "identity/" + serial + "-" + rotRef + ".csr.der"
+		if err := os.WriteFile(filepath.Join(export, csrFile), csrDER, 0o644); err != nil {
 			return err
 		}
-		onBoard, err := spkiDigest(csr.PublicKey)
-		if err != nil {
+		if err := log.row(serial, "ROT_CSR", rotRef, csrFile, true); err != nil {
 			return err
 		}
-
-		// First power-on: the root of trust must release the FPGA.
+		// First power-on: the root of trust must verify the flash and release the FPGA.
 		tmp, err := os.MkdirTemp("", "hslsa-firstboot-")
 		if err != nil {
 			return err
 		}
-		released, err := RoTBoot(rotDir, filepath.Join(board, FlashImage), tmp)
+		released, err := RoTBoot(rotDir, flash, tmp)
 		os.RemoveAll(tmp)
 		if err != nil {
 			return err
 		}
-		kind, raw, _ := UEID(cert)
-		ueid := hex.EncodeToString(append([]byte{kind}, raw...))
-		checks := []Obj{
-			check("image-provenance-verified", provOK, errDetail(provErr, "fw-flash provenance signed by the firmware platform names this image")),
-			check("image-readback", readback == S(flashRD, "digest", "sha256"), ""),
-			check("fuse-readback", canonicalDigest(got) == canonicalDigest(owner), "owner fuses in the root of trust"),
-			check("rot-identity", onBoard == idevid, "the root of trust's IDevID key is the one its vendor endorsed for "+unit),
-			check("first-boot-released", released, "the root of trust verified the flash and released the FPGA"),
+		state := "released"
+		if !released {
+			state = "held in reset"
 		}
-		var images []Obj
-		for _, img := range Objs(m, "images") {
-			images = append(images, Obj{
-				"name": get(img, "name"), "role": hbomRoleOf(S(img, "role")), "storage": "external-flash",
-				"digest":             Obj{"sha256": get(img, "sha256")},
-				"readback":           Obj{"sha256": sha256Bytes(sliceOf(flash, img))},
-				"provenanceVerified": provOK,
-			})
-		}
-		images = append(images, Obj{
-			"name": FlashImage, "role": "configuration", "storage": "external-flash",
-			"digest": get(flashRD, "digest"), "readback": Obj{"sha256": readback}, "provenanceVerified": provOK,
-		})
-		certRD := relRD(bundle, certRel)
-		pred := Obj{
-			"buildDefinition": Obj{
-				"buildType":          ProvisionType,
-				"externalParameters": Obj{"unit": serial, "lotId": S(sc, "assembly", "boardLot"), "stage": "board-programming"},
-				"resolvedDependencies": []Obj{
-					relRD(bundle, FPGADesignDir+"/att/"+FlashAtt), flashRD,
-					relRD(bundle, "att/"+BoardA1), relRD(bundle, rotRel+"/att/"+RoTProvAtt(unit)), certRD,
-				},
-			},
-			"runDetails": Obj{
-				"builder":  Obj{"id": "urn:hslsa:site:" + slug(S(station, "site", "name"))},
-				"metadata": Obj{"invocationId": "provision:" + serial, "finishedOn": Now()},
-			},
-			"hwProvision": markSimulated(Obj{
-				"station":   get(station, "id"),
-				"site":      get(station, "site"),
-				"unit":      boardURN(mfr, serial),
-				"lot":       lotURN,
-				"designRef": Obj{"name": BoardDesign, "digest": fileDigest(filepath.Join(art, BoardDesign)), "release": relRD(bundle, "att/"+BoardA1)},
-				"images":    images,
-				"fuses":     owner,
-				"secrets":   []Obj{},
-				"rootOfTrust": Obj{
-					"refDes": rotRef, "unit": "urn:hslsa:unit:" + unit,
-					"provisioningRef": relRD(bundle, rotRel+"/att/"+RoTProvAtt(unit)),
-				},
-				"identity": Obj{
-					"scheme": "DICE", "ueid": ueid,
-					"idevidPublicKey": Obj{"sha256": idevid},
-					"certificate":     certRD,
-					"endorsingCa":     cert.Issuer.String(),
-				},
-				"checks": checks,
-			}, O(sc, "simulated")),
-		}
-		stmt, err := statement([]Obj{rd(boardURN(mfr, serial), onBoard)}, FWProvisioning, pred)
-		if err != nil {
+		if err := log.row(serial, "POWER_UP", "FPGA", state, released); err != nil {
 			return err
 		}
-		if _, err := Sign(stmt, signer, filepath.Join(bundle, "att", BoardProvAtt(serial))); err != nil {
+		if err := log.row(serial, "CLOSE", "", "", true); err != nil {
 			return err
-		}
-		if failed := failedChecks(checks); len(failed) > 0 {
-			return fmt.Errorf("provisioning board %s: %s failed (recorded in the attestation)", serial, strings.Join(failed, ", "))
 		}
 	}
-	fmt.Printf("board provisioning: %d boards programmed, owner fuses burned, each released its FPGA on first boot\n", len(lotBoards))
+	log.w.Flush()
+	if err := log.w.Error(); err != nil {
+		return err
+	}
+	fmt.Printf("station prog-01: %d boards programmed, export in %s\n", len(lotBoards), export)
 	return nil
+}
+
+// placedRoT is the root of trust on a board: the part the EMS placed itself
+// (Assembly L3), a copy put on the board earlier, or else the unit the A1
+// record says was placed there, copied from devices as the line would have.
+func placedRoT(bundle, devices, board, serial, refDes string) (string, error) {
+	if dir := filepath.Join(board, refDes); hasDie(dir) {
+		return dir, os.RemoveAll(filepath.Join(board, FlashImage))
+	}
+	if dir := filepath.Join(board, "rot"); fileExists(filepath.Join(dir, "fuses.json")) {
+		return dir, nil
+	}
+	unit, err := rotUnitOn(bundle, serial, refDes)
+	if err != nil {
+		return "", err
+	}
+	if devices == "" {
+		return "", fmt.Errorf("board %s has no root of trust yet, and no --devices to place %s from", serial, unit)
+	}
+	if err := os.RemoveAll(board); err != nil {
+		return "", err
+	}
+	dir := filepath.Join(board, "rot")
+	if err := copyTree(filepath.Join(devices, unit), dir); err != nil {
+		return "", fmt.Errorf("board %s: root of trust %s: %v", serial, unit, err)
+	}
+	return dir, nil
 }
 
 func hbomRoleOf(manifestRole string) string {

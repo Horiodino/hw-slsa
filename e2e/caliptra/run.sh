@@ -85,7 +85,7 @@ build() {
 }
 
 produce() {
-  rm -rf "$BUNDLE" "$KEYS" "$DEVICES"
+  rm -rf "$BUNDLE" "$KEYS" "$DEVICES" "$OUT/station"
   mkdir -p "$BUNDLE" "$KEYS" "$DEVICES"
   # One key per party; only public halves leave this job.
   hslsa keygen --out "$KEYS" flow-platform tapeout-authority firmware-platform \
@@ -104,8 +104,15 @@ produce() {
     --trust-root "$BUNDLE/trust-root.json" --policy "$BUNDLE/policy.json"
   hslsa mfg --bundle "$BUNDLE" --scenario "$E2E/mfg-scenario.json" --keys "$KEYS"
   hslsa caliptra fab --bundle "$BUNDLE" --devices "$DEVICES"
-  hslsa caliptra provision --bundle "$BUNDLE" --devices "$DEVICES" --keys "$KEYS" --device-bin "$DEVICE_BIN" \
-    --scenario "$E2E/mfg-scenario.json" --lock "$lock"
+  # Final test: the test house's station runs a job and writes its own export;
+  # the provisioning adapter clears the job's image before it runs and signs
+  # one record per unit from the export afterwards.
+  local station=(--profile "$ROOT/e2e/stations/xg8-profile.json" --station "$E2E/station/ps-01.json" --export "$OUT/station")
+  hslsa caliptra job     --bundle "$BUNDLE" --scenario "$E2E/mfg-scenario.json" --export "$OUT/station"
+  hslsa provision gate   --bundle "$BUNDLE" "${station[@]}"
+  hslsa caliptra station --bundle "$BUNDLE" --devices "$DEVICES" --keys "$KEYS" --device-bin "$DEVICE_BIN" \
+    --scenario "$E2E/mfg-scenario.json" --lock "$lock" --export "$OUT/station"
+  hslsa provision adapt  --bundle "$BUNDLE" "${station[@]}" --key "$KEYS/test-site.key.pem"
   hslsa caliptra hbom --bundle "$BUNDLE" --lock "$lock" --scenario "$E2E/mfg-scenario.json" \
     --key "$KEYS/product-owner.key.pem"
   # Simulated: no review provider has reviewed these images. See docs/caliptra-e2e.md.

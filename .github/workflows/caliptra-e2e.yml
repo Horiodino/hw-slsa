@@ -25,6 +25,7 @@ on:
   pull_request:
     paths:
       - e2e/caliptra/**
+      - e2e/stations/**
       - tools/**
       - go.mod
       - go.sum

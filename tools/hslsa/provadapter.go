@@ -21,6 +21,15 @@ package hslsa
 // fields are secrets, the lifecycle fuses and the identity scheme. A second
 // station model needs only a new profile.
 //
+// A station at an EMS programs boards, not parts: its station file has a
+// board block, and its records are the boards' (urn:hslsa:board:..., the
+// board design and its A1 record, the board lot). On a board with a root of
+// trust it also has a rootOfTrust block: the station reads which part sits at
+// that reference designator and the IDevID CSR the part answers with, and the
+// adapter checks both against the part vendor's own records. The board's
+// record so names the root of trust the station found on the board, which the
+// buyer's board check compares with the one the A1 record says was placed.
+//
 // The adapter signs with the site's key through stationSigner, the one place
 // that knows where the key lives.
 
@@ -28,10 +37,12 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/csv"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -102,7 +113,31 @@ func ReadStationFile(path string) (Obj, error) {
 			return nil, fmt.Errorf("%s: image %s needs provenance and signer", path, name)
 		}
 	}
+	if _, ok := s["board"]; ok && S(s, "board", "manufacturer") == "" {
+		return nil, fmt.Errorf("%s: board does not set the board's manufacturer", path)
+	}
+	if _, ok := s["rootOfTrust"]; ok {
+		if O(s, "board") == nil {
+			return nil, fmt.Errorf("%s: rootOfTrust is for a station that programs boards (a board block)", path)
+		}
+		for _, k := range []string{"refDes", "bundle", "scheme", "caRole"} {
+			if S(s, "rootOfTrust", k) == "" {
+				return nil, fmt.Errorf("%s: rootOfTrust does not set %s", path, k)
+			}
+		}
+	}
 	return s, nil
+}
+
+// provenanceRel is where a station file's provenance envelope sits in the
+// bundle: a bare file name is in att/, anything else is a path from the
+// bundle's root (a board's flash image has its provenance in the design
+// bundle the board bundle carries).
+func provenanceRel(p string) string {
+	if strings.Contains(p, "/") {
+		return path.Clean(p)
+	}
+	return "att/" + p
 }
 
 // Job files
@@ -282,7 +317,8 @@ func ProvisionGate(bundle, profilePath, stationPath, export string) error {
 		if d != img.SHA256 {
 			return failf("gate: %s is not the image the job file names (sha256 %s, job says %s)", img.File, d[:16], img.SHA256[:16])
 		}
-		prov, err := trust.Open(filepath.Join(bundle, "att", S(conf, "provenance")), S(conf, "signer"), SLSAProvenance)
+		provRel := provenanceRel(S(conf, "provenance"))
+		prov, err := trust.Open(filepath.Join(bundle, filepath.FromSlash(provRel)), S(conf, "signer"), SLSAProvenance)
 		if err != nil {
 			return failf("gate: %s: %v", img.Name, err)
 		}
@@ -291,7 +327,7 @@ func ProvisionGate(bundle, profilePath, stationPath, export string) error {
 		}
 		cleared = append(cleared, Obj{
 			"name": img.Name, "region": img.Region, "digest": Obj{"sha256": d},
-			"provenance": envRD(bundle, S(conf, "provenance")), "signer": S(conf, "signer"),
+			"provenance": relRD(bundle, provRel), "signer": S(conf, "signer"),
 		})
 	}
 	dir := filepath.Join(bundle, "artifacts", ProvisioningDir)
@@ -496,11 +532,15 @@ func ProvisionAdapt(bundle, profilePath, stationPath, export, keyRef string) err
 		return fmt.Errorf("job %s is for lot %s, the station file for lot %s", job.ID, job.Lot, S(station, "lotId"))
 	}
 	art := filepath.Join(bundle, "artifacts")
-	units, err := ReadUnits(filepath.Join(art, "shipped-lot.txt"))
+	lotFile := "shipped-lot.txt"
+	if O(station, "board") != nil {
+		lotFile = BoardLot
+	}
+	units, err := ReadUnits(filepath.Join(art, lotFile))
 	if err != nil {
 		return err
 	}
-	final, err := releasedSubject(bundle)
+	design, err := stationDesign(bundle, station)
 	if err != nil {
 		return err
 	}
@@ -556,8 +596,7 @@ func ProvisionAdapt(bundle, profilePath, stationPath, export, keyRef string) err
 
 	a := &adapter{
 		bundle: bundle, export: export, profile: profile, station: station, job: job, log: log,
-		trust: trust, gate: gate, gateErr: gateErr, jobRD: jobRD, gateRD: gateRD,
-		design: Obj{"name": final["name"], "digest": final["digest"], "release": envRD(bundle, AttName("release"))},
+		trust: trust, gate: gate, gateErr: gateErr, jobRD: jobRD, gateRD: gateRD, design: design,
 	}
 	var failedUnits []string
 	for _, u := range units {
@@ -569,7 +608,8 @@ func ProvisionAdapt(bundle, profilePath, stationPath, export, keyRef string) err
 		if err != nil {
 			return err
 		}
-		if _, err := Sign(stmt, signer, filepath.Join(bundle, "att", ProvAtt(u))); err != nil {
+		_, att := a.names(u)
+		if _, err := Sign(stmt, signer, filepath.Join(bundle, "att", att)); err != nil {
 			return err
 		}
 		if failed := failedChecks(Objs(pred, "hwProvision", "checks")); len(failed) > 0 {
@@ -583,6 +623,26 @@ func ProvisionAdapt(bundle, profilePath, stationPath, export, keyRef string) err
 	return nil
 }
 
+// stationDesign is the design a station's records name: the released design
+// for a part, or for a board its design file and the A1 record that built it.
+func stationDesign(bundle string, station Obj) (Obj, error) {
+	if O(station, "board") != nil {
+		d := fileDigest(filepath.Join(bundle, "artifacts", BoardDesign))
+		if d == nil {
+			return nil, fmt.Errorf("the board bundle has no artifacts/%s", BoardDesign)
+		}
+		if !fileExists(filepath.Join(bundle, "att", BoardA1)) {
+			return nil, fmt.Errorf("the board bundle has no A1 record (att/%s)", BoardA1)
+		}
+		return Obj{"name": BoardDesign, "digest": d, "release": relRD(bundle, "att/"+BoardA1)}, nil
+	}
+	final, err := releasedSubject(bundle)
+	if err != nil {
+		return nil, err
+	}
+	return Obj{"name": final["name"], "digest": final["digest"], "release": envRD(bundle, AttName("release"))}, nil
+}
+
 type adapter struct {
 	bundle, export         string
 	profile, station, gate Obj
@@ -594,6 +654,14 @@ type adapter struct {
 }
 
 func (a *adapter) is(r logRow, names ...string) bool { return isOp(a.profile, r, names...) }
+
+// names is a unit's subject name and its record's file name, for a part or a board.
+func (a *adapter) names(unit string) (string, string) {
+	if b := O(a.station, "board"); b != nil {
+		return boardURN(S(b, "manufacturer"), unit), BoardProvAtt(unit)
+	}
+	return "urn:hslsa:unit:" + unit, ProvAtt(unit)
+}
 
 // unit builds one unit's record from its last session.
 func (a *adapter) unit(unit string) (Obj, Obj, error) {
@@ -667,7 +735,7 @@ func (a *adapter) unit(unit string) (Obj, Obj, error) {
 			"name": img.Name, "role": get(conf, "role"), "storage": get(conf, "storage"),
 			"digest": Obj{"sha256": img.SHA256}, "readback": readback, "provenanceVerified": gateOK,
 		})
-		deps = append(deps, envRD(a.bundle, S(conf, "provenance")), rd(img.Name, img.SHA256))
+		deps = append(deps, relRD(a.bundle, provenanceRel(S(conf, "provenance"))), rd(img.Name, img.SHA256))
 	}
 	if len(programmed) != len(a.job.Images) {
 		readbackOK = false // the session left out an image the job loads
@@ -735,10 +803,22 @@ func (a *adapter) unit(unit string) (Obj, Obj, error) {
 		check("fuse-readback", fuseOK, ""),
 	}
 
-	// Identity: the CSR the part exported and the certificate the CA returned.
-	subject := rd("urn:hslsa:unit:"+unit, sha256Bytes([]byte(unit)))
+	// Identity: the CSR the part exported and the certificate the CA returned,
+	// or on a board, the root of trust the station found there and its answer.
+	urn, _ := a.names(unit)
+	subject := rd(urn, sha256Bytes([]byte(unit)))
 	identity := Obj{}
-	if idc := O(a.station, "identity"); idc != nil {
+	var rotBlock Obj
+	if conf := O(a.station, "rootOfTrust"); conf != nil {
+		rot, err := a.rootOfTrust(unit, rows, conf)
+		if err != nil {
+			return nil, nil, err
+		}
+		identity, rotBlock = rot.identity, rot.block
+		checks = append(checks, rot.checks...)
+		deps = append(deps, rot.deps...)
+		subject = rd(urn, rot.key)
+	} else if idc := O(a.station, "identity"); idc != nil {
 		csrDER, certDER, err := a.identityFiles(unit, rows)
 		if err != nil {
 			return nil, nil, err
@@ -784,7 +864,7 @@ func (a *adapter) unit(unit string) (Obj, Obj, error) {
 			"certificate":     certRD,
 			"endorsingCa":     cert.Issuer.CommonName,
 		}
-		subject = rd("urn:hslsa:unit:"+unit, csrKey)
+		subject = rd(urn, csrKey)
 	}
 	if lc := O(a.station, "lifecycle"); lc != nil {
 		checks = append(checks, check("lifecycle-production",
@@ -799,6 +879,23 @@ func (a *adapter) unit(unit string) (Obj, Obj, error) {
 		deps = append(deps, a.gateRD)
 		export["gate"] = a.gateRD
 	}
+	hw := Obj{
+		"station":      S(a.station, "station"),
+		"site":         get(a.station, "site"),
+		"unit":         urn,
+		"lot":          "urn:hslsa:lot:" + S(a.station, "lotId"),
+		"designRef":    a.design,
+		"images":       images,
+		"fuses":        written,
+		"fuseReadback": readDigest,
+		"secrets":      secrets,
+		"identity":     identity,
+		"export":       export,
+		"checks":       checks,
+	}
+	if rotBlock != nil {
+		hw["rootOfTrust"] = rotBlock
+	}
 	pred := Obj{
 		"buildDefinition": Obj{
 			"buildType":            ProvisionType,
@@ -809,22 +906,120 @@ func (a *adapter) unit(unit string) (Obj, Obj, error) {
 			"builder":  Obj{"id": "urn:hslsa:site:" + slug(S(a.station, "site", "name"))},
 			"metadata": Obj{"invocationId": "provision:" + unit, "startedOn": rows[0].Time.UTC().Format(time.RFC3339), "finishedOn": rows[len(rows)-1].Time.UTC().Format(time.RFC3339)},
 		},
-		"hwProvision": markSimulated(Obj{
-			"station":      S(a.station, "station"),
-			"site":         get(a.station, "site"),
-			"unit":         "urn:hslsa:unit:" + unit,
-			"lot":          "urn:hslsa:lot:" + S(a.station, "lotId"),
-			"designRef":    a.design,
-			"images":       images,
-			"fuses":        written,
-			"fuseReadback": readDigest,
-			"secrets":      secrets,
-			"identity":     identity,
-			"export":       export,
-			"checks":       checks,
-		}, O(a.station, "simulated")),
+		"hwProvision": markSimulated(hw, O(a.station, "simulated")),
 	}
 	return pred, subject, nil
+}
+
+// serialRe is a unit serial as a station may report it: it names a file in
+// the part vendor's bundle, so it cannot hold a path.
+var serialRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// rotReading is what a board station found at the root of trust's place.
+type rotReading struct {
+	block, identity Obj
+	key             string // the IDevID public key digest the part answered with
+	checks, deps    []Obj
+}
+
+// rootOfTrust reads which part the station found at the root of trust's
+// reference designator and the IDevID CSR that part answered with, and checks
+// them against the part vendor's records in the bundle: that unit's
+// provisioning record and the certificate the vendor's identity CA endorsed.
+// The board's identity is the part's. Then the first power-on: the root of
+// trust must have verified the flash just written and released the FPGA.
+func (a *adapter) rootOfTrust(unit string, rows []logRow, conf Obj) (*rotReading, error) {
+	pass := S(a.profile, "log", "pass")
+	refDes, partBundle, caRole := S(conf, "refDes"), S(conf, "bundle"), S(conf, "caRole")
+	var part, csrFile string
+	lastProgram, booted := -1, false
+	for i, r := range rows {
+		switch {
+		case a.is(r, "identify") && r.Target == refDes && r.Result == pass:
+			part = r.Value
+		case a.is(r, "csr") && r.Target == refDes && r.Result == pass:
+			csrFile = r.Value
+		case a.is(r, "program", "fuseWrite"):
+			lastProgram, booted = i, false
+		case a.is(r, "powerOn") && i > lastProgram:
+			booted = r.Result == pass
+		}
+	}
+	if csrFile == "" {
+		return nil, failf("%s: the station log has no CSR row for the root of trust at %s", unit, refDes)
+	}
+	p, err := insideExport(a.export, csrFile)
+	if err != nil {
+		return nil, failf("%s: %v", unit, err)
+	}
+	csrDER, err := os.ReadFile(p)
+	if err != nil {
+		return nil, failf("%s: %v", unit, err)
+	}
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	if err != nil {
+		return nil, failf("%s: the root of trust's CSR does not parse: %v", unit, err)
+	}
+	key, err := spkiDigest(csr.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	csrName := "identity/" + unit + ".csr.der"
+	if err := os.MkdirAll(filepath.Join(a.bundle, "artifacts", "identity"), 0o755); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(filepath.Join(a.bundle, "artifacts", csrName), csrDER, 0o644); err != nil {
+		return nil, err
+	}
+	out := &rotReading{
+		key:      key,
+		block:    Obj{"refDes": refDes},
+		identity: Obj{"scheme": get(conf, "scheme"), "idevidPublicKey": Obj{"sha256": key}},
+		deps:     []Obj{rd(csrName, sha256Bytes(csrDER))},
+	}
+
+	// The part the station read at refDes, and what its vendor recorded for that unit.
+	identified, endorsed := false, false
+	detail := "the station read no part at " + refDes
+	if part != "" && !serialRe.MatchString(part) {
+		detail = fmt.Sprintf("the part at %s answered with %q, which is not a unit serial", refDes, part)
+	} else if part != "" {
+		out.block["unit"] = "urn:hslsa:unit:" + part
+		recRel := path.Join(partBundle, "att", ProvAtt(part))
+		detail = part + " has no provisioning record from its vendor in " + partBundle
+		if rec, err := DecodeEnvelope(filepath.Join(a.bundle, filepath.FromSlash(recRel))); err == nil {
+			out.block["provisioningRef"] = relRD(a.bundle, recRel)
+			out.deps = append(out.deps, relRD(a.bundle, recRel))
+			certRel := path.Join(partBundle, "artifacts", S(rec, "predicate", "hwProvision", "identity", "certificate", "name"))
+			detail = part + "'s IDevID certificate is not in " + partBundle
+			if cert, err := loadCert(filepath.Join(a.bundle, filepath.FromSlash(certRel))); err == nil {
+				out.identity["certificate"] = relRD(a.bundle, certRel)
+				out.identity["endorsingCa"] = cert.Issuer.CommonName
+				if kind, raw, ok := UEID(cert); ok {
+					out.identity["ueid"] = hex.EncodeToString(append([]byte{kind}, raw...))
+				}
+				out.deps = append(out.deps, relRD(a.bundle, certRel))
+				certKey, _ := spkiDigest(cert.PublicKey)
+				identified = certKey == key
+				detail = "the part at " + refDes + " answers with the IDevID key its vendor endorsed for " + part
+				if !identified {
+					detail = "the part at " + refDes + " answers with another IDevID key than the one its vendor endorsed for " + part
+				}
+				if trust, err := LoadTrustRoot(filepath.Join(a.bundle, filepath.FromSlash(partBundle), "trust-root.json")); err == nil {
+					for _, k := range trust.Roles[caRole] {
+						endorsed = endorsed || signedBy(cert, k.Public)
+					}
+				}
+			}
+		}
+	}
+	out.checks = []Obj{
+		check("csr-self-signature", csr.CheckSignature() == nil, ""),
+		check("rot-identity", identified, detail),
+		check("certificate-endorsed", endorsed, "signed by a key the part vendor's trust root lists as "+caRole),
+		check("first-boot-released", booted, "powered on after the last write: the root of trust verified the flash and released the FPGA"),
+	}
+	return out, nil
 }
 
 // gateCovers says whether the cleared job is the job that ran and was cleared before the unit's first write.

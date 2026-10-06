@@ -27,6 +27,7 @@ on:
     paths:
       - "tools/hslsa/**"
       - "e2e/fpga/**"
+      - "e2e/stations/**"
       - "e2e/picorv32/**"
       - "e2e/pilot/**"
       - "hbom/hbom-predicate-v0.1.schema.json"
@@ -37,6 +38,7 @@ on:
     paths:
       - "tools/hslsa/**"
       - "e2e/fpga/**"
+      - "e2e/stations/**"
       - "e2e/picorv32/**"
       - "e2e/pilot/**"
       - "hbom/hbom-predicate-v0.1.schema.json"

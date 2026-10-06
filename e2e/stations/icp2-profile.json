@@ -1,0 +1,38 @@
+{
+  "note": "How to read the export of the Example ICP-2, the simulated in-circuit programmer at the FPGA example's EMS (tools/hslsa/fpgaboard.go). It programs assembled boards rather than loose parts, and talks to the root of trust on each board: it reads the part's serial (ROT_SERIAL) and asks it for its IDevID CSR (ROT_CSR), both at the part's reference designator, and powers the board once at the end (POWER_UP). Its program file, log layout, time format and words all differ from the XG-8's.",
+  "model": "Example ICP-2 in-circuit programmer",
+  "job": {
+    "file": "program.ini",
+    "id": "program.name",
+    "lot": "program.lot",
+    "imageSection": "load",
+    "imageFile": "image",
+    "imageRegion": "target",
+    "imageSha256": "sha256"
+  },
+  "log": {
+    "file": "icp2.log",
+    "delimiter": "\t",
+    "timeLayout": "02.01.2006 15:04:05",
+    "pass": "P",
+    "columns": {
+      "time": "When",
+      "unit": "Board",
+      "op": "Step",
+      "target": "Ref",
+      "value": "Data",
+      "result": "Outcome"
+    }
+  },
+  "ops": {
+    "begin": "OPEN",
+    "end": "CLOSE",
+    "program": "SPI_PROG",
+    "verify": "SPI_VERIFY",
+    "fuseWrite": "ROT_OTP_SET",
+    "fuseRead": "ROT_OTP_GET",
+    "identify": "ROT_SERIAL",
+    "csr": "ROT_CSR",
+    "powerOn": "POWER_UP"
+  }
+}

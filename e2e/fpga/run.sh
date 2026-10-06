@@ -76,7 +76,7 @@ rot_design() {
 # from the export afterwards. Then the vendor's chip HBOM.
 rot_station() {
   local b=$1 k=$2 devices=$3 export=$4 scenario=$5
-  local station=(--profile "$HERE/rot/station/xg8-profile.json" --station "$HERE/rot/station/ps-02.json" --export "$export")
+  local station=(--profile "$ROOT/e2e/stations/xg8-profile.json" --station "$HERE/rot/station/ps-02.json" --export "$export")
   hslsa fpga rot-job       --bundle "$b" --scenario "$scenario" --export "$export"
   hslsa provision gate     --bundle "$b" "${station[@]}"
   hslsa fpga rot-station   --bundle "$b" --devices "$devices" --keys "$k" --export "$export"
@@ -120,14 +120,27 @@ board_design() {
 
 # The EMS: shipments, A1, the board HBOM and one provisioning record per board.
 produce_board() {
-  rm -rf "$BUNDLE" "$OUT/boards"
+  rm -rf "$BUNDLE" "$OUT/boards" "$OUT/ems-station"
   mkdir -p "$BUNDLE"
   cp "$DESIGN/trust-root.json" "$BUNDLE/trust-root.json"
   cp "$HERE/policy.json" "$BUNDLE/policy.json"
   hslsa fpga produce --bundle "$BUNDLE" --rot-bundle "$ROT" --design-bundle "$DESIGN" \
     --scenario "$HERE/board-scenario.json" --design "$HERE/board-design.json" --policy "$HERE/policy.json" --keys "$KEYS"
-  hslsa fpga provision --bundle "$BUNDLE" --devices "$OUT/rot-devices" --boards "$OUT/boards" \
-    --scenario "$HERE/board-scenario.json" --keys "$KEYS"
+  ems_station "$BUNDLE" "$KEYS" "$OUT/rot-devices" "$OUT/boards" "$OUT/ems-station" "$HERE/board-scenario.json"
+}
+
+# ems_station <bundle> <keys> <devices> <boards> <export> <scenario>: board
+# programming. The EMS's in-circuit programmer runs a program on every board
+# and writes its own export, with the serial and the CSR of the root of trust
+# it found on each board; the provisioning adapter clears the program's image
+# before it runs and signs one record per board from the export afterwards.
+ems_station() {
+  local b=$1 k=$2 devices=$3 boards=$4 export=$5 scenario=$6
+  local station=(--profile "$ROOT/e2e/stations/icp2-profile.json" --station "$HERE/station/prog-01.json" --export "$export")
+  hslsa fpga board-job     --bundle "$b" --scenario "$scenario" --code-signer "$k/code-signer.pub.pem" --export "$export"
+  hslsa provision gate     --bundle "$b" "${station[@]}"
+  hslsa fpga board-station --bundle "$b" --devices "$devices" --boards "$boards" --export "$export"
+  hslsa provision adapt    --bundle "$b" "${station[@]}" --key "$k/ems-site.key.pem"
 }
 
 boot() {
@@ -298,7 +311,7 @@ l3() {
   hslsa fpga produce --bundle "$b" --rot-bundle "$rot" --design-bundle "$design" --scenario "$HERE/board-scenario.json" \
     --design "$HERE/board-design.json" --policy "$HERE/l3/policy.json" --keys "$k" \
     --chip-parts "$l/rot-parts" --boards-out "$l/boards" "${parts[@]}"
-  hslsa fpga provision --bundle "$b" --devices "$l/rot-parts" --boards "$l/boards" --scenario "$HERE/board-scenario.json" --keys "$k"
+  ems_station "$b" "$k" "$l/rot-parts" "$l/boards" "$l/ems-station" "$HERE/board-scenario.json"
   hslsa fpga boot --bundle "$b" --boards "$l/boards" --list "$HERE/received-boards.txt" --out "$l/boots"
 
   echo "== the buyer receives two boards and checks them at Assembly L3 and Firmware L3"
@@ -537,7 +550,7 @@ l4() {
   hslsa fpga produce --bundle "$b" --rot-bundle "$rot" --design-bundle "$design" --scenario "$l/board-scenario.json" \
     --design "$HERE/board-design.json" --policy "$HERE/l4/policy.json" --keys "$k" \
     --chip-parts "$l/rot-parts" --boards-out "$l/boards" --inspection-commitment "$lab/board-commitment.intoto.json" "${parts[@]}"
-  hslsa fpga provision --bundle "$b" --devices "$l/rot-parts" --boards "$l/boards" --scenario "$l/board-scenario.json" --keys "$k"
+  ems_station "$b" "$k" "$l/rot-parts" "$l/boards" "$l/ems-station" "$l/board-scenario.json"
   echo "== the lab X-rays the two boards its seed draws, checks every marking and challenges every identity part"
   hslsa inspect boards --plan "$HERE/l4/board-inspection-plan.json" --key "$lab/inspection-lab.key.pem" --bundle "$b" \
     --boards "$l/boards" --seed "$lab/board-seed.hex"

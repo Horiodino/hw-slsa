@@ -67,6 +67,34 @@ func reendorse(bundle, caDir string) error {
 	return nil
 }
 
+// resignProvisioning re-signs each unit's provisioning record, which the
+// adapter signed from the test station's export, with key, naming the design
+// release and the IDevID certificate now in the bundle.
+func resignProvisioning(bundle, key string) error {
+	units, err := ReadUnits(filepath.Join(bundle, "artifacts", "shipped-lot.txt"))
+	if err != nil {
+		return err
+	}
+	release := envRD(bundle, AttName("release"))
+	for _, unit := range units {
+		err := resignFile(filepath.Join(bundle, "att", ProvAtt(unit)), key, func(s Obj) {
+			hp := O(s, "predicate", "hwProvision")
+			O(hp, "designRef")["release"] = release
+			cert := O(hp, "identity", "certificate")
+			cert["digest"] = fileDigest(filepath.Join(bundle, "artifacts", S(cert, "name")))
+			for _, d := range Objs(s, "predicate", "buildDefinition", "resolvedDependencies") {
+				if S(d, "name") == S(cert, "name") {
+					d["digest"] = cert["digest"]
+				}
+			}
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func resignFile(path, key string, mutate func(Obj)) error {
 	stmt, err := DecodeEnvelope(path)
 	if err != nil {
@@ -142,7 +170,7 @@ func calRebuild(bundle string, fromRomMerge bool) error {
 	if err := Mfg(bundle, calScenario, keys, nil); err != nil {
 		return err
 	}
-	if err := SignProvisioning(bundle, filepath.Join(keys, "test-site.key.pem")); err != nil {
+	if err := resignProvisioning(bundle, filepath.Join(keys, "test-site.key.pem")); err != nil {
 		return err
 	}
 	return CaliptraHBOM(bundle, calLock, calScenario, filepath.Join(keys, "product-owner.key.pem"))
@@ -309,7 +337,7 @@ func TestIDevIDEndorsedByAnotherCA(t *testing.T) {
 	work := calWork(t)
 	bundle := filepath.Join(work, "bundle")
 	must(t, reendorse(bundle, filepath.Join(work, "keys", "attacker-ca")))
-	must(t, SignProvisioning(bundle, filepath.Join(work, "keys", "test-site.key.pem")))
+	must(t, resignProvisioning(bundle, filepath.Join(work, "keys", "test-site.key.pem")))
 	calRejects(t, work, "device "+calUnit+": IDevID certificate is not endorsed by the identity CA")
 }
 

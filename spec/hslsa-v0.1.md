@@ -1,6 +1,6 @@
 # Hardware Supply Chain Security Framework v0.1
 
-**Status:** working draft, version 0.1, revision 18 (2026-10-04). See the [changelog](#changelog).
+**Status:** working draft, version 0.1, revision 19 (2026-10-06). See the [changelog](#changelog).
 
 ## Overview
 
@@ -523,11 +523,11 @@ A `fw-provisioning` record is SLSA Provenance v1 with buildType `.../fw-provisio
 | `fuseReadback` | Optional: the digest of the fuse values read back, as canonical JSON |
 | `secrets[]` | Each secret by field, key id and origin (`generated-on-die`, or the injecting HSM), never its value |
 | `identity` | For a part with a device identity: scheme, UEID, IDevID public key digest, the endorsed certificate by digest, and the endorsing CA |
-| `rootOfTrust` | For a board with a root of trust: its reference designator, the unit placed there, and that unit's provisioning record by digest; `identity` is then the root of trust's |
+| `rootOfTrust` | For a board with a root of trust: its reference designator, the unit the station read from the part at that position, and that unit's provisioning record by digest; `identity` is then the root of trust's |
 | `export` | For a record an adapter signed from the station's own export: the station model, the job file by digest, this unit's log rows by digest, the number of sessions the station ran on the unit, and the provenance gate by digest |
 | `checks[]` | At least `image-provenance-verified`, `image-readback` and `fuse-readback`; `lifecycle-production` where the part has a lifecycle state |
 
-`resolvedDependencies` lists each image's provenance and the images, and for a part with an identity the exported CSR and the endorsed certificate; a record signed from a station export adds the job file, the unit's log rows and the gate. The subject is the unit, named as in [Naming subjects](#naming-subjects). The [Caliptra example](../docs/caliptra-e2e.md) signs one per unit, and the [FPGA board example](../docs/fpga-board-example.md) one per root of trust unit and one per board.
+`resolvedDependencies` lists each image's provenance and the images, and for a part with an identity the exported CSR and the endorsed certificate; a record signed from a station export adds the job file, the unit's log rows and the gate. The subject is the unit, named as in [Naming subjects](#naming-subjects). The [Caliptra example](../docs/caliptra-e2e.md) signs one per unit, and the [FPGA board example](../docs/fpga-board-example.md) one per root of trust unit and one per board, all from their stations' own exports.
 
 #### Firmware review
 
@@ -690,7 +690,7 @@ The programming station is the firmware's last builder. For every part it writes
 
 **Records from a station's own export.** Programming stations log in their own formats and sign nothing. The site MAY sign the records from the station's export with an adapter: the job file it ran, its log, the readback dumps and the identity files it exchanged. The record is still the site's own, signed with its site key, not a [proxy-signed record](#proxy-signed-record). Because the station cannot check provenance, the adapter MUST do it before the job runs, as a gate over every image the job file loads, and records `image-provenance-verified` only when the gate cleared that exact job file before the unit's first write. It builds each unit's record from the unit's last session in the log, keeps that unit's log rows by digest in `export`, and MUST refuse an export that logs a secret's value. The [provisioning adapter](../docs/provisioning-adapter.md) in the reference tool does this, with one profile per station model.
 
-On a board with a root of trust, the EMS signs one record per board. It burns the board owner's fuses into the root of trust (the hash of the key that signs the board's boot manifest, the manifest's offset and the anti-rollback value), writes the flash, powers the board once, and records the root of trust unit it placed with that unit's IDevID certificate and its vendor's provisioning record. The record's subject is the board's URN with the root of trust's IDevID public key digest, so the board's identity is its root of trust's.
+On a board with a root of trust, the EMS signs one record per board. Its station reads which root of trust unit sits at the root of trust's reference designator from the part itself, and the IDevID CSR the part answers with; it burns the board owner's fuses into the root of trust (the hash of the key that signs the board's boot manifest, the manifest's offset and the anti-rollback value), writes the flash and powers the board once. The record names the unit the station found, with that unit's IDevID certificate and its vendor's provisioning record, and the part's key MUST be the one its vendor endorsed for that unit (`rot-identity`). It names what the station read, not what A1 says was placed, so a verifier that compares the two finds a part swapped between placement and programming. The record's subject is the board's URN with the root of trust's IDevID public key digest, so the board's identity is its root of trust's.
 
 ### Where the chain is checked
 
@@ -736,7 +736,7 @@ The [board example](../docs/board-example.md) runs these checks and breaks each 
 1. Exactly one `parts[]` entry carries `rootOfTrust`, the policy accepts its part number, and it has an `hbomRef`, so step 4 above ran its chain. It guards every part the policy says it must hold in reset, and its `images` are exactly the board's `firmware[]` entries in external flash.
 2. The root of trust reaches Firmware L2 itself: its firmware has provenance from an allowed build platform with an SBOM and a CoRIM holding exactly that image's reference value, the image is signed by its vendor's code signer, and its HBOM lists the image.
 3. Each image in the board's flash has its record: a bitstream is the design release of an FPGA design that passes the tapeout check, other firmware has provenance and an SBOM. The boot manifest is signed by the board owner's code signer, lists exactly those images, and is what the flash image holds at the offset its provenance states. The flash image's provenance consumes the release and each image, the board CoRIM holds the reference values the manifest implies, and each `firmware[]` entry names its image's digest and points at its record and the CoRIM.
-4. Every board in the board lot has a provisioning record signed by an allowed EMS station, with every gate passed, that wrote the checked flash image and burned the board owner's code signer as owner key. It names the root of trust unit A1 placed on that board, and its subject is that unit's IDevID key digest. That unit's own provisioning record is signed by its vendor's station, with every gate passed, the vendor's code signer in its key fuse, the image with provenance written, and an IDevID certificate endorsed by its vendor's identity CA.
+4. Every board in the board lot has a provisioning record signed by an allowed EMS station, with every gate passed, that wrote the checked flash image and burned the board owner's code signer as owner key. The root of trust unit it names, which the station read from the part on the board, is the unit A1 placed there, and its subject is that unit's IDevID key digest. That unit's own provisioning record is signed by its vendor's station, with every gate passed, the vendor's code signer in its key fuse, the image with provenance written, and an IDevID certificate endorsed by its vendor's identity CA.
 
 **At boot, on a board with a root of trust**, each board returns the root of trust's DICE alias certificate and a platform certificate the alias key signed:
 
@@ -1156,6 +1156,11 @@ The longer path to real-world use, with suppliers, buyers and a neutral home, is
 - [x] Reach Design L2 in an example: a signed, reviewed source freeze and signed IP provenance ([e2e-test.md](../docs/e2e-test.md)).
 
 ## Changelog
+
+### Revision 19 (2026-10-06)
+
+- **The EMS reads the root of trust from the board.** A board's provisioning record names the root of trust unit the EMS's station read from the part at its reference designator, checked against the IDevID key its vendor endorsed for that unit, instead of the unit A1 says was placed. The buyer's board check compares the two, so a part swapped between placement and programming is refused ([Provisioning](#provisioning)).
+- **Examples.** Every provisioning station in the examples now writes its own export and goes through the provisioning adapter: the Caliptra example's test station and the FPGA board example's EMS join the root of trust vendor's test station. The adapter gains board stations, with the root of trust read from each board and its first power-on.
 
 ### Revision 18 (2026-10-04)
 

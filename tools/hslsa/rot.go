@@ -445,7 +445,8 @@ func RoTProvAtt(unit string) string { return ProvAtt(unit) }
 // "Example XG-8". Like a real one it knows nothing about HSLSA: it runs a job
 // file and writes its own export (job.ini, log.csv, readback/, identity/),
 // and the provisioning adapter (provadapter.go) turns that export into the
-// records. Its profile is e2e/fpga/rot/station/xg8-profile.json.
+// records. Its profile is e2e/stations/xg8-profile.json. The Caliptra
+// example's test station is another XG-8 (caliptra.go).
 
 const (
 	xg8Sockets = 8
@@ -458,7 +459,17 @@ func RoTJob(bundle, scenarioPath, export string) error {
 	if err != nil {
 		return err
 	}
-	art := filepath.Join(bundle, "artifacts")
+	lotID := S(sc, "finalTest", "lotId")
+	if err := xg8Job(export, filepath.Join(bundle, "artifacts"), sc, RoTFWImage, RoTFWSig); err != nil {
+		return err
+	}
+	fmt.Printf("station job: FT-%s loads %s and %s\n", lotID, RoTFWImage, RoTFWSig)
+	return nil
+}
+
+// xg8Job starts an XG-8 export with the job file for a scenario's final test
+// lot, loading each image from art into its own flash region.
+func xg8Job(export, art string, sc Obj, images ...string) error {
 	if err := os.RemoveAll(export); err != nil {
 		return err
 	}
@@ -469,7 +480,7 @@ func RoTJob(bundle, scenarioPath, export string) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "; Example XG-8 job file\n[job]\nid = FT-%s\nproduct = %s %s\nlot = %s\nsockets = %d\n",
 		lotID, S(sc, "product", "partNumber"), S(sc, "product", "revision"), lotID, xg8Sockets)
-	for i, f := range []string{RoTFWImage, RoTFWSig} {
+	for i, f := range images {
 		if err := copyFile(filepath.Join(art, f), filepath.Join(export, "images", f)); err != nil {
 			return err
 		}
@@ -479,17 +490,66 @@ func RoTJob(bundle, scenarioPath, export string) error {
 		}
 		fmt.Fprintf(&b, "\n[image %d]\nfile = images/%s\nregion = %s%d\nchecksum = SHA256:%s\n", i+1, f, xg8Regions, i, strings.ToUpper(d))
 	}
-	if err := os.WriteFile(filepath.Join(export, "job.ini"), []byte(b.String()), 0o644); err != nil {
-		return err
-	}
-	fmt.Printf("station job: FT-%s loads %s and %s\n", lotID, RoTFWImage, RoTFWSig)
-	return nil
+	return os.WriteFile(filepath.Join(export, "job.ini"), []byte(b.String()), 0o644)
 }
 
 // xg8Log is the station's log as it writes it.
 type xg8Log struct {
+	f    *os.File
 	w    *csv.Writer
 	last time.Time
+}
+
+// newXG8Log starts the station's log in its export, with its header row.
+func newXG8Log(export string) (*xg8Log, error) {
+	f, err := os.Create(filepath.Join(export, "log.csv"))
+	if err != nil {
+		return nil, err
+	}
+	l := &xg8Log{f: f, w: csv.NewWriter(f)}
+	if err := l.w.Write([]string{"timestamp", "socket", "serial", "operation", "target", "value", "result"}); err != nil {
+		f.Close()
+		return nil, err
+	}
+	return l, nil
+}
+
+// close flushes the log and closes its file.
+func (l *xg8Log) close() error {
+	l.w.Flush()
+	err := l.w.Error()
+	if cerr := l.f.Close(); err == nil {
+		err = cerr
+	}
+	return err
+}
+
+// xg8Image writes one image the job loads into a part's flash, then reads
+// it back into a dump in the export, logging both.
+func xg8Image(l *xg8Log, export string, socket int, unit string, img map[string]string, flash string) error {
+	data, err := os.ReadFile(filepath.Join(export, filepath.FromSlash(img["file"])))
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(flash, data, 0o644); err != nil {
+		return err
+	}
+	if err := l.row(socket, unit, "PROGRAM", img["region"], img["file"], true); err != nil {
+		return err
+	}
+	back, err := os.ReadFile(flash)
+	if err != nil {
+		return err
+	}
+	dump := "readback/" + unit + "/" + img["region"] + ".bin"
+	if err := os.MkdirAll(filepath.Join(export, "readback", unit), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(export, filepath.FromSlash(dump)), back, 0o644); err != nil {
+		return err
+	}
+	want := strings.TrimPrefix(img["checksum"], "SHA256:")
+	return l.row(socket, unit, "VERIFY", img["region"], dump, strings.EqualFold(sha256Bytes(back), want))
 }
 
 func (l *xg8Log) row(socket int, unit, op, target, value string, ok bool) error {
@@ -550,15 +610,11 @@ func RoTStation(bundle, devices, keysDir, export string) error {
 			return err
 		}
 	}
-	f, err := os.Create(filepath.Join(export, "log.csv"))
+	log, err := newXG8Log(export)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	log := &xg8Log{w: csv.NewWriter(f)}
-	if err := log.w.Write([]string{"timestamp", "socket", "serial", "operation", "target", "value", "result"}); err != nil {
-		return err
-	}
+	defer log.f.Close()
 
 	var ca *rotCA
 	for i, unit := range shipped {
@@ -625,30 +681,7 @@ func RoTStation(bundle, devices, keysDir, export string) error {
 				continue
 			}
 			img := job.values[sec]
-			data, err := os.ReadFile(filepath.Join(export, filepath.FromSlash(img["file"])))
-			if err != nil {
-				return err
-			}
-			name := filepath.Base(img["file"])
-			if err := os.WriteFile(filepath.Join(dev, "flash", name), data, 0o644); err != nil {
-				return err
-			}
-			if err := log.row(socket, unit, "PROGRAM", img["region"], img["file"], true); err != nil {
-				return err
-			}
-			back, err := os.ReadFile(filepath.Join(dev, "flash", name))
-			if err != nil {
-				return err
-			}
-			dump := "readback/" + unit + "/" + img["region"] + ".bin"
-			if err := os.MkdirAll(filepath.Join(export, "readback", unit), 0o755); err != nil {
-				return err
-			}
-			if err := os.WriteFile(filepath.Join(export, filepath.FromSlash(dump)), back, 0o644); err != nil {
-				return err
-			}
-			want := strings.TrimPrefix(img["checksum"], "SHA256:")
-			if err := log.row(socket, unit, "VERIFY", img["region"], dump, strings.EqualFold(sha256Bytes(back), want)); err != nil {
+			if err := xg8Image(log, export, socket, unit, img, filepath.Join(dev, "flash", filepath.Base(img["file"]))); err != nil {
 				return err
 			}
 		}
@@ -707,8 +740,7 @@ func RoTStation(bundle, devices, keysDir, export string) error {
 			return err
 		}
 	}
-	log.w.Flush()
-	if err := log.w.Error(); err != nil {
+	if err := log.close(); err != nil {
 		return err
 	}
 	fmt.Printf("station ps-02: %d units programmed, export in %s\n", len(shipped), export)

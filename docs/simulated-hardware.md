@@ -57,8 +57,8 @@ All the examples' manufacturing is simulated, so their policies set `simulated.a
 | [MES and STDF adapter](mes-stdf-adapter.md), pilot rehearsal | The suppliers' exports | sample exports written by the adapter's tests |
 | Virtual shuttle (this page) | Fab, sort, packaging and test, from the netlist | `.../tools/hslsa/sim/shuttle@v0.1` |
 | [Board](board-example.md) | Shipments (typed in, or read from sample shipper exports by the [distributor importer](distributor-importer.md)) and the EMS line | hand-written scenario |
-| [FPGA board](fpga-board-example.md) | The EMS line, the board, the EXR-01 root of trust and its programming station, and the after-sale sites (field updater, returns site, repair site) | hand-written scenario, the board and RoT models, the simulated XG-8 station |
-| [Caliptra](caliptra-e2e.md) | The lot, and each unit's silicon during provisioning (the emulator, or the Verilated RTL) | hand-written scenario and the caliptra-sw hardware model |
+| [FPGA board](fpga-board-example.md) | The EMS line and its programming station, the board, the EXR-01 root of trust and its programming station, and the after-sale sites (field updater, returns site, repair site) | hand-written scenario, the board and RoT models, the simulated XG-8 and ICP-2 stations |
+| [Caliptra](caliptra-e2e.md) | The lot, the programming station, and each unit's silicon during provisioning (the emulator, or the Verilated RTL) | hand-written scenario, the simulated XG-8 station and the caliptra-sw hardware model |
 
 The mark is the signer's own statement, like every other field. A record without it is not thereby proven to come from real equipment; the mark exists so that the tool cannot produce simulated records that look like real ones, for example when a supplier rehearses the pilot with its real, enrolled key.
 

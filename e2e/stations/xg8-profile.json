@@ -1,5 +1,5 @@
 {
-  "note": "How to read the export of the Example XG-8, the simulated gang programmer at the root of trust vendor's test house (tools/hslsa/rot.go). A real station model needs its own profile; the station file (ps-02.json) stays the same.",
+  "note": "How to read the export of the Example XG-8, the simulated gang programmer (tools/hslsa/rot.go) at two test houses: the FPGA example's root of trust vendor (e2e/fpga/rot/station/ps-02.json) and the Caliptra example (e2e/caliptra/station/ps-01.json). A real station model needs its own profile; the station files stay the same.",
   "model": "Example XG-8 gang programmer",
   "job": {
     "file": "job.ini",

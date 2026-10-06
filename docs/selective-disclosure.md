@@ -60,9 +60,9 @@ e2e/escrow.sh direct          # without an auditor: the per-unit commitment and 
 The auditor's run:
 
 ```
-tapeout check: PASSED for picorv32.netlist.v sha256:f9c3b9d9...
+tapeout check: PASSED for picorv32.netlist.v sha256:c0a95f07...
 lot receipt check: PASSED for urn:hslsa:lot:ASM-EXAMPLE-17 sha256:4876860b..., 3 received units found in the lot
-escrow audit: VSAs for the design and 3 received units written to out/buyer/vsa; manifest of 14 records, 16 files and 4 disclosure files kept at out/auditor/escrow-manifest.json
+escrow audit: VSAs for the design and 3 received units written to out/buyer/vsa; manifest of 17 records, 18 files and 5 disclosure files kept at out/auditor/escrow-manifest.json
 ok: rejects a received unit that was scrapped at final test
 ```
 
@@ -89,12 +89,12 @@ slsa-verifier verify-vsa \
 
 | What | Measured |
 | --- | --- |
-| Records | 14 envelopes: 4 `design-flow`, 1 `hbom`, 7 `manufacturing-step` (F1 to F4 and the three transfers between them), 1 `source-review`, 1 SLSA Provenance (the IP release) |
+| Records | 15 envelopes: 5 `design-flow`, 1 `hbom`, 7 `manufacturing-step` (F1 to F4 and the three transfers between them), 1 `source-review`, 1 SLSA Provenance (the IP release) |
 | Signing keys | 9 distinct key ids, each naming one party in every record it signs, across lots and buyers |
 | Builders | the flow platform, `urn:hslsa:site:example-wafer-fab`, `urn:hslsa:site:example-sort-house`, `urn:hslsa:site:example-osat`, `urn:hslsa:site:example-test-house` |
 | Subject names | `urn:hslsa:lot:ASM-EXAMPLE-17`, `urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A`, `urn:hslsa:assembly-lot:ASM-EXAMPLE-17` |
-| Timeline | `finishedOn` on 12 records |
-| Withheld fields | 9, values hidden |
+| Timeline | `finishedOn` on 13 records |
+| Withheld fields | 10, values hidden: the synthesis script, the mask set id, the probe and test programs, both yields, and in the HBOM the mask set id, the wafer ids and both test programs |
 | Withheld values shown elsewhere | none |
 | Data files named by manufacturing records | `wafer-maps.json`, `genealogy.json`, `final-test-results.json` and the three transfer packing lists, all salted |
 | `urn:hslsa:assembly-lot:ASM-EXAMPLE-17` | recovered from its digest by guessing: 40 units, serials PSOC130-A0-00001 to PSOC130-A0-00040, found at guess 1 |
@@ -106,8 +106,8 @@ slsa-verifier verify-vsa \
 
 | VSA | Subject | Resource | Levels | Inputs |
 | --- | --- | --- | --- | --- |
-| `design.vsa.intoto.json` | `picorv32.netlist.v` | `hslsa:design:picorv32.netlist.v` | HSLSA_DESIGN_LEVEL_2, SLSA_BUILD_LEVEL_2 | 1 (the manifest) |
-| `receipt.vsa.intoto.json` | `urn:hslsa:receipt:ASM-EXAMPLE-17` | `urn:hslsa:lot:ASM-EXAMPLE-17` | HSLSA_WAFER_LEVEL_2, HSLSA_PACKAGE_TEST_LEVEL_2, HSLSA_DESIGN_LEVEL_2 | 1 (the manifest) |
+| `design.vsa.intoto.json` | `picorv32.netlist.v` | `hslsa:design:picorv32.netlist.v` | HSLSA_DESIGN_LEVEL_3, SLSA_BUILD_LEVEL_3 | 1 (the manifest) |
+| `receipt.vsa.intoto.json` | `urn:hslsa:receipt:ASM-EXAMPLE-17` | `urn:hslsa:lot:ASM-EXAMPLE-17` | HSLSA_WAFER_LEVEL_2, HSLSA_PACKAGE_TEST_LEVEL_2, HSLSA_DESIGN_LEVEL_3, HSLSA_SIMULATED | 1 (the manifest) |
 
 So withheld fields hid every value they covered, and no other record showed one of them, but the lots were recovered from their digests in about 3 ms, and with them the final test yield and the scrapped serials that F4 withholds. Site names, the fab and the timeline stayed visible. Under escrow the buyer learned only the design digest, the lot id, the levels and the auditor. The spec draws the same conclusions in [What each view reveals](../spec/hslsa-v0.1.md#what-each-view-reveals).
 
@@ -122,7 +122,7 @@ A buyer that wants to check its own units, and not hand the check to an auditor,
 3. A proof made up for a unit that failed final test is refused.
 4. The buyer also runs its own log (`hslsa tlog`), and its policy requires every manufacturing record, transfer and the HBOM in it, and a proof for every received unit (`manufacturing.transparencyLog`, `manufacturing.unitCommitment`). The lot receipt check passes, and is refused once one record's inclusion proof is taken away.
 
-Final test's record still names the lot by its lot digest, which at Package/Test L2 is taken over guessable serials, so the buyer can still recover the lot as below. The commitment adds a check the buyer can run alone; it keeps the lot's size and members from the buyer only at Package/Test L3.
+Final test's record still names the lot by its lot digest, which at Package/Test L2 is taken over guessable serials, so the buyer can still recover the lot as above. The commitment adds a check the buyer can run alone; it keeps the lot's size and members from the buyer only at Package/Test L3.
 
 ## Tests
 

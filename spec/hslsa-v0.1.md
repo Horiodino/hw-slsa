@@ -893,13 +893,13 @@ Each signer keeps its records, the data files they name, and the salts and discl
 
 ### What each view reveals
 
-The reference tool's `leaks` command measures this on a bundle, and a producer can run it before handing anything out. On the PicoRV32 example, whose lot has 40 packaged and 37 shipped units named by serial (Package/Test L2), the records withhold both yields, the probe and test programs, the mask set id and the wafer ids, and salt the wafer maps, genealogy and test results. The buyer holds three of the 37 units.
+The reference tool's `leaks` command measures this on a bundle, and a producer can run it before handing anything out. On the PicoRV32 example, whose lot has 40 packaged and 37 shipped units named by serial (Package/Test L2), the records withhold both yields, the probe and test programs, the mask set id, the wafer ids and the synthesis script, and salt the wafer maps, genealogy and test results. The buyer holds three of the 37 units.
 
 | What | Holding the signed records, fields withheld | Holding only the escrow VSAs |
 | --- | --- | --- |
-| Withheld values: yields, programs, mask set, wafer ids | Hidden | Hidden |
+| Withheld values: yields, programs, mask set, wafer ids, synthesis script | Hidden | Hidden |
 | Data files: wafer maps, genealogy, test results | Hidden (salted) | Hidden |
-| Records | 14 envelopes, by predicate type | One manifest digest |
+| Records | 15 envelopes, by predicate type | One manifest digest |
 | Parties | 9 signing key ids, the same across lots and buyers; builder ids name each site | The auditor |
 | Site, fab and lot ids | In builder ids and subject URNs, such as `urn:hslsa:wafer-lot:skywater:LOT-EXAMPLE-A` | The shipped lot's id |
 | Timing | `finishedOn` on every step record | When the auditor checked |

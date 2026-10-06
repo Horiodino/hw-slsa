@@ -58,11 +58,11 @@ The board receipt check runs the importer again on the exports in the bundle and
 
 ```
 read again from the shippers' exports the distribution records carry:
-  distribution mfg-distribution-EXAMPLE-SHIP-0001.intoto.json: matches packing-list-EXAMPLE-SHIP-0001.csv, coc-EXAMPLE-SHIP-0001.txt, epcis-EXAMPLE-SHIP-0001.json
   distribution mfg-distribution-EXAMPLE-SHIP-0002.intoto.json: matches packing-list-EXAMPLE-SHIP-0002.csv, coc-EXAMPLE-SHIP-0002.txt
+  distribution mfg-distribution-EXAMPLE-SHIP-0001.intoto.json: matches packing-list-EXAMPLE-SHIP-0001.csv, coc-EXAMPLE-SHIP-0001.txt, epcis-EXAMPLE-SHIP-0001.json
 ```
 
-A buyer that wants every shipment checkable this way sets `requireShipmentExports` in its board policy. The verifier then refuses a distribution record that carries no exports, which is how `e2e/board/run.sh import` shows the main board bundle failing that policy.
+The lines follow the order of the HBOM's parts, whose first line, the bare board, came direct from the PCB fab. A buyer that wants every shipment checkable this way sets `requireShipmentExports` in its board policy. The verifier then refuses a distribution record that carries no exports, which is how `e2e/board/run.sh import` shows the main board bundle failing that policy. The same run refuses a certificate of conformance changed after the shipment was signed, and the importer refuses a packing list line with no certificate.
 
 The tests in [`distimport_test.go`](../tools/hslsa/distimport_test.go) accept the imported shipments and check that each line and the EPCIS event came through. They refuse:
 

@@ -133,6 +133,7 @@ openlane2/       the OpenLane 2 RTL-to-GDS example: pins, script overlay, run.sh
 pilot/           the pilot kit: buyer, supplier and vendor guides, agreement, make-kit.sh
 site/            the documentation website: page generator, templates, build.sh
 .github/workflows/  the four CI workflows, the release workflow and the docs site build
+Makefile         one entry point for every build, check, example and release: `make` lists them
 ```
 
 | Path | What it is |
@@ -170,6 +171,21 @@ site/            the documentation website: page generator, templates, build.sh
 ## Building and testing
 
 You need Go at the version in [`go.mod`](go.mod) (the `toolchain` line; `go` downloads it if yours is older). Nothing else is needed for the tool and its unit tests.
+
+The [`Makefile`](Makefile) runs everything in this section and in [CI](#ci); `make` lists its targets. Each target runs the commands of the CI job it names, in the same order and with the same pinned tool versions. The main ones:
+
+| Run | What it does |
+| --- | --- |
+| `make build` | Builds the tool into `bin/hslsa` |
+| `make check` | gofmt, go vet, the unit tests, govulncheck, the HBOM schema check, the Rego policy tests, then the docs site with its link check |
+| `make e2e-chip`, `e2e-fpga`, `e2e-caliptra`, `e2e-openlane` | One example's whole workflow, every job in order; each job also has its own target, such as `make e2e-chip-verify`. `make e2e` runs all four |
+| `make e2e-caliptra-rtl` | The Caliptra units booted on the Verilated RTL, which takes hours |
+| `make release-dry-run` | The release workflow's dry run: a pilot kit signed with a throwaway key and checked as a recipient would, then the container image built with its OCI labels and run. Nothing is published |
+| `make release VERSION=v0.1.0-pilot.2` | Tags `origin/main` and pushes the tag, which starts the [release workflow](docs/release.md); it asks first |
+| `make all` | Every check, every example and the release dry run |
+| `make deps-ubuntu`, `deps-rust`, `deps-openlane` | Installs what the examples need, as CI does: the Ubuntu 24.04 packages at the versions the L3 policies pin, the Caliptra Rust toolchain, the OpenLane image and the SKY130 PDK |
+
+Every e2e target deletes the keys it made when it ends, pass or fail (`make clean-keys` does it by hand), and nothing leaves the machine except through `make image-push` and `make release`.
 
 ```sh
 go build -o bin/hslsa ./tools/hslsa/cmd/hslsa   # or: go run ./tools/hslsa/cmd/hslsa <command>

@@ -12,12 +12,16 @@
    git push origin v0.1.0-pilot.2
    ```
 
+   `make release VERSION=v0.1.0-pilot.2` does the same: it refuses a tag that exists or is not a `v*` version, shows the commit, and asks before it pushes.
+
    Creating the tag in GitHub's **Releases > Draft a new release** also works. If the workflow does not start on its own, run it by hand: **Actions > Release > Run workflow**, with "Use workflow from" set to the tag. When the release already exists, the workflow adds its files to it instead of creating a new one.
 3. The workflow runs the four test workflows on the tagged commit: the end-to-end test (lint, unit tests, the PicoRV32 chain, the board example, verifier escrow), the FPGA board example, the OpenLane 2 flow with its rebuild, and the Caliptra example. It publishes only if all four pass.
 
 A tag with a hyphen, such as `v0.1.0-pilot.2`, is marked as a pre-release.
 
 Run from a branch instead of a tag, the workflow is a dry run: the same tests, a kit signed with a throwaway key and checked, the image built and run locally, and nothing published. A pull request that changes the release files runs the dry run without the tests, since the tests run on the pull request anyway.
+
+`make release-dry-run` runs the same dry run on your machine (the kit and the image; `make e2e` runs the tests), and `make version` and `make labels` print the version, commit, spec revision and image labels a release from your checkout would carry.
 
 ## The kit key
 

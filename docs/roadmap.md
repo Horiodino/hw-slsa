@@ -8,7 +8,7 @@ The phases are ordered by dependency, not by date. Each ends with an exit criter
 
 What works today, all in CI with local keys:
 
-- The four examples (PicoRV32, board, OpenLane 2, Caliptra) sign every record, run the tapeout, lot receipt, board receipt and at-boot checks, and pass their VSAs through slsa-verifier.
+- The five examples (PicoRV32, board, OpenLane 2, FPGA board, Caliptra) sign every record, run the tapeout, lot receipt, board receipt and at-boot checks, and pass their VSAs through slsa-verifier.
 - Verified levels: Design L1, Wafer L2, Package/Test L2, Assembly L2, Firmware L2. Since spec revision 16, L3 in every track ([levels.md](levels.md)): Design L3 in the PicoRV32 example, Wafer L3 and Package/Test L3 on a second run of its lot, Assembly L3 on the board example, and Assembly L3 and Firmware L3 on the FPGA board, all on simulated manufacturing. Since revision 17, L4 in every track: Design L4, Wafer L4 and Package/Test L4 on a third run of the PicoRV32 lot, Assembly L4 on the board example, and Assembly L4 and Firmware L4 on the FPGA board, with the rebuilder and the inspection lab simulated as separate companies.
 - Since revision 18, the spec's sixteen open questions are answered or deferred ([Decided in revision 18](../spec/hslsa-v0.1.md#decided-in-revision-18)). The FPGA board records field updates, returns, rework and reshipments; the board example imports its shipments from distributors' exports; the PicoRV32 lot makes its transfers from MES events, can be checked unit by unit against final test's commitment and its records required in the buyer's log; and OPA checks the PicoRV32 lot and the board under Rego policies.
 
@@ -139,15 +139,13 @@ L4 is expensive and mostly matters to defense and root-of-trust buyers, so it ru
 
 - A real second builder and a real lab, each under its own account and key, not simulated in the same job.
 
-- Inspection limits: which attacks delayering and imaging find, and which they miss, with references.
-
-Sampling plans and lab accreditation are decided in spec revision 18: the buyer sets `inspection.minSample` from the spec's table, and the lab's enrollment must carry an accreditation the buyer's policy lists ([Limits of physical inspection](../spec/hslsa-v0.1.md#limits-of-physical-inspection)).
+The spec's [Limits of physical inspection](../spec/hslsa-v0.1.md#limits-of-physical-inspection) says which attacks delayering and imaging find and which they miss, with references. Sampling plans and lab accreditation are decided in spec revision 18: the buyer sets `inspection.minSample` from the spec's table, and the lab's enrollment must carry an accreditation the buyer's policy lists.
 
 ## Decisions the owner needs to make
 
 | Decision | Needed by |
 | --- | --- |
-| Whether to accept proxy-signed records at L1 | Phase 2 |
+| Whether to label the spec v0.2 or v0.3: the phase 0 and phase 1 targets name those versions, and the spec is still v0.1 at revision 19 | Phase 0 and phase 1 exits |
 | Which buyer to offer the pilot kit to first, and whether by tarball (`pilot/make-kit.sh`) or a private invitation | Phase 4 |
 | Whether to make the repository and spec public | Phase 5 (the pilot kit works while it stays private) |
 | Which neutral home to approach first | Phase 5 |

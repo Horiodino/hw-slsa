@@ -60,7 +60,7 @@ The roadmap's pilot has three steps. Each maps to commands in this kit.
 | [`make-kit.sh`](make-kit.sh) | Builds the tarball: the repository at one commit, `hslsa` binaries for common platforms, the licenses of the Go modules in them, checksums; then signs it and writes its provenance |
 | [`vendor.md`](vendor.md) | Where a chip vendor starts when it receives the kit before any buyer is involved |
 | [`../e2e/pilot/`](../e2e/pilot) | The rehearsal: the buyer's policy for the part, the adapter configuration, a cost sheet template, and `run.sh` |
-| [`../spec/hslsa-v0.1.md`](../spec/hslsa-v0.1.md) | The specification; the pilot uses revision 14 |
+| [`../spec/hslsa-v0.1.md`](../spec/hslsa-v0.1.md) | The specification, at the revision of the kit's commit: release v0.1.0-pilot.1 carries revision 14, and `main` is at revision 19 |
 | [`../tools/hslsa`](../tools/hslsa) | The reference tool and verifier, in Go |
 
 ## The rehearsal

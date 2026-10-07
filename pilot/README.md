@@ -2,7 +2,7 @@
 
 This kit is what the owner of this repository hands one buyer for [roadmap phase 4](../docs/roadmap.md#phase-4-pilots-with-one-buyer-who-needs-this): one buyer, one root of trust part, one supplier signing its own records, and a measured result. It is aimed at the roadmap's first candidate, a hyperscaler in the Open Compute Project that already requires a Caliptra-class root of trust and reads OCP S.A.F.E. reports, because the [viability assessment](../docs/viability.md) found the Firmware track and board checks ready now and Package/Test plausible with a large customer behind it.
 
-The repository is private. The buyer gets the kit as a tarball (`pilot/make-kit.sh`) or a private invitation to the repository; nothing in it needs a public transparency log or a network service.
+The repository is public, but the kit is not published: the buyer gets it as a tarball (`pilot/make-kit.sh`) from the owner; nothing in it needs a public transparency log or a network service.
 
 ## Checking the kit you received
 
@@ -60,7 +60,7 @@ The roadmap's pilot has three steps. Each maps to commands in this kit.
 | [`make-kit.sh`](make-kit.sh) | Builds the tarball: the repository at one commit, `hslsa` binaries for common platforms, the licenses of the Go modules in them, checksums; then signs it and writes its provenance |
 | [`vendor.md`](vendor.md) | Where a chip vendor starts when it receives the kit before any buyer is involved |
 | [`../e2e/pilot/`](../e2e/pilot) | The rehearsal: the buyer's policy for the part, the adapter configuration, a cost sheet template, and `run.sh` |
-| [`../spec/hslsa-v0.1.md`](../spec/hslsa-v0.1.md) | The specification, at the revision of the kit's commit: release v0.1.0-pilot.1 carries revision 14, and `main` is at revision 19 |
+| [`../spec/hslsa-v0.1.md`](../spec/hslsa-v0.1.md) | The specification, at the revision of the kit's commit; `main` is at revision 19. No release is published now, so a kit is built from `main` (`pilot/make-kit.sh`) |
 | [`../tools/hslsa`](../tools/hslsa) | The reference tool and verifier, in Go |
 
 ## The rehearsal

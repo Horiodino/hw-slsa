@@ -24,7 +24,7 @@ What the assessment found missing or weak:
 | All physical data is simulated (since spec revision 15 every such record says so, and the virtual shuttle derives it from the netlist) | Nothing shows a real supplier's data fits the records | 2 |
 | Commercial EDA, MES and test systems emit nothing | Every supplier would need custom integration | 3 |
 | No buyer requires it; no trust root for sites | Suppliers have cost and no benefit | 4 |
-| Spec lives in one person's private repository | Industry will not adopt it from there | 5 |
+| Spec lives in one person's repository (public since 2026-10-08) | Industry will not adopt it from there | 5 |
 
 ## Phase 0: Make the spec honest and complete
 
@@ -126,7 +126,7 @@ In the pilot:
 ## Phase 5: A neutral home and v1.0
 
 1. **Choose a home.** OpenSSF (where SLSA lives), CHIPS Alliance (where Caliptra lives), or the OCP security project. Present the IR 8536 profile and pilot results at NIST's traceability work as well.
-2. **Open the repository.** Adoption needs a public spec. This repository is private and signs nothing publicly by the owner's choice; opening it is the owner's decision.
+2. **Open the repository.** Adoption needs a public spec. Done on 2026-10-08: the repository and its [documentation site](https://horiodino.github.io/hw-slsa/) are public. It still signs nothing publicly (no transparency log, no keyless signing), and the release image is private.
 3. **Neutral identifiers.** Move predicate URIs from this repository to the new home's domain, with a mapping from the v0.x names.
 4. **Trust roots.** Work with accreditors that already vet sites (DMEA Trusted Supplier, O-TTPS) on issuing and revoking site keys.
 5. **v1.0 criteria.** At least two independent verifier implementations, one production pilot, and every open question in the spec either closed or explicitly deferred. Revision 18 closes fourteen of the sixteen open questions and defers two; it also lists three new questions that came out of that work, which are still open.

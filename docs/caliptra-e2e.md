@@ -145,7 +145,7 @@ The verify job also runs slsa-verifier three times expecting failure: Firmware L
 
 ## Keys and privacy
 
-The same rules as [the PicoRV32 test](e2e-test.md#keys-and-privacy) apply. Nothing is uploaded to a transparency log, no job requests an OIDC token, producer keys never leave the produce job, and `HSLSA_VSA_SIGNING_KEY` makes the buyer's key stable. The `hslsa-caliptra-devices` artifact holds each unit's simulated UDS seed and field entropy, which in silicon never leave the die. They are test values, and the repository is private.
+The same rules as [the PicoRV32 test](e2e-test.md#keys-and-privacy) apply. Nothing is uploaded to a transparency log, no job requests an OIDC token, producer keys never leave the produce job, and `HSLSA_VSA_SIGNING_KEY` makes the buyer's key stable. The `hslsa-caliptra-devices` artifact holds each unit's simulated UDS seed and field entropy, which in silicon never leave the die. They are test values with no use outside the run; since the repository is public, anyone signed in to GitHub can download the artifact while it is kept (14 days).
 
 ## Running it locally
 

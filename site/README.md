@@ -21,7 +21,7 @@ The built site works opened straight from disk: links are relative, pages end in
 
 ## Publishing
 
-Nothing is published. The repository is private, and a GitHub Pages site would be readable by anyone, so the workflow only builds the site. Publishing it is the owner's decision; if that changes, the site needs only a deploy step, plus `noindex = false` in [`hugo.toml`](hugo.toml) if it should appear in search engines.
+Every push to `main` that changes the site's sources also publishes it on GitHub Pages, at <https://horiodino.github.io/hw-slsa/>, where anyone can read it and search engines can index it. Pull requests only build and check it. The deploy job needs Pages turned on once: Settings → Pages → Source: **GitHub Actions**. To keep the site out of search engines, set `noindex = true` in [`hugo.toml`](hugo.toml).
 
 ## Layout
 

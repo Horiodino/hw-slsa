@@ -4,7 +4,7 @@ HSLSA is a framework for proving how a chip or board was made, the way [SLSA](ht
 
 This README is the entry point for anyone new to the project, whether you are here to contribute, to review the spec, or to run the pilot as a buyer or supplier. It explains the ideas, says where everything lives, and links to the documents that go deeper.
 
-**Status:** working draft, spec version 0.1, [revision 19](spec/hslsa-v0.1.md#changelog) (2026-10-06). Everything runs in CI on real open-source designs and tools, with simulated fab, packaging and test data, and every record made from simulated hardware says so. No company outside this repository signs records yet; the [pilot kit](pilot/README.md) is how that starts. The repository is private by the owner's choice.
+**Status:** working draft, spec version 0.1, [revision 19](spec/hslsa-v0.1.md#changelog) (2026-10-06). Everything runs in CI on real open-source designs and tools, with simulated fab, packaging and test data, and every record made from simulated hardware says so. No company outside this repository signs records yet; the [pilot kit](pilot/README.md) is how that starts. The repository and its [documentation site](https://horiodino.github.io/hw-slsa/) are public; the release image stays private.
 
 ## Contents
 
@@ -303,9 +303,9 @@ Six GitHub Actions workflows in [`.github/workflows/`](.github/workflows):
 | [`caliptra-e2e.yml`](.github/workflows/caliptra-e2e.yml) | Pushes to main, pull requests touching the tool or the example | Produce, verify; `verify-rtl` only when dispatched by hand with `rtl` set |
 | [`openlane2-flow.yml`](.github/workflows/openlane2-flow.yml) | Changes to `openlane2/`, the EDA hook or the tool | Flow, independent rebuild, verify |
 | [`release.yml`](.github/workflows/release.yml) | A `v*` tag, or by hand (a dry run from a branch) | The four workflows above, then the signed pilot kit, the private `hslsa` image on GHCR and a GitHub release ([docs/release.md](docs/release.md)) |
-| [`docs-site.yml`](.github/workflows/docs-site.yml) | Changes to any markdown, the site or the tool's commands | Builds the documentation website, checks every link in it, uploads it as the `docs-site` artifact; publishes nothing |
+| [`docs-site.yml`](.github/workflows/docs-site.yml) | Changes to any markdown, the site or the tool's commands | Builds the documentation website, checks every link in it, uploads it as the `docs-site` artifact; on `main`, publishes it at <https://horiodino.github.io/hw-slsa/> |
 
-Each "produce" job plays the suppliers and deletes its private keys before uploading the bundle; each "verify" job plays the buyer and sees only the bundle and public trust roots. Because the repository is private, Actions minutes count against the owner's plan: long jobs such as the Caliptra boot on the Verilated RTL (hours, past the 6-hour hosted limit) run only when dispatched by hand, on the owner's self-hosted runner.
+Each "produce" job plays the suppliers and deletes its private keys before uploading the bundle; each "verify" job plays the buyer and sees only the bundle and public trust roots. Long jobs such as the Caliptra boot on the Verilated RTL (hours, past the 6-hour hosted limit) run only when dispatched by hand, on a self-hosted runner; no workflow runs a pull request on one.
 
 ## Project status and roadmap
 

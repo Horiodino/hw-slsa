@@ -47,7 +47,7 @@ Commands that drive other tools (`hslsa design` steps that run a simulator or Yo
 
 ## Who can pull it
 
-This repository is private, so the image is a private package too, and nothing is public. The workflow links the package to the repository, so by default everyone who can read the repository can pull the image.
+The repository is public, but the image is a private package: an anonymous `docker pull` fails. The workflow links the package to the repository, so the repository's collaborators can pull it.
 
 To give someone else access, such as a pilot vendor:
 
@@ -60,4 +60,4 @@ To give someone else access, such as a pilot vendor:
    docker pull ghcr.io/horiodino/hw-slsa@sha256:...
    ```
 
-Access to the package does not give access to the repository. Making the package public is a separate switch in the same settings; leave it off while the repository is private.
+Access to the package does not give access to the repository. Making the package public is a separate switch in the same settings; it is off, and turning it on is the owner's decision.

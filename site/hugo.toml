@@ -4,7 +4,7 @@ title = "HSLSA"
 languageCode = "en"
 baseURL = "/"
 # Relative links and .html page names let the built site be opened straight
-# from disk, which is how the private preview is read.
+# from disk, and served from GitHub Pages under /hw-slsa/ unchanged.
 relativeURLs = true
 uglyURLs = true
 disableKinds = ["taxonomy", "term", "RSS", "sitemap", "404"]
@@ -14,8 +14,8 @@ enableRobotsTXT = false
 repo = "https://github.com/Horiodino/hw-slsa"
 # Set by the build: HUGO_PARAMS_COMMIT=<sha>.
 commit = ""
-# The site is private for now; keep search engines away if a copy leaks.
-noindex = true
+# The site is public on GitHub Pages; true keeps search engines away.
+noindex = false
 
 [outputs]
 home = ["html", "searchindex"]

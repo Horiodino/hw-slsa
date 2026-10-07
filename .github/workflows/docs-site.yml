@@ -2,9 +2,8 @@
 # markdown (site/gen), built with Hugo, every internal link and anchor
 # checked, and the result uploaded as an artifact named docs-site.
 #
-# Private by design: nothing is deployed and GitHub Pages is not used, since a
-# Pages site is readable by anyone. To read the site, download the artifact
-# from the run, unzip it and open index.html. See site/README.md.
+# A push to main also publishes the site on GitHub Pages, which anyone can
+# read. Pull requests only build and check it. See site/README.md.
 name: Docs site
 
 on:
@@ -61,6 +60,10 @@ jobs:
           path: site/public
           retention-days: 30
           if-no-files-found: error
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: site/public
       - name: Summary
         run: |
           pages=$(find site/public -name '*.html' | wc -l)
@@ -70,3 +73,19 @@ jobs:
             echo "$pages pages built from commit \`${GITHUB_SHA::7}\`, every internal link and anchor checked."
             echo "Download **docs-site** from this run's artifacts, unzip it and open \`index.html\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Publish to GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
